@@ -6,6 +6,7 @@ export const config = {
   port: Number(process.env.PORT || 4000),
   appOrigin: process.env.APP_ORIGIN || 'http://localhost:3000',
   cookieSecure: process.env.COOKIE_SECURE === 'true',
+  cookieSameSite: process.env.COOKIE_SAME_SITE || 'strict',
   sessionSecret: process.env.SESSION_SECRET,
   inviteBaseUrl: process.env.INVITE_BASE_URL || 'http://localhost:3000/accept-invite',
   db: { host: process.env.DB_HOST, port: Number(process.env.DB_PORT || 3306), database: process.env.DB_NAME, user: process.env.DB_USER, password: process.env.DB_PASSWORD }
