@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import bcrypt from 'bcryptjs';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { pool } from '../db.js';
@@ -34,4 +35,46 @@ router.post('/organizations/:orgId/invitations', requireAuth, requireActiveUser,
     res.status(201).json({ message: 'Invitation created. Deliver this one-time token through a trusted channel.', invitationUrl: `${config.inviteBaseUrl}?token=${token}` });
   } catch (err) { next(err); }
 });
+
+router.post('/accept-signup', async (req, res, next) => {
+  try {
+    const input = z.object({
+      token: z.string().min(32).max(256),
+      fullName: z.string().trim().min(2).max(120),
+      password: z.string().min(12).max(128)
+    }).parse(req.body);
+    const tokenHash = createHash('sha256').update(input.token).digest('hex');
+    const [invites] = await pool.execute(
+      "SELECT * FROM invitations WHERE token_hash = ? AND accepted_at IS NULL AND expires_at > NOW() LIMIT 1",
+      [tokenHash]
+    );
+    const invitation = invites[0];
+    if (!invitation) return res.status(400).json({ error: 'Invitation is invalid or expired.' });
+    const conn = await pool.getConnection();
+    const userId = randomUUID();
+    try {
+      await conn.beginTransaction();
+      const [existing] = await conn.execute('SELECT id FROM users WHERE email = ? FOR UPDATE', [invitation.email.toLowerCase()]);
+      if (existing.length) {
+        await conn.rollback();
+        return res.status(409).json({ error: 'An account already exists for this email. Sign in first, then accept the invitation.' });
+      }
+      const passwordHash = await bcrypt.hash(input.password, 12);
+      await conn.execute("INSERT INTO users (id, full_name, email, password_hash, account_status) VALUES (?, ?, ?, ?, 'ACTIVE')", [userId, input.fullName, invitation.email.toLowerCase(), passwordHash]);
+      await conn.execute("INSERT INTO memberships (id, organization_id, user_id, role, membership_status) VALUES (?, ?, ?, ?, 'ACTIVE')", [randomUUID(), invitation.organization_id, userId, invitation.role]);
+      await conn.execute('UPDATE invitations SET accepted_at = NOW() WHERE id = ?', [invitation.id]);
+      await conn.commit();
+    } catch (e) { await conn.rollback(); throw e; } finally { conn.release(); }
+    await audit({ orgId: invitation.organization_id, actorId: userId, action: 'INVITATION_ACCEPTED_WITH_SIGNUP', targetType: 'INVITATION', targetId: invitation.id, ip: req.ip });
+    req.session.regenerate(err => {
+      if (err) return next(err);
+      req.session.userId = userId;
+      req.session.save(saveErr => {
+        if (saveErr) return next(saveErr);
+        res.status(201).json({ message: 'Account created and invitation accepted.' });
+      });
+    });
+  } catch (err) { next(err); }
+});
+
 export default router;
