@@ -58,6 +58,7 @@ router.post('/projects/:projectId/tasks',async(req,res,next)=>{
     const orgId=scope[0].organization_id;
     const [members]=await pool.execute("SELECT role FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE'",[orgId,req.user.id]);
     if(!members.length||!['OWNER','ADMIN','MANAGER','ANALYST'].includes(members[0].role))return res.status(403).json({error:'Insufficient organization permissions.'});
+    if(input.assigneeId && !['OWNER','ADMIN','MANAGER'].includes(members[0].role)) return res.status(403).json({error:'Only managers can assign tasks.'});
     if(input.assigneeId){
       const [assignee]=await pool.execute("SELECT id FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE'",[orgId,input.assigneeId]);
       if(!assignee.length)return res.status(400).json({error:'Assignee must be an active member of this organization.'});
