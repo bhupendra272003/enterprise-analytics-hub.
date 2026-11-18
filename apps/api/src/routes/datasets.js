@@ -75,7 +75,7 @@ router.get('/datasets/:datasetId/profile',async(req,res,next)=>{
       const numeric=present.map(Number).filter(Number.isFinite);
       const numericType=present.length>0&&numeric.length/present.length>=0.9;
       const distinct=new Set(present).size;
-      return {name,type:present.length===0?'EMPTY':numericType?'NUMERIC':'TEXT',total:values.length,missing:values.length-present.length,distinct,...(numericType?{min:Math.min(...numeric),max:Math.max(...numeric),mean:Number((numeric.reduce((a,b)=>a+b,0)/numeric.length).toFixed(3))}:{})};
+      return {name,type:present.length===0?'EMPTY':numericType?'NUMERIC':'TEXT',total:values.length,missing:values.length-present.length,distinct,...(numericType?{min:numeric.reduce((a,b)=>Math.min(a,b),Infinity),max:numeric.reduce((a,b)=>Math.max(a,b),-Infinity),mean:Number((numeric.reduce((a,b)=>a+b,0)/numeric.length).toFixed(3))}:{})};
     });
     res.json({profile:{datasetId:rows[0].id,name:rows[0].name,rowCount:records.length,columnCount:columns.length,columns:profile}});
   }catch(e){next(e);}
