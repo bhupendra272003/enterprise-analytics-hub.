@@ -73,6 +73,7 @@ For local development, configure the API `APP_ORIGIN=http://localhost:3000` and 
 - `/workspace/data`: upload CSV files, inspect metadata, preview 10 rows and run a basic column profile
 - `/workspace/data`: upload CSV files, inspect metadata and preview the first 10 rows
 - `/workspace/audit`: review organization audit activity (OWNER/ADMIN)
+- `/workspace/reports`: manage the organization's Power BI report-link catalog
 - `/accept-invite?token=...`: accept an invitation or create an invited account
 
 
@@ -89,8 +90,10 @@ This is a development foundation, not production-certified software. Before publ
 2. Team directory and invitation flow — initial UI/API implemented
 3. Projects and task tracking — initial UI/API implemented
 4. Organization audit activity — initial read-only console/API implemented
-5. Authorized data connectors and ingestion
-6. Immutable raw snapshots and versioned working datasets
-7. Governed SQL/Python analyst workspace
-8. Power BI/report integration and dashboards
-9. Alerts, backups and security hardening
+5. CSV data catalog and basic column profiling — initial upload/preview implementation
+6. Power BI report-link catalog — initial registry implemented
+7. Authorized data connectors and ingestion
+8. Immutable raw snapshots and versioned working datasets
+9. Governed SQL/Python analyst workspace and cleaning pipeline
+10. Power BI secure embedding and dashboard integration
+11. Alerts, backups and security hardening
