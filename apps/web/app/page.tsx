@@ -10,6 +10,7 @@ export default function Home() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [notice, setNotice] = useState('');
+  const [verificationUrl, setVerificationUrl] = useState('');
   const [busy, setBusy] = useState(false);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -25,6 +26,7 @@ export default function Home() {
       });
       const result = await response.json();
       setNotice(result.message || result.error || 'Something went wrong.');
+      setVerificationUrl(result.verificationUrl || '');
       if (response.ok && mode === 'login') window.location.href = '/workspace';
       if (response.ok && mode === 'register') {
         setMode('login');
@@ -35,6 +37,15 @@ export default function Home() {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function resendVerification() {
+    if (!email) { setNotice('Enter your work email first.'); return; }
+    setBusy(true);
+    try {
+      const r = await fetch(`${API}/api/auth/resend-verification`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', 'X-Hub-Request': '1' }, body: JSON.stringify({ email }) });
+      const d = await r.json(); setNotice(d.message || d.error || 'Request completed.'); setVerificationUrl(d.verificationUrl || '');
+    } catch { setNotice('Unable to connect to NEXUS.'); } finally { setBusy(false); }
   }
 
   return (
@@ -73,6 +84,8 @@ export default function Home() {
               <button className="submit" type="submit" disabled={busy}>{busy ? 'Please wait…' : mode === 'login' ? 'Sign in to NEXUS' : 'Submit registration'} <span>↗</span></button>
             </form>
             {notice && <div className="notice" role="status">{notice}</div>}
+            {verificationUrl && <a className="auth-action-link" href={verificationUrl}>Verify email ↗</a>}
+            {mode === 'login' && <div className="auth-help-links"><a href="/forgot-password">Forgot password?</a><button type="button" onClick={resendVerification} disabled={busy}>Resend verification email</button></div>}
             <div className="auth-note"><span className="lock">⌑</span> Protected access · Organization-level permissions</div>
           </div>
           <div className="auth-bottom"><span>NEED AN INVITATION?</span><span>Ask your organization manager.</span></div>
