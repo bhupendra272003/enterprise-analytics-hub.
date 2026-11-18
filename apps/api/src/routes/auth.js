@@ -24,7 +24,7 @@ router.post('/login', async (req, res, next) => {
     const [rows] = await pool.execute('SELECT id, password_hash, account_status FROM users WHERE email = ? LIMIT 1', [email]);
     const user = rows[0];
     if (!user || !(await bcrypt.compare(password, user.password_hash))) return res.status(401).json({ error: 'Invalid email or password.' });
-    if (user.account_status !== 'ACTIVE') return res.status(403).json({ error: 'Account is pending approval or suspended.' });
+    if (user.account_status === 'SUSPENDED') return res.status(403).json({ error: 'This account has been suspended.' });
     req.session.regenerate(err => {
       if (err) return next(err);
       req.session.userId = user.id;
