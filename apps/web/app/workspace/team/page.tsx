@@ -82,6 +82,7 @@ export default function TeamPage() {
       <div className="side-label side-bottom-label">WORK MANAGEMENT</div>
       <a className="side-link" href="/workspace/projects"><span>◫</span> Projects & tasks</a>
       <a className="side-link" href="/workspace/data"><span>◈</span> Data workspace</a>
+      <a className="side-link" href="/workspace/reports"><span>▤</span> Reports</a>
       <a className="side-link" href="/workspace/audit"><span>⌑</span> Audit activity</a>
       <div className="sidebar-footer"><span className="online-dot" /> SYSTEM ONLINE<br/><small>IDENTITY MODULE · 01</small></div>
     </aside>
