@@ -15,7 +15,7 @@ router.get('/directory', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// Public organization directory exposes only basic discovery fields.\nrouter.get('/directory', async (req, res, next) => {\n  try {\n    const [rows] = await pool.execute('SELECT id, name, slug FROM organizations ORDER BY name ASC LIMIT 100');\n    res.json({ organizations: rows });\n  } catch (err) { next(err); }\n});\n\n// Pending users may submit an organization-specific access request.
+// Pending users may submit an organization-specific access request.
 router.post('/:orgId/request-access', requireAuth, async (req, res, next) => {
   try {
     if (!req.user || req.user.account_status === 'SUSPENDED') {
