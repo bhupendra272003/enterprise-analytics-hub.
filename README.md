@@ -16,6 +16,7 @@ A multi-tenant analytics and team collaboration platform. The repository include
 - `database/schema.sql`: MySQL schema
 - `docs/ARCHITECTURE.md`: architecture and roadmap
 - `docs/API-TESTING.md`: local API smoke-test sequence
+- `docs/DEPLOYMENT.md`: production hosting and environment guide
 
 ## Local setup
 
@@ -33,7 +34,7 @@ npm run dev
 The API listens on port 4000 by default. Check `http://localhost:4000/health`. Set `DATA_STORAGE_DIR` to a private, persistent disk path for CSV uploads; never place it inside the public web root. The default local path is `apps/api/storage/datasets` when starting from `apps/api`.
 
 ### Database migrations
-For an existing database, apply migrations in numeric order from `database/migrations/`. Migrations 001–004 add organization access requests, projects/tasks, dataset metadata and Power BI report links respectively.
+For an existing database, apply migrations in numeric order from `database/migrations/`. Migrations 001–006 add organization access requests, projects/tasks, dataset metadata, Power BI report links, notifications and email/password tokens respectively.
 
 ### 3. Web app
 Copy `apps/web/.env.example` to `apps/web/.env.local`. Set `NEXT_PUBLIC_API_URL=http://localhost:4000`.
@@ -63,7 +64,7 @@ For local development, configure the API `APP_ORIGIN=http://localhost:3000` and 
 - OWNER/ADMIN/MANAGER users can view the organization member directory.
 - Invitees can accept with an existing account or create an account from the invite link.
 - Invite links are one-time tokens; only a matching invited email can accept with an existing account.
-- Keep invitation URLs private. The current API returns the URL for manual delivery; production must integrate a trusted email provider and must not expose tokens in logs.
+- When SMTP is configured, invitations are emailed automatically; without SMTP, the API returns a one-time URL for private manual delivery. Never expose invitation tokens in logs.
 
 ## Frontend routes
 - `/`: sign in and open registration
@@ -83,7 +84,7 @@ For local development, configure the API `APP_ORIGIN=http://localhost:3000` and 
 For production, set `COOKIE_SECURE=true`, use HTTPS, and configure `APP_ORIGIN` and `INVITE_BASE_URL` to the deployed frontend. Prefer frontend and API custom subdomains under the same site (for example, `app.example.com` and `api.example.com`) so secure session cookies work reliably. If using separate cross-site hosting domains, assess browser third-party-cookie restrictions before choosing `COOKIE_SAME_SITE=none`; that setting also requires secure cookies.
 
 ## Notifications
-In-app notifications are generated for access requests and decisions, invitation activity, task assignments and newly registered reports. The inbox is user-scoped and supports read/unread state. Email delivery is not configured yet.
+In-app notifications are generated for access requests and decisions, invitation activity, task assignments and newly registered reports. The inbox is user-scoped and supports read/unread state. SMTP is used for email verification, password recovery and invitation delivery when configured.
 
 ## Data storage note
 CSV uploads are stored outside the public web directory. The default local disk adapter is suitable for development only; configure a persistent private volume or replace the storage adapter with managed object storage before production. Dataset preview currently exposes only the first 10 rows. Python profiling/cleaning jobs and dataset versioning are the next data-engineering layer.
@@ -98,8 +99,9 @@ This is a development foundation, not production-certified software. Before publ
 4. Organization audit activity — initial read-only console/API implemented
 5. CSV data catalog and basic column profiling — initial upload/preview implementation
 6. Power BI report-link catalog — initial registry implemented
-7. Authorized data connectors and ingestion
-8. Immutable raw snapshots and versioned working datasets
-9. Governed SQL/Python analyst workspace and cleaning pipeline
-10. Power BI secure embedding and dashboard integration
-11. Alerts, backups and security hardening
+7. In-app notifications and account recovery — initial implementation
+8. Authorized data connectors and ingestion
+9. Immutable raw snapshots and versioned working datasets
+10. Governed SQL/Python analyst workspace and cleaning pipeline
+11. Power BI secure embedding and dashboard integration
+12. MFA, alerts, backups and security hardening
