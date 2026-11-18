@@ -12,6 +12,7 @@ const registerSchema=z.object({fullName:z.string().trim().min(2).max(120),email:
 const tokenHash=token=>createHash('sha256').update(token).digest('hex');
 const tokenUrl=(path,token)=>config.appOrigin+path+'?token='+encodeURIComponent(token);
 async function createToken(userId,purpose){
+ await pool.execute('UPDATE auth_tokens SET used_at=NOW() WHERE user_id=? AND purpose=? AND used_at IS NULL',[userId,purpose]);
  const token=randomBytes(32).toString('hex');
  await pool.execute('INSERT INTO auth_tokens (id,user_id,token_hash,purpose,expires_at) VALUES (?,?,?,?,?)',[randomUUID(),userId,tokenHash(token),purpose,purpose==='EMAIL_VERIFY'?new Date(Date.now()+24*60*60*1000):new Date(Date.now()+60*60*1000)]);
  return token;
