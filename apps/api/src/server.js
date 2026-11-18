@@ -11,6 +11,7 @@ import authRoutes from './routes/auth.js';
 import organizationRoutes from './routes/organizations.js';
 import invitationRoutes from './routes/invitations.js';
 import projectRoutes from './routes/projects.js';
+import datasetRoutes from './routes/datasets.js';
 const app = express();
 const MySQLStore = MySQLStoreFactory(session);
 const sessionStore = new MySQLStore({ createDatabaseTable: true }, pool);
@@ -30,8 +31,11 @@ app.use('/api/auth', rateLimit({ windowMs: 15 * 60 * 1000, limit: 30 }), authRou
 app.use('/api/organizations', organizationRoutes);
 app.use('/api/invitations', invitationRoutes);
 app.use('/api', projectRoutes);
+app.use('/api', datasetRoutes);
 app.use((err, req, res, next) => {
+  if (err?.name === 'MulterError') return res.status(err.code === 'LIMIT_FILE_SIZE' ? 413 : 400).json({ error: err.code === 'LIMIT_FILE_SIZE' ? 'CSV file exceeds the 15 MB limit.' : 'File upload could not be processed.' });
   if (err?.name === 'ZodError') return res.status(400).json({ error: 'Validation failed.', details: err.issues });
+  if (err?.message === 'Only CSV files are supported.') return res.status(400).json({ error: err.message });
   console.error(err);
   res.status(500).json({ error: 'Internal server error.' });
 });
