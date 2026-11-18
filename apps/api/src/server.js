@@ -22,7 +22,7 @@ app.use((req, res, next) => {
   if (req.get('origin') !== config.appOrigin || req.get('x-hub-request') !== '1') return res.status(403).json({ error: 'Request origin validation failed.' });
   next();
 });
-app.use(session({ name: 'hub.sid', secret: config.sessionSecret, store: sessionStore, resave: false, saveUninitialized: false, cookie: { httpOnly: true, secure: config.cookieSecure, sameSite: 'strict', maxAge: 8 * 60 * 60 * 1000 } }));
+app.use(session({ name: 'hub.sid', secret: config.sessionSecret, store: sessionStore, resave: false, saveUninitialized: false, cookie: { httpOnly: true, secure: config.cookieSecure, sameSite: config.cookieSameSite, maxAge: 8 * 60 * 60 * 1000 } }));
 app.use(loadUser);
 app.get('/health', (req, res) => res.json({ status: 'ok', service: 'nexus-analytics-api' }));
 app.use('/api/auth', rateLimit({ windowMs: 15 * 60 * 1000, limit: 30 }), authRoutes);
