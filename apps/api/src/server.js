@@ -10,6 +10,7 @@ import { loadUser } from './middleware.js';
 import authRoutes from './routes/auth.js';
 import organizationRoutes from './routes/organizations.js';
 import invitationRoutes from './routes/invitations.js';
+import projectRoutes from './routes/projects.js';
 const app = express();
 const MySQLStore = MySQLStoreFactory(session);
 const sessionStore = new MySQLStore({ createDatabaseTable: true }, pool);
@@ -28,6 +29,7 @@ app.get('/health', (req, res) => res.json({ status: 'ok', service: 'nexus-analyt
 app.use('/api/auth', rateLimit({ windowMs: 15 * 60 * 1000, limit: 30 }), authRoutes);
 app.use('/api/organizations', organizationRoutes);
 app.use('/api/invitations', invitationRoutes);
+app.use('/api', projectRoutes);
 app.use((err, req, res, next) => {
   if (err?.name === 'ZodError') return res.status(400).json({ error: 'Validation failed.', details: err.issues });
   console.error(err);
