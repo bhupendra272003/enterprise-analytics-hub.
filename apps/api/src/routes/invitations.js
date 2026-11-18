@@ -7,9 +7,10 @@ import { audit } from '../audit.js';
 import { requireAuth, requireActiveUser, requireRole } from '../middleware.js';
 import { config } from '../config.js';
 const router = Router();
-router.post('/accept', requireAuth, requireActiveUser, async (req, res, next) => {
+router.post('/accept', requireAuth, async (req, res, next) => {
   try {
     const { token } = z.object({ token: z.string().min(32).max(256) }).parse(req.body);
+    if (req.user.account_status === 'SUSPENDED') return res.status(403).json({ error: 'This account has been suspended.' });
     const tokenHash = createHash('sha256').update(token).digest('hex');
     const conn = await pool.getConnection();
     let invitation;
@@ -19,6 +20,7 @@ router.post('/accept', requireAuth, requireActiveUser, async (req, res, next) =>
       invitation = rows[0];
       if (!invitation || invitation.email.toLowerCase() !== req.user.email.toLowerCase()) { await conn.rollback(); return res.status(400).json({ error: 'Invitation is invalid or expired.' }); }
       await conn.execute("INSERT INTO memberships (id, organization_id, user_id, role, membership_status) VALUES (?, ?, ?, ?, 'ACTIVE') ON DUPLICATE KEY UPDATE role = VALUES(role), membership_status = 'ACTIVE'", [randomUUID(), invitation.organization_id, req.user.id, invitation.role]);
+      await conn.execute("UPDATE users SET account_status = 'ACTIVE' WHERE id = ? AND account_status = 'PENDING'", [req.user.id]);
       await conn.execute('UPDATE invitations SET accepted_at = NOW() WHERE id = ?', [invitation.id]);
       await conn.commit();
     } catch (e) { await conn.rollback(); throw e; } finally { conn.release(); }
