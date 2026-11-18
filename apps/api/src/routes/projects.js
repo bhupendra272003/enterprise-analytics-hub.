@@ -72,13 +72,15 @@ router.post('/projects/:projectId/tasks',async(req,res,next)=>{
 router.patch('/tasks/:taskId',async(req,res,next)=>{
   try{
     const input=z.object({status:z.enum(['TODO','IN_PROGRESS','BLOCKED','DONE']).optional(),priority:z.enum(['LOW','MEDIUM','HIGH','URGENT']).optional(),assigneeId:z.string().uuid().nullable().optional()}).refine(v=>Object.keys(v).length>0).parse(req.body);
-    const [rows]=await pool.execute('SELECT t.project_id,p.organization_id FROM tasks t JOIN projects p ON p.id=t.project_id WHERE t.id=? LIMIT 1',[req.params.taskId]);
+    const [rows]=await pool.execute('SELECT t.project_id,t.assignee_id,p.organization_id FROM tasks t JOIN projects p ON p.id=t.project_id WHERE t.id=? LIMIT 1',[req.params.taskId]);
     if(!rows.length)return res.status(404).json({error:'Task not found.'});
     const orgId=rows[0].organization_id;
     const [members]=await pool.execute("SELECT role FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE'",[orgId,req.user.id]);
     if(!members.length)return res.status(403).json({error:'Insufficient organization permissions.'});
     const role=members[0].role;
-    if(!['OWNER','ADMIN','MANAGER'].includes(role)&&input.assigneeId!==undefined)return res.status(403).json({error:'Only managers can reassign tasks.'});
+    const manager=['OWNER','ADMIN','MANAGER'].includes(role);
+    if(!manager && (input.assigneeId!==undefined || input.priority!==undefined)) return res.status(403).json({error:'Only managers can change task assignments or priority.'});
+    if(!manager && rows[0].assignee_id!==req.user.id) return res.status(403).json({error:'Only managers or the assigned member can update this task.'});
     if(input.assigneeId){
       const [assignee]=await pool.execute("SELECT id FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE'",[orgId,input.assigneeId]);
       if(!assignee.length)return res.status(400).json({error:'Assignee must be an active organization member.'});
