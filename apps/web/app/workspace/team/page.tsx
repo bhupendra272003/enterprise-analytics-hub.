@@ -79,10 +79,10 @@ export default function TeamPage() {
       <div className="side-label">WORKSPACE</div>
       <a className="side-link" href="/workspace"><span>▦</span> Overview</a>
       <a className="side-link selected" href="/workspace/team"><span>♧</span> Team & access</a>
-      <div className="side-label side-bottom-label">COMING NEXT</div>
-      <div className="side-muted"><span>◫</span> Projects & tasks</div>
-      <div className="side-muted"><span>◈</span> Data workspace</div>
-      <div className="side-muted"><span>▤</span> Reports</div>
+      <div className="side-label side-bottom-label">WORK MANAGEMENT</div>
+      <a className="side-link" href="/workspace/projects"><span>◫</span> Projects & tasks</a>
+      <a className="side-link" href="/workspace/data"><span>◈</span> Data workspace</a>
+      <a className="side-link" href="/workspace/audit"><span>⌑</span> Audit activity</a>
       <div className="sidebar-footer"><span className="online-dot" /> SYSTEM ONLINE<br/><small>IDENTITY MODULE · 01</small></div>
     </aside>
 
