@@ -7,6 +7,7 @@ import { audit } from '../audit.js';
 import { requireAuth, requireActiveUser, requireRole } from '../middleware.js';
 import { config } from '../config.js';
 import { notifyUser } from './notifications.js';
+import { sendEmail } from '../mailer.js';
 const router = Router();
 router.post('/accept', requireAuth, async (req, res, next) => {
   try {
@@ -38,7 +39,11 @@ router.post('/organizations/:orgId/invitations', requireAuth, requireActiveUser,
     await audit({ orgId: req.params.orgId, actorId: req.user.id, action: 'INVITATION_CREATED', targetType: 'INVITATION', targetId: id, metadata: { email: input.email, role: input.role }, ip: req.ip });
     const [invitedUsers] = await pool.execute('SELECT id FROM users WHERE email = ? LIMIT 1', [input.email]);
     if (invitedUsers.length) await notifyUser({ userId: invitedUsers[0].id, organizationId: req.params.orgId, type: 'INVITATION', title: 'You have a workspace invitation', message: 'An organization administrator invited you to join a workspace.', href: '/workspace' });
-    res.status(201).json({ message: 'Invitation created. Deliver this one-time token through a trusted channel.', invitationUrl: `${config.inviteBaseUrl}?token=${token}` });
+    const invitationUrl = `${config.inviteBaseUrl}?token=${token}`;
+    let emailSent = false;
+    try { emailSent = await sendEmail({ to: input.email, subject: 'You are invited to NEXUS Analytics', text: 'You have been invited to join an organization workspace. Accept your invitation here: ' + invitationUrl + '\n\nThis one-time link expires in 7 days.' }); }
+    catch (mailError) { console.error('Invitation email delivery failed:', mailError.message); }
+    res.status(201).json({ message: emailSent ? 'Invitation email sent successfully.' : 'Invitation created. Share this one-time link privately.', ...(!emailSent ? { invitationUrl } : {}) });
   } catch (err) { next(err); }
 });
 
