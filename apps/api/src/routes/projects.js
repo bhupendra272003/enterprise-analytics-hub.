@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { pool } from '../db.js';
 import { audit } from '../audit.js';
 import { requireAuth, requireActiveUser, requireRole } from '../middleware.js';
+import { notifyUser } from './notifications.js';
 
 const router=Router();
 router.use(requireAuth,requireActiveUser);
@@ -67,6 +68,7 @@ router.post('/projects/:projectId/tasks',async(req,res,next)=>{
     const id=randomUUID();
     await pool.execute('INSERT INTO tasks (id,project_id,title,description,status,priority,due_date,assignee_id,created_by) VALUES (?,?,?,?,"TODO",?,?,?,?)',[id,req.params.projectId,input.title,input.description,input.priority,input.dueDate||null,input.assigneeId||null,req.user.id]);
     await audit({orgId,actorId:req.user.id,action:'TASK_CREATED',targetType:'TASK',targetId:id,ip:req.ip});
+    if(input.assigneeId && input.assigneeId!==req.user.id) await notifyUser({userId:input.assigneeId,organizationId:orgId,type:'TASK_ASSIGNED',title:'A task was assigned to you',message:'You have a new task in an organization project.',href:'/workspace/projects'});
     res.status(201).json({task:{id,...input,status:'TODO'}});
   }catch(e){next(e);}
 });
@@ -92,6 +94,7 @@ router.patch('/tasks/:taskId',async(req,res,next)=>{
     values.push(req.params.taskId);
     await pool.execute('UPDATE tasks SET '+sets.join(', ')+', updated_at=NOW() WHERE id=?',values);
     await audit({orgId,actorId:req.user.id,action:'TASK_UPDATED',targetType:'TASK',targetId:req.params.taskId,metadata:input,ip:req.ip});
+    if(input.assigneeId && input.assigneeId!==rows[0].assignee_id && input.assigneeId!==req.user.id) await notifyUser({userId:input.assigneeId,organizationId:orgId,type:'TASK_ASSIGNED',title:'A task was assigned to you',message:'A task in your organization was assigned to you.',href:'/workspace/projects'});
     res.json({message:'Task updated.'});
   }catch(e){next(e);}
 });
