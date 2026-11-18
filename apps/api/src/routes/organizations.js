@@ -15,16 +15,19 @@ router.post('/:orgId/request-access', requireAuth, async (req, res, next) => {
     }
     const [orgs] = await pool.execute('SELECT id FROM organizations WHERE id = ? LIMIT 1', [req.params.orgId]);
     if (!orgs.length) return res.status(404).json({ error: 'Organization not found.' });
-    const [existing] = await pool.execute(
-      "SELECT id, status FROM organization_access_requests WHERE organization_id = ? AND user_id = ? AND status = 'PENDING' LIMIT 1",
-      [req.params.orgId, req.user.id]
-    );
-    if (existing.length) return res.status(409).json({ error: 'Your access request is already pending.' });
+    const conn = await pool.getConnection();
     const requestId = randomUUID();
-    await pool.execute(
-      "INSERT INTO organization_access_requests (id, organization_id, user_id, status) VALUES (?, ?, ?, 'PENDING')",
-      [requestId, req.params.orgId, req.user.id]
-    );
+    try {
+      await conn.beginTransaction();
+      await conn.execute('SELECT id FROM users WHERE id = ? FOR UPDATE', [req.user.id]);
+      const [existing] = await conn.execute(
+        \"SELECT id FROM organization_access_requests WHERE organization_id = ? AND user_id = ? AND status = 'PENDING' LIMIT 1 FOR UPDATE\",
+        [req.params.orgId, req.user.id]
+      );
+      if (existing.length) { await conn.rollback(); return res.status(409).json({ error: 'Your access request is already pending.' }); }
+      await conn.execute(\"INSERT INTO organization_access_requests (id, organization_id, user_id, status) VALUES (?, ?, ?, 'PENDING')\", [requestId, req.params.orgId, req.user.id]);
+      await conn.commit();
+    } catch (e) { await conn.rollback(); throw e; } finally { conn.release(); }
     await audit({ orgId: req.params.orgId, actorId: req.user.id, action: 'ACCESS_REQUEST_SUBMITTED', targetType: 'ACCESS_REQUEST', targetId: requestId, ip: req.ip });
     res.status(201).json({ message: 'Access request submitted. An organization administrator can now review it.' });
   } catch (err) { next(err); }
