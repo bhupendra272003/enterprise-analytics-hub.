@@ -17,6 +17,7 @@ A multi-tenant analytics and team collaboration platform. The repository include
 - `docs/ARCHITECTURE.md`: architecture and roadmap
 - `docs/API-TESTING.md`: local API smoke-test sequence
 - `docs/DEPLOYMENT.md`: production hosting and environment guide
+- `docs/DEPLOYMENT.md`: production hosting and environment guide
 
 ## Local setup
 
