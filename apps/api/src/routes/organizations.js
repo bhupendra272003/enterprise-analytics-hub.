@@ -102,6 +102,30 @@ router.get('/:orgId/audit', requireRole('OWNER', 'ADMIN'), async (req, res, next
   } catch (err) { next(err); }
 });
 
+
+router.patch('/:orgId/members/:userId', requireRole('OWNER', 'ADMIN'), async (req, res, next) => {
+  try {
+    if (req.params.userId === req.user.id) return res.status(400).json({ error: 'You cannot change your own membership here.' });
+    const input = z.object({
+      role: z.enum(['ADMIN', 'MANAGER', 'ANALYST', 'VIEWER']).optional(),
+      membershipStatus: z.enum(['ACTIVE', 'SUSPENDED']).optional()
+    }).refine(v => Object.keys(v).length > 0).parse(req.body);
+    const [rows] = await pool.execute(
+      'SELECT role, membership_status FROM memberships WHERE organization_id = ? AND user_id = ? LIMIT 1',
+      [req.params.orgId, req.params.userId]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Organization member not found.' });
+    if (rows[0].role === 'OWNER') return res.status(403).json({ error: 'The organization owner cannot be modified here.' });
+    if (req.membership.role === 'ADMIN' && rows[0].role === 'ADMIN') return res.status(403).json({ error: 'Only the owner can modify another administrator.' });
+    await pool.execute(
+      'UPDATE memberships SET role = COALESCE(?, role), membership_status = COALESCE(?, membership_status) WHERE organization_id = ? AND user_id = ?',
+      [input.role || null, input.membershipStatus || null, req.params.orgId, req.params.userId]
+    );
+    await audit({ orgId: req.params.orgId, actorId: req.user.id, action: 'MEMBERSHIP_UPDATED', targetType: 'MEMBERSHIP', targetId: req.params.userId, metadata: input, ip: req.ip });
+    res.json({ message: 'Member access updated.' });
+  } catch (err) { next(err); }
+});
+
 router.get('/:orgId/requests', requireRole('OWNER', 'ADMIN', 'MANAGER'), async (req, res, next) => {
   try {
     const [rows] = await pool.execute(
