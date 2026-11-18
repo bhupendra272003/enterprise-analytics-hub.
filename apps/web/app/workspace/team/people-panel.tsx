@@ -11,7 +11,9 @@ export default function PeoplePanel({ organizationId, role }: { organizationId:s
   const [requests,setRequests]=useState<AccessRequest[]>([]);
   const [notice,setNotice]=useState('');
   const [busy,setBusy]=useState('');
+  const [draftRoles,setDraftRoles]=useState<Record<string,string>>({});
   const canReview=['OWNER','ADMIN'].includes(role);
+  const canManageMembers=canReview;
   const canView=['OWNER','ADMIN','MANAGER'].includes(role);
   const load=useCallback(async()=>{
     if(!organizationId || !canView) return;
@@ -41,13 +43,24 @@ export default function PeoplePanel({ organizationId, role }: { organizationId:s
     }catch(e){setNotice(e instanceof Error?e.message:'Action failed.');}
     finally{setBusy('');}
   }
+  async function updateMember(member:Member,change:{role?:string;membershipStatus?:string}){
+    setBusy(member.id);setNotice('');
+    try{
+      const response=await fetch(`${API}/api/organizations/${organizationId}/members/${member.id}`,{
+        method:'PATCH',credentials:'include',headers:{'Content-Type':'application/json','X-Hub-Request':'1'},body:JSON.stringify(change)
+      });
+      const data=await response.json();if(!response.ok)throw new Error(data.error||'Member update failed.');
+      setNotice(data.message);await load();
+    }catch(e){setNotice(e instanceof Error?e.message:'Member update failed.');}
+    finally{setBusy('');}
+  }
   if(!canView) return null;
   return <section className="panel people-panel">
     <div className="panel-title"><div><small>ORGANIZATION DIRECTORY</small><h2>People & access</h2></div><span className="count-chip">{members.length} MEMBERS</span></div>
     {notice&&<div className="team-notice" role="status">{notice}</div>}
-    <div className="people-table-wrap"><table className="people-table"><thead><tr><th>MEMBER</th><th>ROLE</th><th>ACCOUNT</th><th>MEMBERSHIP</th></tr></thead><tbody>
-      {members.map(member=><tr key={member.id}><td><b>{member.fullName}</b><small>{member.email}</small></td><td><span className="role-pill">{member.role}</span></td><td>{member.accountStatus}</td><td>{member.membershipStatus}</td></tr>)}
-      {!members.length&&<tr><td colSpan={4} className="people-empty">No members found in this workspace.</td></tr>}
+    <div className="people-table-wrap"><table className="people-table"><thead><tr><th>MEMBER</th><th>ROLE</th><th>ACCOUNT</th><th>MEMBERSHIP</th>{canManageMembers&&<th>ACTIONS</th>}</tr></thead><tbody>
+      {members.map(member=><tr key={member.id}><td><b>{member.fullName}</b><small>{member.email}</small></td><td><span className="role-pill">{member.role}</span></td><td>{member.accountStatus}</td><td>{member.membershipStatus}</td>{canManageMembers&&<td>{member.role!=='OWNER'&&!(role==='ADMIN'&&member.role==='ADMIN')?<div className="member-actions"><select aria-label={`Role for ${member.fullName}`} value={draftRoles[member.id]||member.role} onChange={e=>setDraftRoles(v=>({...v,[member.id]:e.target.value}))}><option value="ADMIN">Admin</option><option value="MANAGER">Manager</option><option value="ANALYST">Analyst</option><option value="VIEWER">Viewer</option></select><button disabled={!!busy||((draftRoles[member.id]||member.role)===member.role)} onClick={()=>updateMember(member,{role:draftRoles[member.id]||member.role})}>Save</button><button className="member-status-button" disabled={!!busy} onClick={()=>updateMember(member,{membershipStatus:member.membershipStatus==='ACTIVE'?'SUSPENDED':'ACTIVE'})}>{member.membershipStatus==='ACTIVE'?'Suspend':'Restore'}</button></div>:<span className="people-empty">Protected</span>}</td>}</tr>)}
+      {!members.length&&<tr><td colSpan={canManageMembers?5:4} className="people-empty">No members found in this workspace.</td></tr>}
     </tbody></table></div>
     <div className="panel-title requests-title"><div><small>REVIEW QUEUE</small><h2>Pending access requests</h2></div><span className="count-chip">{requests.length} PENDING</span></div>
     {requests.length?requests.map(item=><article className="request-card" key={item.id}>
