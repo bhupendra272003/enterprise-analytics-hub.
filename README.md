@@ -1,6 +1,6 @@
 # NEXUS ANALYTICS — Enterprise Analytics Hub
 
-A multi-tenant analytics and team collaboration platform. The repository currently contains the identity foundation and the first responsive web application.
+A multi-tenant analytics and team collaboration platform. The repository includes identity, organization access, team management, projects and task-tracking foundations with a responsive web application.
 
 ## Stack
 - Web: Next.js 15, React 19, TypeScript
@@ -19,7 +19,7 @@ A multi-tenant analytics and team collaboration platform. The repository current
 ## Local setup
 
 ### 1. Database
-Create a MySQL 8 database and run `database/schema.sql`.
+Create a MySQL 8 database and run `database/schema.sql`, then apply `database/migrations/002_projects_tasks.sql` to enable projects and tasks. Migration 001 is safe to apply if the access-request table is not present.
 
 ### 2. API
 Copy `apps/api/.env.example` to `apps/api/.env`, configure local database credentials and a random session secret of at least 32 characters.
