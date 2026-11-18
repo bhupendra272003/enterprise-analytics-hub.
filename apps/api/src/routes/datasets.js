@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
-import { mkdir, writeFile, unlink } from 'node:fs/promises';
+import { mkdir, writeFile, unlink, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import multer from 'multer';
 import { parse } from 'csv-parse/sync';
@@ -56,6 +56,28 @@ router.get('/datasets/:datasetId/preview',async(req,res,next)=>{
     const columns=typeof rows[0].columns_json==='string'?JSON.parse(rows[0].columns_json):rows[0].columns_json;
     const preview=typeof rows[0].preview_json==='string'?JSON.parse(rows[0].preview_json):rows[0].preview_json;
     res.json({dataset:{id:rows[0].id,name:rows[0].name,columns,preview}});
+  }catch(e){next(e);}
+});
+
+
+router.get('/datasets/:datasetId/profile',async(req,res,next)=>{
+  try{
+    const [rows]=await pool.execute('SELECT id,name,storage_path,organization_id FROM datasets WHERE id=? LIMIT 1',[req.params.datasetId]);
+    if(!rows.length)return res.status(404).json({error:'Dataset not found.'});
+    const [membership]=await pool.execute("SELECT id FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE'",[rows[0].organization_id,req.user.id]);
+    if(!membership.length)return res.status(403).json({error:'Insufficient organization permissions.'});
+    const raw=await readFile(rows[0].storage_path);
+    const records=parse(raw,{columns:true,skip_empty_lines:true,bom:true,trim:true,relax_column_count:false});
+    const columns=Object.keys(records[0]||{});
+    const profile=columns.map(name=>{
+      const values=records.map(row=>String(row[name]??'').trim());
+      const present=values.filter(v=>v!=='');
+      const numeric=present.map(Number).filter(Number.isFinite);
+      const numericType=present.length>0&&numeric.length/present.length>=0.9;
+      const distinct=new Set(present).size;
+      return {name,type:present.length===0?'EMPTY':numericType?'NUMERIC':'TEXT',total:values.length,missing:values.length-present.length,distinct,...(numericType?{min:Math.min(...numeric),max:Math.max(...numeric),mean:Number((numeric.reduce((a,b)=>a+b,0)/numeric.length).toFixed(3))}:{})};
+    });
+    res.json({profile:{datasetId:rows[0].id,name:rows[0].name,rowCount:records.length,columnCount:columns.length,columns:profile}});
   }catch(e){next(e);}
 });
 
