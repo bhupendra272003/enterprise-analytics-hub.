@@ -23,6 +23,8 @@ router.post('/:orgId/request-access', requireAuth, async (req, res, next) => {
     }
     const [orgs] = await pool.execute('SELECT id FROM organizations WHERE id = ? LIMIT 1', [req.params.orgId]);
     if (!orgs.length) return res.status(404).json({ error: 'Organization not found.' });
+    const [memberRows] = await pool.execute(\"SELECT id FROM memberships WHERE organization_id = ? AND user_id = ? AND membership_status = 'ACTIVE' LIMIT 1\", [req.params.orgId, req.user.id]);
+    if (memberRows.length) return res.status(409).json({ error: 'You are already an active member of this organization.' });
     const conn = await pool.getConnection();
     const requestId = randomUUID();
     try {
