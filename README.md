@@ -19,7 +19,7 @@ A multi-tenant analytics and team collaboration platform. The repository include
 ## Local setup
 
 ### 1. Database
-Create a MySQL 8 database and run `database/schema.sql`. The fresh-install schema includes identity, access requests, projects, tasks and dataset metadata. For an existing database, apply the scripts in `database/migrations/` in numeric order; migration scripts use `IF NOT EXISTS` for their tables.
+Create a MySQL 8 database and run `database/schema.sql`. The fresh-install schema includes identity, access requests, projects, tasks, datasets and reports. For an existing database, apply the scripts in `database/migrations/` in numeric order; migration scripts use `IF NOT EXISTS` for their tables.
 
 ### 2. API
 Copy `apps/api/.env.example` to `apps/api/.env`, configure local database credentials and a random session secret of at least 32 characters.
@@ -32,7 +32,7 @@ npm run dev
 The API listens on port 4000 by default. Check `http://localhost:4000/health`. Set `DATA_STORAGE_DIR` to a private, persistent disk path for CSV uploads; never place it inside the public web root. The default local path is `apps/api/storage/datasets` when starting from `apps/api`.
 
 ### Database migrations
-For an existing database, apply migrations in numeric order from `database/migrations/`. Migrations 001–003 add organization access requests, projects/tasks and dataset metadata respectively.
+For an existing database, apply migrations in numeric order from `database/migrations/`. Migrations 001–004 add organization access requests, projects/tasks, dataset metadata and Power BI report links respectively.
 
 ### 3. Web app
 Copy `apps/web/.env.example` to `apps/web/.env.local`. Set `NEXT_PUBLIC_API_URL=http://localhost:4000`.
@@ -67,11 +67,10 @@ For local development, configure the API `APP_ORIGIN=http://localhost:3000` and 
 ## Frontend routes
 - `/`: sign in and open registration
 - `/workspace`: authenticated profile and organization overview
-- `/workspace/team`: organization creation, invitations, member directory and access approval queue
+- `/workspace/team`: organization creation, invitations, member directory, member role changes, suspension and access approval queue
 - `/workspace/access`: browse organizations and request membership
 - `/workspace/projects`: create projects, add tasks and update task status
 - `/workspace/data`: upload CSV files, inspect metadata, preview 10 rows and run a basic column profile
-- `/workspace/data`: upload CSV files, inspect metadata and preview the first 10 rows
 - `/workspace/audit`: review organization audit activity (OWNER/ADMIN)
 - `/workspace/reports`: manage the organization's Power BI report-link catalog
 - `/accept-invite?token=...`: accept an invitation or create an invited account
