@@ -1,0 +1,8 @@
+'use client';
+import {FormEvent,useState} from 'react';
+const API=process.env.NEXT_PUBLIC_API_URL||'http://localhost:4000';
+export default function ForgotPasswordPage(){
+ const [email,setEmail]=useState(''),[message,setMessage]=useState(''),[resetUrl,setResetUrl]=useState(''),[busy,setBusy]=useState(false);
+ async function submit(e:FormEvent){e.preventDefault();setBusy(true);setMessage('');try{const r=await fetch(API+'/api/auth/forgot-password',{method:'POST',headers:{'Content-Type':'application/json','X-Hub-Request':'1'},body:JSON.stringify({email})});const d=await r.json();setMessage(d.message||d.error||'Request completed.');setResetUrl(d.resetUrl||'');}catch{setMessage('Unable to connect to NEXUS.');}finally{setBusy(false);}}
+ return <main className="access-shell"><section className="access-card"><a className="brand" href="/"><span className="brand-mark">N</span><span>NEXUS<span className="brand-light"> ANALYTICS</span></span></a><div className="eyebrow"><span/> ACCOUNT RECOVERY</div><h1>Reset your <em>password.</em></h1><p>Enter your work email. If an account exists, we'll send a secure reset link.</p><form onSubmit={submit}><label>WORK EMAIL<input type="email" required value={email} onChange={e=>setEmail(e.target.value)} placeholder="name@company.com"/></label><button className="primary-action" disabled={busy}>{busy?'Sending…':'Send reset link ↗'}</button></form>{message&&<div className="team-notice">{message}</div>}{resetUrl&&<a className="auth-action-link" href={resetUrl}>Open development reset link ↗</a>}<a className="back-link" href="/">Back to sign in</a></section></main>;
+}
