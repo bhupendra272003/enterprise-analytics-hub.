@@ -49,6 +49,21 @@ For local development, configure the API `APP_ORIGIN=http://localhost:3000` and 
 - The authenticated workspace reads the signed-in profile and organization memberships.
 - Organization-specific access is enforced by the API, not by hiding frontend links.
 
+
+## Team and invitation flow
+- Open `/workspace/team` after signing in.
+- Create an organization; its creator becomes OWNER.
+- OWNER/ADMIN users can generate 7-day invitation links for MANAGER, ANALYST, VIEWER or ADMIN roles.
+- Invitees can accept with an existing account or create an account from the invite link.
+- Invite links are one-time tokens; only a matching invited email can accept with an existing account.
+- Keep invitation URLs private. The current API returns the URL for manual delivery; production must integrate a trusted email provider and must not expose tokens in logs.
+
+## Frontend routes
+- `/`: sign in and open registration
+- `/workspace`: authenticated profile and organization overview
+- `/workspace/team`: organization creation and invitations
+- `/accept-invite?token=...`: accept an invitation or create an invited account
+
 ## Important production checklist
 This is a development foundation, not production-certified software. Before public deployment, complete mature CSRF protection, email verification, password recovery, MFA, invitation email delivery, tenant-isolation tests, security review, backups, monitoring and managed secret storage. Configure strict CORS and secure cookies for the deployed domains. Never commit real credentials or customer data.
 
