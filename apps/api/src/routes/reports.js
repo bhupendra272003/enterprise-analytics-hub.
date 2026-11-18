@@ -7,7 +7,7 @@ import {requireAuth,requireActiveUser,requireRole} from '../middleware.js';
 import {notifyOrganizationRoles} from './notifications.js';
 const router=Router();
 router.use(requireAuth,requireActiveUser);
-const reportInput=z.object({title:z.string().trim().min(2).max(160),description:z.string().trim().max(1000).optional().default(''),reportUrl:z.string().url().refine(value=>{try{const u=new URL(value);return u.protocol==='https:'&&['app.powerbi.com','app.powerbi.de','app.powerbigov.us'].includes(u.hostname);}catch{return false;}},'Use a secure Power BI report URL.')});
+const reportInput=z.object({title:z.string().trim().min(2).max(160),description:z.string().trim().max(1000).optional().default(''),reportUrl:z.string().url().max(2048).refine(value=>{try{const u=new URL(value);return u.protocol==='https:'&&['app.powerbi.com','app.powerbi.de','app.powerbigov.us'].includes(u.hostname);}catch{return false;}},'Use a secure Power BI report URL.')});
 router.get('/organizations/:orgId/reports',requireRole('OWNER','ADMIN','MANAGER','ANALYST','VIEWER'),async(req,res,next)=>{
  try{const [rows]=await pool.execute("SELECT r.id,r.title,r.description,r.report_url AS reportUrl,r.created_at AS createdAt,u.full_name AS createdBy FROM reports r JOIN users u ON u.id=r.created_by WHERE r.organization_id=? AND r.status='ACTIVE' ORDER BY r.created_at DESC",[req.params.orgId]);res.json({reports:rows});}catch(e){next(e);}
 });
