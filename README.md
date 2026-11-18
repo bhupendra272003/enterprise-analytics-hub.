@@ -70,6 +70,7 @@ For local development, configure the API `APP_ORIGIN=http://localhost:3000` and 
 - `/workspace/team`: organization creation, invitations, member directory and access approval queue
 - `/workspace/access`: browse organizations and request membership
 - `/workspace/projects`: create projects, add tasks and update task status
+- `/workspace/audit`: review organization audit activity (OWNER/ADMIN)
 - `/accept-invite?token=...`: accept an invitation or create an invited account
 
 
@@ -82,8 +83,9 @@ This is a development foundation, not production-certified software. Before publ
 1. Identity, organizations, access requests and approvals — foundation implemented
 2. Team directory and invitation flow — initial UI/API implemented
 3. Projects and task tracking — initial UI/API implemented
-4. Authorized data connectors and ingestion
-5. Immutable raw snapshots and versioned working datasets
-6. Governed SQL/Python analyst workspace
-7. Power BI/report integration and dashboards
-8. Audit console, alerts, backups and security hardening
+4. Organization audit activity — initial read-only console/API implemented
+5. Authorized data connectors and ingestion
+6. Immutable raw snapshots and versioned working datasets
+7. Governed SQL/Python analyst workspace
+8. Power BI/report integration and dashboards
+9. Alerts, backups and security hardening
