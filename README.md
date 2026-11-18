@@ -70,6 +70,7 @@ For local development, configure the API `APP_ORIGIN=http://localhost:3000` and 
 - `/workspace/team`: organization creation, invitations, member directory and access approval queue
 - `/workspace/access`: browse organizations and request membership
 - `/workspace/projects`: create projects, add tasks and update task status
+- `/workspace/data`: upload CSV files, inspect metadata, preview 10 rows and run a basic column profile
 - `/workspace/data`: upload CSV files, inspect metadata and preview the first 10 rows
 - `/workspace/audit`: review organization audit activity (OWNER/ADMIN)
 - `/accept-invite?token=...`: accept an invitation or create an invited account
