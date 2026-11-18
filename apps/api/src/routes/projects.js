@@ -46,7 +46,8 @@ router.get('/projects/:projectId/tasks',async(req,res,next)=>{
       'SELECT t.id,t.title,t.description,t.status,t.priority,t.due_date AS dueDate,t.assignee_id AS assigneeId,u.full_name AS assigneeName,t.created_at AS createdAt FROM tasks t LEFT JOIN users u ON u.id=t.assignee_id WHERE t.project_id=? ORDER BY t.created_at DESC',
       [req.params.projectId]
     );
-    res.json({tasks:rows});
+    const manager=['OWNER','ADMIN','MANAGER'].includes(members[0].role);
+    res.json({tasks:rows.map(task=>({...task,canUpdate:manager||task.assigneeId===req.user.id}))});
   }catch(e){next(e);}
 });
 
