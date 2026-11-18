@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { pool } from '../db.js';
 import { audit } from '../audit.js';
 import { requireAuth, requireActiveUser, requireRole } from '../middleware.js';
+import { notifyUser, notifyOrganizationRoles } from './notifications.js';
 
 const router = Router();
 
@@ -39,6 +40,7 @@ router.post('/:orgId/request-access', requireAuth, async (req, res, next) => {
       await conn.commit();
     } catch (e) { await conn.rollback(); throw e; } finally { conn.release(); }
     await audit({ orgId: req.params.orgId, actorId: req.user.id, action: 'ACCESS_REQUEST_SUBMITTED', targetType: 'ACCESS_REQUEST', targetId: requestId, ip: req.ip });
+    await notifyOrganizationRoles({ organizationId: req.params.orgId, roles: ['OWNER', 'ADMIN'], type: 'ACCESS_REQUEST', title: 'New access request', message: 'A user requested to join your organization.', href: '/workspace/team' });
     res.status(201).json({ message: 'Access request submitted. An organization administrator can now review it.' });
   } catch (err) { next(err); }
 });
@@ -92,16 +94,6 @@ router.get('/:orgId/members', requireRole('OWNER', 'ADMIN', 'MANAGER'), async (r
   } catch (err) { next(err); }
 });
 
-router.get('/:orgId/audit', requireRole('OWNER', 'ADMIN'), async (req, res, next) => {
-  try {
-    const [rows] = await pool.execute(
-      'SELECT a.id, a.action, a.target_type AS targetType, a.target_id AS targetId, a.metadata, a.created_at AS createdAt, u.full_name AS actorName, u.email AS actorEmail FROM audit_logs a LEFT JOIN users u ON u.id = a.actor_user_id WHERE a.organization_id = ? ORDER BY a.created_at DESC LIMIT 100',
-      [req.params.orgId]
-    );
-    res.json({ events: rows });
-  } catch (err) { next(err); }
-});
-
 
 router.patch('/:orgId/members/:userId', requireRole('OWNER', 'ADMIN'), async (req, res, next) => {
   try {
@@ -122,6 +114,7 @@ router.patch('/:orgId/members/:userId', requireRole('OWNER', 'ADMIN'), async (re
       [input.role || null, input.membershipStatus || null, req.params.orgId, req.params.userId]
     );
     await audit({ orgId: req.params.orgId, actorId: req.user.id, action: 'MEMBERSHIP_UPDATED', targetType: 'MEMBERSHIP', targetId: req.params.userId, metadata: input, ip: req.ip });
+    await notifyUser({ userId: req.params.userId, organizationId: req.params.orgId, type: 'MEMBERSHIP_UPDATED', title: 'Your workspace access changed', message: 'Your organization role or membership status was updated.', href: '/workspace' });
     res.json({ message: 'Member access updated.' });
   } catch (err) { next(err); }
 });
@@ -167,6 +160,7 @@ router.patch('/:orgId/requests/:requestId', requireRole('OWNER', 'ADMIN'), async
       await conn.commit();
     } catch (e) { await conn.rollback(); throw e; } finally { conn.release(); }
     await audit({ orgId: req.params.orgId, actorId: req.user.id, action: input.decision === 'APPROVE' ? 'ACCESS_REQUEST_APPROVED' : 'ACCESS_REQUEST_REJECTED', targetType: 'ACCESS_REQUEST', targetId: request.id, metadata: input.decision === 'APPROVE' ? { role: input.role } : {}, ip: req.ip });
+    await notifyUser({ userId: request.user_id, organizationId: req.params.orgId, type: 'ACCESS_REVIEW', title: input.decision === 'APPROVE' ? 'Access approved' : 'Access request declined', message: input.decision === 'APPROVE' ? 'Your organization access is now active.' : 'Your organization access request was not approved.', href: '/workspace' });
     res.json({ message: input.decision === 'APPROVE' ? 'Access request approved.' : 'Access request rejected.' });
   } catch (err) { next(err); }
 });
