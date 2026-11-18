@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import PeoplePanel from './people-panel';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 type Org = { id: string; name: string; slug: string; role: string };
@@ -112,6 +113,7 @@ export default function TeamPage() {
             {inviteUrl && <div className="invite-result"><small>ONE-TIME INVITATION LINK</small><div className="invite-url">{inviteUrl}</div><button onClick={copyInvite}>Copy link</button><p>Expires in 7 days. Share privately with the invited email address.</p></div>}
           </section>
         </div>
+        {activeOrg && <PeoplePanel organizationId={activeOrg.id} role={activeOrg.role} />}
         {notice && <div className="team-notice" role="status"><span>✳</span>{notice}</div>}
         <div className="security-note"><span>⌑</span><div><b>Access is enforced server-side</b><small>Changing a visible role or URL does not grant permissions. Every organization action is checked by the API.</small></div></div>
       </div>
