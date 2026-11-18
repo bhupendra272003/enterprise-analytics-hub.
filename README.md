@@ -79,9 +79,9 @@ For production, set `COOKIE_SECURE=true`, use HTTPS, and configure `APP_ORIGIN` 
 This is a development foundation, not production-certified software. Before public deployment, complete mature CSRF protection, email verification, password recovery, MFA, invitation email delivery, tenant-isolation tests, security review, backups, monitoring and managed secret storage. Configure strict CORS and secure cookies for the deployed domains. Never commit real credentials or customer data.
 
 ## Roadmap
-1. Identity, organizations and access approvals
-2. Team directory and invitation UI
-3. Projects, tasks, assignments and reviews
+1. Identity, organizations, access requests and approvals — foundation implemented
+2. Team directory and invitation flow — initial UI/API implemented
+3. Projects and task tracking — initial UI/API implemented
 4. Authorized data connectors and ingestion
 5. Immutable raw snapshots and versioned working datasets
 6. Governed SQL/Python analyst workspace
