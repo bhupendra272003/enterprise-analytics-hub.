@@ -6,6 +6,7 @@ import { pool } from '../db.js';
 import { audit } from '../audit.js';
 import { requireAuth, requireActiveUser, requireRole } from '../middleware.js';
 import { config } from '../config.js';
+import { notifyUser } from './notifications.js';
 const router = Router();
 router.post('/accept', requireAuth, async (req, res, next) => {
   try {
@@ -25,6 +26,7 @@ router.post('/accept', requireAuth, async (req, res, next) => {
       await conn.commit();
     } catch (e) { await conn.rollback(); throw e; } finally { conn.release(); }
     await audit({ orgId: invitation.organization_id, actorId: req.user.id, action: 'INVITATION_ACCEPTED', targetType: 'INVITATION', targetId: invitation.id, ip: req.ip });
+    await notifyUser({ userId: invitation.invited_by, organizationId: invitation.organization_id, type: 'INVITATION_ACCEPTED', title: 'Invitation accepted', message: 'Your organization invitation was accepted.', href: '/workspace/team' });
     res.json({ message: 'Invitation accepted.' });
   } catch (err) { next(err); }
 });
@@ -34,6 +36,8 @@ router.post('/organizations/:orgId/invitations', requireAuth, requireActiveUser,
     const token = randomBytes(32).toString('hex'), id = randomUUID();
     await pool.execute('INSERT INTO invitations (id, organization_id, email, role, token_hash, invited_by, expires_at) VALUES (?, ?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 7 DAY))', [id, req.params.orgId, input.email, input.role, createHash('sha256').update(token).digest('hex'), req.user.id]);
     await audit({ orgId: req.params.orgId, actorId: req.user.id, action: 'INVITATION_CREATED', targetType: 'INVITATION', targetId: id, metadata: { email: input.email, role: input.role }, ip: req.ip });
+    const [invitedUsers] = await pool.execute('SELECT id FROM users WHERE email = ? LIMIT 1', [input.email]);
+    if (invitedUsers.length) await notifyUser({ userId: invitedUsers[0].id, organizationId: req.params.orgId, type: 'INVITATION', title: 'You have a workspace invitation', message: 'An organization administrator invited you to join a workspace.', href: '/workspace' });
     res.status(201).json({ message: 'Invitation created. Deliver this one-time token through a trusted channel.', invitationUrl: `${config.inviteBaseUrl}?token=${token}` });
   } catch (err) { next(err); }
 });
@@ -68,6 +72,7 @@ router.post('/accept-signup', async (req, res, next) => {
       await conn.commit();
     } catch (e) { await conn.rollback(); throw e; } finally { conn.release(); }
     await audit({ orgId: invitation.organization_id, actorId: userId, action: 'INVITATION_ACCEPTED_WITH_SIGNUP', targetType: 'INVITATION', targetId: invitation.id, ip: req.ip });
+    await notifyUser({ userId: invitation.invited_by, organizationId: invitation.organization_id, type: 'INVITATION_ACCEPTED', title: 'Invitation accepted', message: 'Your organization invitation was accepted.', href: '/workspace/team' });
     req.session.regenerate(err => {
       if (err) return next(err);
       req.session.userId = userId;
