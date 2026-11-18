@@ -7,6 +7,14 @@ import { requireAuth, requireActiveUser, requireRole } from '../middleware.js';
 
 const router = Router();
 
+// Public directory exposes only basic workspace identity, never member data.
+router.get('/directory', async (req, res, next) => {
+  try {
+    const [rows] = await pool.execute('SELECT id, name, slug FROM organizations ORDER BY name ASC LIMIT 200');
+    res.json({ organizations: rows });
+  } catch (err) { next(err); }
+});
+
 // Pending users may submit an organization-specific access request.
 router.post('/:orgId/request-access', requireAuth, async (req, res, next) => {
   try {
