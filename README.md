@@ -64,6 +64,9 @@ For local development, configure the API `APP_ORIGIN=http://localhost:3000` and 
 - `/workspace/team`: organization creation and invitations
 - `/accept-invite?token=...`: accept an invitation or create an invited account
 
+
+For production, set `COOKIE_SECURE=true`, use HTTPS, and configure `APP_ORIGIN` and `INVITE_BASE_URL` to the deployed frontend. Prefer frontend and API custom subdomains under the same site (for example, `app.example.com` and `api.example.com`) so secure session cookies work reliably. If using separate cross-site hosting domains, assess browser third-party-cookie restrictions before choosing `COOKIE_SAME_SITE=none`; that setting also requires secure cookies.
+
 ## Important production checklist
 This is a development foundation, not production-certified software. Before public deployment, complete mature CSRF protection, email verification, password recovery, MFA, invitation email delivery, tenant-isolation tests, security review, backups, monitoring and managed secret storage. Configure strict CORS and secure cookies for the deployed domains. Never commit real credentials or customer data.
 
