@@ -73,10 +73,14 @@ For local development, configure the API `APP_ORIGIN=http://localhost:3000` and 
 - `/workspace/data`: upload CSV files, inspect metadata, preview 10 rows and run a basic column profile
 - `/workspace/audit`: review organization audit activity (OWNER/ADMIN)
 - `/workspace/reports`: manage the organization's Power BI report-link catalog
+- `/workspace/notifications`: review and mark in-app notifications
 - `/accept-invite?token=...`: accept an invitation or create an invited account
 
 
 For production, set `COOKIE_SECURE=true`, use HTTPS, and configure `APP_ORIGIN` and `INVITE_BASE_URL` to the deployed frontend. Prefer frontend and API custom subdomains under the same site (for example, `app.example.com` and `api.example.com`) so secure session cookies work reliably. If using separate cross-site hosting domains, assess browser third-party-cookie restrictions before choosing `COOKIE_SAME_SITE=none`; that setting also requires secure cookies.
+
+## Notifications
+In-app notifications are generated for access requests and decisions, invitation activity, task assignments and newly registered reports. The inbox is user-scoped and supports read/unread state. Email delivery is not configured yet.
 
 ## Data storage note
 CSV uploads are stored outside the public web directory. The default local disk adapter is suitable for development only; configure a persistent private volume or replace the storage adapter with managed object storage before production. Dataset preview currently exposes only the first 10 rows. Python profiling/cleaning jobs and dataset versioning are the next data-engineering layer.
