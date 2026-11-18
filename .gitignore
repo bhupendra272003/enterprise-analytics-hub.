@@ -8,3 +8,6 @@ node_modules/
 coverage/
 .next/
 dist/
+
+# Private uploaded datasets
+apps/api/storage/
