@@ -21,7 +21,7 @@ router.post('/accept', requireAuth, async (req, res, next) => {
       invitation = rows[0];
       if (!invitation || invitation.email.toLowerCase() !== req.user.email.toLowerCase()) { await conn.rollback(); return res.status(400).json({ error: 'Invitation is invalid or expired.' }); }
       await conn.execute("INSERT INTO memberships (id, organization_id, user_id, role, membership_status) VALUES (?, ?, ?, ?, 'ACTIVE') ON DUPLICATE KEY UPDATE role = VALUES(role), membership_status = 'ACTIVE'", [randomUUID(), invitation.organization_id, req.user.id, invitation.role]);
-      await conn.execute("UPDATE users SET account_status = 'ACTIVE' WHERE id = ? AND account_status = 'PENDING'", [req.user.id]);
+      await conn.execute("UPDATE users SET account_status = 'ACTIVE', email_verified_at = COALESCE(email_verified_at, NOW()) WHERE id = ? AND account_status = 'PENDING'", [req.user.id]);
       await conn.execute('UPDATE invitations SET accepted_at = NOW() WHERE id = ?', [invitation.id]);
       await conn.commit();
     } catch (e) { await conn.rollback(); throw e; } finally { conn.release(); }
@@ -66,7 +66,7 @@ router.post('/accept-signup', async (req, res, next) => {
         return res.status(409).json({ error: 'An account already exists for this email. Sign in first, then accept the invitation.' });
       }
       const passwordHash = await bcrypt.hash(input.password, 12);
-      await conn.execute("INSERT INTO users (id, full_name, email, password_hash, account_status) VALUES (?, ?, ?, ?, 'ACTIVE')", [userId, input.fullName, invitation.email.toLowerCase(), passwordHash]);
+      await conn.execute("INSERT INTO users (id, full_name, email, password_hash, account_status, email_verified_at) VALUES (?, ?, ?, ?, 'ACTIVE', NOW())", [userId, input.fullName, invitation.email.toLowerCase(), passwordHash]);
       await conn.execute("INSERT INTO memberships (id, organization_id, user_id, role, membership_status) VALUES (?, ?, ?, ?, 'ACTIVE')", [randomUUID(), invitation.organization_id, userId, invitation.role]);
       await conn.execute('UPDATE invitations SET accepted_at = NOW() WHERE id = ?', [invitation.id]);
       await conn.commit();
