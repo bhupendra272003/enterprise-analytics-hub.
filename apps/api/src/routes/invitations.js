@@ -1,0 +1,37 @@
+import { Router } from 'express';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { z } from 'zod';
+import { pool } from '../db.js';
+import { audit } from '../audit.js';
+import { requireAuth, requireActiveUser, requireRole } from '../middleware.js';
+import { config } from '../config.js';
+const router = Router();
+router.post('/accept', requireAuth, requireActiveUser, async (req, res, next) => {
+  try {
+    const { token } = z.object({ token: z.string().min(32).max(256) }).parse(req.body);
+    const tokenHash = createHash('sha256').update(token).digest('hex');
+    const conn = await pool.getConnection();
+    let invitation;
+    try {
+      await conn.beginTransaction();
+      const [rows] = await conn.execute("SELECT * FROM invitations WHERE token_hash = ? AND accepted_at IS NULL AND expires_at > NOW() FOR UPDATE", [tokenHash]);
+      invitation = rows[0];
+      if (!invitation || invitation.email.toLowerCase() !== req.user.email.toLowerCase()) { await conn.rollback(); return res.status(400).json({ error: 'Invitation is invalid or expired.' }); }
+      await conn.execute("INSERT INTO memberships (id, organization_id, user_id, role, membership_status) VALUES (?, ?, ?, ?, 'ACTIVE') ON DUPLICATE KEY UPDATE role = VALUES(role), membership_status = 'ACTIVE'", [randomUUID(), invitation.organization_id, req.user.id, invitation.role]);
+      await conn.execute('UPDATE invitations SET accepted_at = NOW() WHERE id = ?', [invitation.id]);
+      await conn.commit();
+    } catch (e) { await conn.rollback(); throw e; } finally { conn.release(); }
+    await audit({ orgId: invitation.organization_id, actorId: req.user.id, action: 'INVITATION_ACCEPTED', targetType: 'INVITATION', targetId: invitation.id, ip: req.ip });
+    res.json({ message: 'Invitation accepted.' });
+  } catch (err) { next(err); }
+});
+router.post('/organizations/:orgId/invitations', requireAuth, requireActiveUser, requireRole('OWNER','ADMIN'), async (req, res, next) => {
+  try {
+    const input = z.object({ email: z.string().email().transform(v => v.toLowerCase()), role: z.enum(['ADMIN','MANAGER','ANALYST','VIEWER']) }).parse(req.body);
+    const token = randomBytes(32).toString('hex'), id = randomUUID();
+    await pool.execute('INSERT INTO invitations (id, organization_id, email, role, token_hash, invited_by, expires_at) VALUES (?, ?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 7 DAY))', [id, req.params.orgId, input.email, input.role, createHash('sha256').update(token).digest('hex'), req.user.id]);
+    await audit({ orgId: req.params.orgId, actorId: req.user.id, action: 'INVITATION_CREATED', targetType: 'INVITATION', targetId: id, metadata: { email: input.email, role: input.role }, ip: req.ip });
+    res.status(201).json({ message: 'Invitation created. Deliver this one-time token through a trusted channel.', invitationUrl: `${config.inviteBaseUrl}?token=${token}` });
+  } catch (err) { next(err); }
+});
+export default router;
