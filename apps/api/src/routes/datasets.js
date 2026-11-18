@@ -44,7 +44,7 @@ router.post('/organizations/:orgId/datasets',datasetRole,upload.single('file'),a
       [id,req.params.orgId,input.name,path.basename(req.file.originalname).slice(0,255),storedPath,req.file.size,records.length,columns.length,JSON.stringify(columns),JSON.stringify(records.slice(0,10)),req.user.id]);
     await audit({orgId:req.params.orgId,actorId:req.user.id,action:'DATASET_UPLOADED',targetType:'DATASET',targetId:id,metadata:{name:input.name,rowCount:records.length,columnCount:columns.length},ip:req.ip});
     res.status(201).json({dataset:{id,name:input.name,rowCount:records.length,columnCount:columns.length,columns,preview:records.slice(0,10)}});
-  }catch(e){if(storedPath)await unlink(storedPath).catch(()=>{});next(e);}
+  }catch(e){if(storedPath)await unlink(storedPath).catch(()=>{});if(e?.code?.startsWith('CSV_'))return res.status(400).json({error:'The CSV file is invalid. Check its header and row structure.'});next(e);}
 });
 
 router.get('/datasets/:datasetId/preview',async(req,res,next)=>{
@@ -53,7 +53,9 @@ router.get('/datasets/:datasetId/preview',async(req,res,next)=>{
     if(!rows.length)return res.status(404).json({error:'Dataset not found.'});
     const [membership]=await pool.execute("SELECT id FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE'",[rows[0].organization_id,req.user.id]);
     if(!membership.length)return res.status(403).json({error:'Insufficient organization permissions.'});
-    res.json({dataset:{id:rows[0].id,name:rows[0].name,columns:rows[0].columns_json,preview:rows[0].preview_json}});
+    const columns=typeof rows[0].columns_json==='string'?JSON.parse(rows[0].columns_json):rows[0].columns_json;
+    const preview=typeof rows[0].preview_json==='string'?JSON.parse(rows[0].preview_json):rows[0].preview_json;
+    res.json({dataset:{id:rows[0].id,name:rows[0].name,columns,preview}});
   }catch(e){next(e);}
 });
 
