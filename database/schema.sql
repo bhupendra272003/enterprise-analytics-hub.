@@ -65,7 +65,7 @@ CREATE TABLE audit_logs (
   CONSTRAINT fk_audit_actor FOREIGN KEY (actor_user_id) REFERENCES users(id)
 ) ENGINE=InnoDB;
 
-CREATE TABLE organization_access_requests (
+CREATE TABLE IF NOT EXISTS organization_access_requests (
   id CHAR(36) PRIMARY KEY,
   organization_id CHAR(36) NOT NULL,
   user_id CHAR(36) NOT NULL,
@@ -73,7 +73,6 @@ CREATE TABLE organization_access_requests (
   reviewed_by CHAR(36) NULL,
   reviewed_at DATETIME NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE KEY uq_org_user_access_request (organization_id, user_id),
   KEY idx_access_request_queue (organization_id, status, created_at),
   CONSTRAINT fk_access_request_org FOREIGN KEY (organization_id) REFERENCES organizations(id),
   CONSTRAINT fk_access_request_user FOREIGN KEY (user_id) REFERENCES users(id),
