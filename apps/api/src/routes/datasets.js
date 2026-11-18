@@ -35,15 +35,16 @@ router.post('/organizations/:orgId/datasets',datasetRole,upload.single('file'),a
     const columns=Object.keys(records[0]);
     if(!columns.length||columns.some(c=>!c.trim()))return res.status(400).json({error:'The CSV must contain valid column headers.'});
     if(columns.length>200)return res.status(400).json({error:'CSV files may contain at most 200 columns.'});
+    const preview=records.slice(0,10).map(record=>Object.fromEntries(columns.map(column=>[column,String(record[column]??'').slice(0,500)])));
     const id=randomUUID();
     const root=path.resolve(config.dataStorageDir);
     await mkdir(root,{recursive:true});
     storedPath=path.join(root,id+'.csv');
     await writeFile(storedPath,req.file.buffer,{flag:'wx',mode:0o600});
     await pool.execute('INSERT INTO datasets (id,organization_id,name,original_filename,storage_path,file_size,row_count,column_count,columns_json,preview_json,uploaded_by) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
-      [id,req.params.orgId,input.name,path.basename(req.file.originalname).slice(0,255),storedPath,req.file.size,records.length,columns.length,JSON.stringify(columns),JSON.stringify(records.slice(0,10)),req.user.id]);
+      [id,req.params.orgId,input.name,path.basename(req.file.originalname).slice(0,255),storedPath,req.file.size,records.length,columns.length,JSON.stringify(columns),JSON.stringify(preview),req.user.id]);
     await audit({orgId:req.params.orgId,actorId:req.user.id,action:'DATASET_UPLOADED',targetType:'DATASET',targetId:id,metadata:{name:input.name,rowCount:records.length,columnCount:columns.length},ip:req.ip});
-    res.status(201).json({dataset:{id,name:input.name,rowCount:records.length,columnCount:columns.length,columns,preview:records.slice(0,10)}});
+    res.status(201).json({dataset:{id,name:input.name,rowCount:records.length,columnCount:columns.length,columns,preview}});
   }catch(e){if(storedPath)await unlink(storedPath).catch(()=>{});if(e?.code?.startsWith('CSV_'))return res.status(400).json({error:'The CSV file is invalid. Check its header and row structure.'});next(e);}
 });
 
