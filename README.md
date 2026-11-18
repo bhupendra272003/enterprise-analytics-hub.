@@ -1,32 +1,60 @@
 # NEXUS ANALYTICS — Enterprise Analytics Hub
 
-A multi-tenant analytics and team collaboration platform. This repository starts with Module 01: identity, organizations, memberships, invitations and approval foundations.
+A multi-tenant analytics and team collaboration platform. The repository currently contains the identity foundation and the first responsive web application.
 
 ## Stack
+- Web: Next.js 15, React 19, TypeScript
 - API: Node.js 20+, Express, MySQL 8+
-- Authentication: secure server-side sessions and bcrypt password hashing
+- Authentication: server-side sessions and bcrypt password hashing
 - Validation: Zod
 - Security baseline: Helmet, CORS allow-list, rate limiting and origin/request-header checks
 
 ## Repository layout
+- `apps/web`: Next.js web application (sign-in, registration and authenticated workspace)
 - `apps/api`: Express API
 - `database/schema.sql`: MySQL schema
 - `docs/ARCHITECTURE.md`: architecture and roadmap
-- `docs/API-TESTING.md`: local smoke-test sequence
+- `docs/API-TESTING.md`: local API smoke-test sequence
 
 ## Local setup
-1. Create a MySQL 8 database and run `database/schema.sql`.
-2. Copy `apps/api/.env.example` to `apps/api/.env` and set local credentials.
-3. From `apps/api`, run `npm install`.
-4. Run `npm run dev`.
-5. Check `GET http://localhost:4000/health`.
 
-## Important
-This is a development foundation, not production-certified software. Before public deployment, complete CSRF protection, email verification, password recovery, MFA, security review, backups, monitoring, strict CORS configuration and managed secret storage. Never commit real credentials or customer data.
+### 1. Database
+Create a MySQL 8 database and run `database/schema.sql`.
+
+### 2. API
+Copy `apps/api/.env.example` to `apps/api/.env`, configure local database credentials and a random session secret of at least 32 characters.
+
+From `apps/api`:
+```bash
+npm install
+npm run dev
+```
+The API listens on port 4000 by default. Check `http://localhost:4000/health`.
+
+### 3. Web app
+Copy `apps/web/.env.example` to `apps/web/.env.local`. Set `NEXT_PUBLIC_API_URL=http://localhost:4000`.
+
+From `apps/web`:
+```bash
+npm install
+npm run dev
+```
+Open `http://localhost:3000`.
+
+For local development, configure the API `APP_ORIGIN=http://localhost:3000` and `COOKIE_SECURE=false`. Use HTTPS and secure cookies in production.
+
+## Current identity flow
+- Registration creates a PENDING account.
+- Login is allowed only for ACTIVE accounts.
+- The authenticated workspace reads the signed-in profile and organization memberships.
+- Organization-specific access is enforced by the API, not by hiding frontend links.
+
+## Important production checklist
+This is a development foundation, not production-certified software. Before public deployment, complete mature CSRF protection, email verification, password recovery, MFA, invitation email delivery, tenant-isolation tests, security review, backups, monitoring and managed secret storage. Configure strict CORS and secure cookies for the deployed domains. Never commit real credentials or customer data.
 
 ## Roadmap
 1. Identity, organizations and access approvals
-2. Team directory and invitations UI
+2. Team directory and invitation UI
 3. Projects, tasks, assignments and reviews
 4. Authorized data connectors and ingestion
 5. Immutable raw snapshots and versioned working datasets
