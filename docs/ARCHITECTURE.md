@@ -1,37 +1,53 @@
 # NEXUS ANALYTICS — Architecture
 
-## Principles
-1. Multi-tenant: every organization-owned record is scoped to an organization.
-2. Least privilege: enforce permissions in the API, not only in the UI.
-3. Data integrity: raw ingested snapshots remain separate from analyst working copies.
-4. Traceability: security-sensitive actions emit audit events.
-5. Human approval: self-registration creates a pending account; organization access requires invitation or approval.
-6. Separation of duties: owners, admins, managers, analysts and viewers have distinct permissions.
+## Current architecture
 
-## Logical architecture
-Browser (Next.js) -> HTTPS API (Node.js / Express) -> Auth/session -> RBAC + tenant scope -> MySQL.
-Future services: queue, Python workers, object storage, approved API/database connectors, reporting layer and Power BI integration.
+- Web application: Next.js 15, React 19 and TypeScript.
+- API: Node.js 20 and Express.
+- Identity: server-side MySQL sessions, bcrypt password hashing, email verification and password-reset tokens.
+- Tenant model: organizations, memberships and role-based API authorization.
+- Database: MySQL 8.
+- Data ingestion: CSV upload with a private local-disk storage adapter, metadata catalog, 10-row preview and basic column profiling.
+- Reporting: organization-scoped Power BI report-link catalog. Power BI itself remains responsible for report access.
+- Notifications: user-scoped in-app inbox for access decisions, invitations, task assignments and report publication.
+- Audit: organization-scoped activity feed for owners/admins.
+
+## Multi-tenant security
+
+Every organization-owned API operation checks the signed-in user's active membership in the requested organization. Never rely on frontend visibility for authorization. User-level notifications are filtered by the authenticated user. Dataset previews and files are accessible only after membership checks.
 
 ## Roles
-- OWNER: full organization administration and security policy.
-- ADMIN: manage members and organization settings, but not transfer ownership.
-- MANAGER: manage projects and assignments within permitted scope.
-- ANALYST: work on assigned projects and working datasets.
-- VIEWER: read-only access to explicitly shared resources.
 
-## Data governance
-- Raw ingestion records are append-only at application level.
-- Analysts work on derived datasets.
-- Dataset versions are immutable; transformations create new versions.
-- Retention/purge requires a separate owner-controlled, audited workflow.
-- Audit events should be exported to tamper-resistant storage.
-- A database or infrastructure superuser may still override application-level restrictions.
+- OWNER: full organization administration, member management and access decisions.
+- ADMIN: manage organization members and settings; cannot grant administrator privileges or modify another admin.
+- MANAGER: coordinate projects, assign tasks, review access requests and view the member directory.
+- ANALYST: create tasks, work with authorized datasets and reports; can update only tasks assigned to them.
+- VIEWER: read-only organization access.
+
+## Data lifecycle
+
+The current CSV adapter stores source files outside the public web directory and persists metadata plus a small preview in MySQL. It is a development/local-disk implementation; production requires a persistent private volume or managed object storage. Versioned immutable snapshots, Python cleaning workers, quality rules and retention controls are planned but not yet implemented.
+
+## Security controls currently present
+
+- Password hashing with bcrypt.
+- Email verification required before sign-in for open registration.
+- One-time, expiring verification and password-reset tokens stored as SHA-256 hashes.
+- Password reset revokes sessions stored in the MySQL session table.
+- Session regeneration on login.
+- Secure cookie settings configurable by environment.
+- Helmet, exact-origin CORS, request-origin/header guard and authentication rate limiting.
+- Tenant-scoped membership checks and audit events for key operations.
+
+## Production gaps
+
+Complete a dedicated CSRF review and token strategy, MFA, automated security/dependency scanning, tenant-isolation integration tests, object-storage adapter, monitoring/alerting, backup/restore drills, and independent security review. Power BI secure embedding and service-principal token handling are not implemented; current integration is a link catalog only.
 
 ## Roadmap
-02 Team directory and invitation UI
-03 Projects, tasks, assignment, deadlines and reviews
-04 Approved data-source registry and scheduled ingestion
-05 Raw/working dataset versioning and Python cleaning jobs
-06 Governed SQL workspace
-07 Power BI/report integration and dashboards
-08 Audit console, alerts, backups, MFA and security hardening
+
+1. Complete identity and access management with MFA and security review.
+2. Add persistent object storage, dataset versions and immutable raw snapshots.
+3. Add Python profiling/cleaning jobs and governed analyst workspace.
+4. Add approved data connectors and scheduled ingestion.
+5. Add secure Power BI embedding and dashboard integration.
+6. Add operational alerts, monitoring and recovery automation.
