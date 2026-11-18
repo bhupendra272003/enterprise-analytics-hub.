@@ -49,10 +49,10 @@ router.post('/verify-email',async(req,res,next)=>{
 });
 router.post('/resend-verification',async(req,res,next)=>{
  try{
+  if(config.nodeEnv==='production'&&!config.smtpHost)return res.status(503).json({error:'Email delivery is not configured.'});
   const email=z.string().trim().email().max(254).parse(req.body.email).toLowerCase();
   const [rows]=await pool.execute('SELECT id,full_name,email_verified_at FROM users WHERE email=? LIMIT 1',[email]);
   if(!rows.length||rows[0].email_verified_at)return res.json({message:'If the account needs verification, a new link has been sent.'});
-  if(config.nodeEnv==='production'&&!config.smtpHost)return res.status(503).json({error:'Email delivery is not configured.'});
   const token=await createToken(rows[0].id,'EMAIL_VERIFY'),url=tokenUrl('/verify-email',token);
   const sent=await sendEmail({to:email,subject:'Your NEXUS verification link',text:'Verify your email: '+url+'\n\nThis link expires in 24 hours.'});
   res.json({message:sent?'If the account needs verification, a new link has been sent.':'Development verification link generated.',...(!sent&&config.nodeEnv!=='production'?{verificationUrl:url}:{})});
@@ -79,10 +79,10 @@ router.post('/login',async(req,res,next)=>{
 });
 router.post('/forgot-password',async(req,res,next)=>{
  try{
+  if(config.nodeEnv==='production'&&!config.smtpHost)return res.status(503).json({error:'Password recovery email is not configured.'});
   const email=z.string().trim().email().max(254).parse(req.body.email).toLowerCase();
   const [rows]=await pool.execute('SELECT id FROM users WHERE email=? LIMIT 1',[email]);
   if(!rows.length)return res.json({message:'If an account exists for that email, a reset link has been sent.'});
-  if(config.nodeEnv==='production'&&!config.smtpHost)return res.status(503).json({error:'Password recovery email is not configured.'});
   const token=await createToken(rows[0].id,'PASSWORD_RESET'),url=tokenUrl('/reset-password',token);
   const sent=await sendEmail({to:email,subject:'Reset your NEXUS Analytics password',text:'Reset your password: '+url+'\n\nThis link expires in 1 hour. If you did not request this, ignore this email.'});
   res.json({message:'If an account exists for that email, a reset link has been sent.',...(!sent&&config.nodeEnv!=='production'?{resetUrl:url}:{})});
