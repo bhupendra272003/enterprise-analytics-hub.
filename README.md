@@ -5,7 +5,8 @@ A multi-tenant analytics and team collaboration platform. The repository include
 ## Stack
 - Web: Next.js 15, React 19, TypeScript
 - API: Node.js 20+, Express, MySQL 8+
-- Authentication: server-side sessions and bcrypt password hashing
+- Authentication: server-side sessions, bcrypt password hashing, email verification and password recovery
+- Email: configurable SMTP via Nodemailer
 - Validation: Zod
 - Security baseline: Helmet, CORS allow-list, rate limiting and origin/request-header checks
 
@@ -22,7 +23,7 @@ A multi-tenant analytics and team collaboration platform. The repository include
 Create a MySQL 8 database and run `database/schema.sql`. The fresh-install schema includes identity, access requests, projects, tasks, datasets and reports. For an existing database, apply the scripts in `database/migrations/` in numeric order; migration scripts use `IF NOT EXISTS` for their tables.
 
 ### 2. API
-Copy `apps/api/.env.example` to `apps/api/.env`, configure local database credentials and a random session secret of at least 32 characters.
+Copy `apps/api/.env.example` to `apps/api/.env`, configure local database credentials and a random session secret of at least 32 characters. Configure SMTP credentials for production email verification and password recovery; development mode returns one-time links in the UI when SMTP is not configured.
 
 From `apps/api`:
 ```bash
@@ -47,8 +48,8 @@ Open `http://localhost:3000`.
 For local development, configure the API `APP_ORIGIN=http://localhost:3000` and `COOKIE_SECURE=false`. Use HTTPS and secure cookies in production.
 
 ## Current identity flow
-- Registration creates a PENDING account.
-- Pending users can sign in to submit an organization-specific access request; suspended accounts are blocked.
+- Registration creates a PENDING account and requires email verification before sign-in.
+- Verified pending users can sign in to submit an organization-specific access request; suspended accounts are blocked.
 - Organization administrators review requests before membership is activated.
 - The authenticated workspace reads the signed-in profile and organization memberships.
 - Organization-specific access is enforced by the API, not by hiding frontend links.
@@ -74,6 +75,8 @@ For local development, configure the API `APP_ORIGIN=http://localhost:3000` and 
 - `/workspace/audit`: review organization audit activity (OWNER/ADMIN)
 - `/workspace/reports`: manage the organization's Power BI report-link catalog
 - `/workspace/notifications`: review and mark in-app notifications
+- `/verify-email?token=...`: verify an email address
+- `/forgot-password` and `/reset-password?token=...`: recover and reset account passwords
 - `/accept-invite?token=...`: accept an invitation or create an invited account
 
 
@@ -86,7 +89,7 @@ In-app notifications are generated for access requests and decisions, invitation
 CSV uploads are stored outside the public web directory. The default local disk adapter is suitable for development only; configure a persistent private volume or replace the storage adapter with managed object storage before production. Dataset preview currently exposes only the first 10 rows. Python profiling/cleaning jobs and dataset versioning are the next data-engineering layer.
 
 ## Important production checklist
-This is a development foundation, not production-certified software. Before public deployment, complete mature CSRF protection, email verification, password recovery, MFA, invitation email delivery, tenant-isolation tests, security review, backups, monitoring and managed secret storage. Configure strict CORS and secure cookies for the deployed domains. Never commit real credentials or customer data.
+This is a development foundation, not production-certified software. Before public deployment, complete mature CSRF protection, MFA, automated invitation email delivery, tenant-isolation tests, security review, backups, monitoring and managed secret storage. Configure strict CORS and secure cookies for the deployed domains. Never commit real credentials or customer data.
 
 ## Roadmap
 1. Identity, organizations, access requests and approvals — foundation implemented
