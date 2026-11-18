@@ -45,7 +45,8 @@ For local development, configure the API `APP_ORIGIN=http://localhost:3000` and 
 
 ## Current identity flow
 - Registration creates a PENDING account.
-- Login is allowed only for ACTIVE accounts.
+- Pending users can sign in to submit an organization-specific access request; suspended accounts are blocked.
+- Organization administrators review requests before membership is activated.
 - The authenticated workspace reads the signed-in profile and organization memberships.
 - Organization-specific access is enforced by the API, not by hiding frontend links.
 
@@ -54,6 +55,8 @@ For local development, configure the API `APP_ORIGIN=http://localhost:3000` and 
 - Open `/workspace/team` after signing in.
 - Create an organization; its creator becomes OWNER.
 - OWNER/ADMIN users can generate 7-day invitation links for MANAGER, ANALYST, VIEWER or ADMIN roles.
+- Pending users can submit an organization-specific access request; OWNER/ADMIN/MANAGER users can view the queue, and OWNER/ADMIN users can approve or reject requests.
+- OWNER/ADMIN/MANAGER users can view the organization member directory.
 - Invitees can accept with an existing account or create an account from the invite link.
 - Invite links are one-time tokens; only a matching invited email can accept with an existing account.
 - Keep invitation URLs private. The current API returns the URL for manual delivery; production must integrate a trusted email provider and must not expose tokens in logs.
@@ -61,7 +64,7 @@ For local development, configure the API `APP_ORIGIN=http://localhost:3000` and 
 ## Frontend routes
 - `/`: sign in and open registration
 - `/workspace`: authenticated profile and organization overview
-- `/workspace/team`: organization creation and invitations
+- `/workspace/team`: organization creation and invitations (member directory and approval API are available; UI integration is pending)
 - `/accept-invite?token=...`: accept an invitation or create an invited account
 
 
