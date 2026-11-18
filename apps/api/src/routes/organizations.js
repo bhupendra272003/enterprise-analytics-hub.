@@ -22,6 +22,7 @@ router.post('/:orgId/request-access', requireAuth, async (req, res, next) => {
     if (!req.user || req.user.account_status === 'SUSPENDED') {
       return res.status(403).json({ error: 'This account cannot request access.' });
     }
+    if (!req.user.email_verified_at) return res.status(403).json({ error: 'Verify your email before requesting organization access.' });
     const [orgs] = await pool.execute('SELECT id FROM organizations WHERE id = ? LIMIT 1', [req.params.orgId]);
     if (!orgs.length) return res.status(404).json({ error: 'Organization not found.' });
     const [memberRows] = await pool.execute("SELECT id FROM memberships WHERE organization_id = ? AND user_id = ? AND membership_status = 'ACTIVE' LIMIT 1", [req.params.orgId, req.user.id]);
