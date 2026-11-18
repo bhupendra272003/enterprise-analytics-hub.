@@ -29,7 +29,7 @@ From `apps/api`:
 npm install
 npm run dev
 ```
-The API listens on port 4000 by default. Check `http://localhost:4000/health`.
+The API listens on port 4000 by default. Check `http://localhost:4000/health`. Set `DATA_STORAGE_DIR` to a private, persistent disk path for CSV uploads; never place it inside the public web root. The default local path is `apps/api/storage/datasets` when starting from `apps/api`.
 
 ### Database migrations
 For an existing database, apply migrations in numeric order from `database/migrations/`. The initial schema creates identity and access-request tables; later migrations add projects and tasks.
@@ -75,6 +75,9 @@ For local development, configure the API `APP_ORIGIN=http://localhost:3000` and 
 
 
 For production, set `COOKIE_SECURE=true`, use HTTPS, and configure `APP_ORIGIN` and `INVITE_BASE_URL` to the deployed frontend. Prefer frontend and API custom subdomains under the same site (for example, `app.example.com` and `api.example.com`) so secure session cookies work reliably. If using separate cross-site hosting domains, assess browser third-party-cookie restrictions before choosing `COOKIE_SAME_SITE=none`; that setting also requires secure cookies.
+
+## Data storage note
+CSV uploads are stored outside the public web directory. The default local disk adapter is suitable for development only; configure a persistent private volume or replace the storage adapter with managed object storage before production. Dataset preview currently exposes only the first 10 rows. Python profiling/cleaning jobs and dataset versioning are the next data-engineering layer.
 
 ## Important production checklist
 This is a development foundation, not production-certified software. Before public deployment, complete mature CSRF protection, email verification, password recovery, MFA, invitation email delivery, tenant-isolation tests, security review, backups, monitoring and managed secret storage. Configure strict CORS and secure cookies for the deployed domains. Never commit real credentials or customer data.
