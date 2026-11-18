@@ -1,0 +1,36 @@
+import express from 'express';
+import session from 'express-session';
+import MySQLStoreFactory from 'express-mysql-session';
+import helmet from 'helmet';
+import cors from 'cors';
+import rateLimit from 'express-rate-limit';
+import { config } from './config.js';
+import { pool } from './db.js';
+import { loadUser } from './middleware.js';
+import authRoutes from './routes/auth.js';
+import organizationRoutes from './routes/organizations.js';
+import invitationRoutes from './routes/invitations.js';
+const app = express();
+const MySQLStore = MySQLStoreFactory(session);
+const sessionStore = new MySQLStore({ createDatabaseTable: true }, pool);
+app.set('trust proxy', 1);
+app.use(helmet());
+app.use(cors({ origin: config.appOrigin, credentials: true }));
+app.use(express.json({ limit: '1mb' }));
+app.use((req, res, next) => {
+  if (['GET','HEAD','OPTIONS'].includes(req.method)) return next();
+  if (req.get('origin') !== config.appOrigin || req.get('x-hub-request') !== '1') return res.status(403).json({ error: 'Request origin validation failed.' });
+  next();
+});
+app.use(session({ name: 'hub.sid', secret: config.sessionSecret, store: sessionStore, resave: false, saveUninitialized: false, cookie: { httpOnly: true, secure: config.cookieSecure, sameSite: 'strict', maxAge: 8 * 60 * 60 * 1000 } }));
+app.use(loadUser);
+app.get('/health', (req, res) => res.json({ status: 'ok', service: 'nexus-analytics-api' }));
+app.use('/api/auth', rateLimit({ windowMs: 15 * 60 * 1000, limit: 30 }), authRoutes);
+app.use('/api/organizations', organizationRoutes);
+app.use('/api/invitations', invitationRoutes);
+app.use((err, req, res, next) => {
+  if (err?.name === 'ZodError') return res.status(400).json({ error: 'Validation failed.', details: err.issues });
+  console.error(err);
+  res.status(500).json({ error: 'Internal server error.' });
+});
+app.listen(config.port, () => console.log(`NEXUS Analytics API listening on port ${config.port}`));
