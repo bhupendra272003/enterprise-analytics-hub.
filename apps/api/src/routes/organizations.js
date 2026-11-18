@@ -90,6 +90,16 @@ router.get('/:orgId/members', requireRole('OWNER', 'ADMIN', 'MANAGER'), async (r
   } catch (err) { next(err); }
 });
 
+router.get('/:orgId/audit', requireRole('OWNER', 'ADMIN'), async (req, res, next) => {
+  try {
+    const [rows] = await pool.execute(
+      'SELECT a.id, a.action, a.target_type AS targetType, a.target_id AS targetId, a.metadata, a.created_at AS createdAt, u.full_name AS actorName, u.email AS actorEmail FROM audit_logs a LEFT JOIN users u ON u.id = a.actor_user_id WHERE a.organization_id = ? ORDER BY a.created_at DESC LIMIT 100',
+      [req.params.orgId]
+    );
+    res.json({ events: rows });
+  } catch (err) { next(err); }
+});
+
 router.get('/:orgId/requests', requireRole('OWNER', 'ADMIN', 'MANAGER'), async (req, res, next) => {
   try {
     const [rows] = await pool.execute(
