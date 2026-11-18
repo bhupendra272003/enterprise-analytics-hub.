@@ -31,6 +31,9 @@ npm run dev
 ```
 The API listens on port 4000 by default. Check `http://localhost:4000/health`.
 
+### Database migrations
+For an existing database, apply migrations in numeric order from `database/migrations/`. The initial schema creates identity and access-request tables; later migrations add projects and tasks.
+
 ### 3. Web app
 Copy `apps/web/.env.example` to `apps/web/.env.local`. Set `NEXT_PUBLIC_API_URL=http://localhost:4000`.
 
@@ -64,7 +67,9 @@ For local development, configure the API `APP_ORIGIN=http://localhost:3000` and 
 ## Frontend routes
 - `/`: sign in and open registration
 - `/workspace`: authenticated profile and organization overview
-- `/workspace/team`: organization creation and invitations (member directory and approval API are available; UI integration is pending)
+- `/workspace/team`: organization creation, invitations, member directory and access approval queue
+- `/workspace/access`: browse organizations and request membership
+- `/workspace/projects`: create projects, add tasks and update task status
 - `/accept-invite?token=...`: accept an invitation or create an invited account
 
 
