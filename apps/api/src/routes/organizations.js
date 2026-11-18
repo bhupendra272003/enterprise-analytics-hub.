@@ -108,7 +108,7 @@ router.patch('/:orgId/members/:userId', requireRole('OWNER', 'ADMIN'), async (re
     );
     if (!rows.length) return res.status(404).json({ error: 'Organization member not found.' });
     if (rows[0].role === 'OWNER') return res.status(403).json({ error: 'The organization owner cannot be modified here.' });
-    if (req.membership.role === 'ADMIN' && rows[0].role === 'ADMIN') return res.status(403).json({ error: 'Only the owner can modify another administrator.' });
+    if (req.membership.role === 'ADMIN' && (rows[0].role === 'ADMIN' || input.role === 'ADMIN')) return res.status(403).json({ error: 'Only the owner can manage administrator roles.' });
     await pool.execute(
       'UPDATE memberships SET role = COALESCE(?, role), membership_status = COALESCE(?, membership_status) WHERE organization_id = ? AND user_id = ?',
       [input.role || null, input.membershipStatus || null, req.params.orgId, req.params.userId]
