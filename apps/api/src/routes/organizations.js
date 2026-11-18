@@ -69,6 +69,17 @@ router.post('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.get('/:orgId/audit', requireRole('OWNER', 'ADMIN'), async (req, res, next) => {
+  try {
+    const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 100);
+    const [rows] = await pool.execute(
+      'SELECT a.id, a.action, a.target_type AS targetType, a.target_id AS targetId, a.metadata, a.ip_address AS ipAddress, a.created_at AS createdAt, u.full_name AS actorName, u.email AS actorEmail FROM audit_logs a LEFT JOIN users u ON u.id = a.actor_user_id WHERE a.organization_id = ? ORDER BY a.created_at DESC LIMIT ?',
+      [req.params.orgId, limit]
+    );
+    res.json({ events: rows });
+  } catch (err) { next(err); }
+});
+
 router.get('/:orgId/members', requireRole('OWNER', 'ADMIN', 'MANAGER'), async (req, res, next) => {
   try {
     const [rows] = await pool.execute(
