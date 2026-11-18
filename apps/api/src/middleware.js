@@ -10,7 +10,7 @@ export function requireActiveUser(req, res, next) {
 export async function loadUser(req, res, next) {
   try {
     if (!req.session?.userId) return next();
-    const [rows] = await pool.execute('SELECT id, full_name, email, account_status FROM users WHERE id = ? LIMIT 1', [req.session.userId]);
+    const [rows] = await pool.execute('SELECT id, full_name, email, account_status, email_verified_at FROM users WHERE id = ? LIMIT 1', [req.session.userId]);
     req.user = rows[0] || null;
     next();
   } catch (err) { next(err); }
