@@ -96,6 +96,7 @@ router.post('/reset-password',async(req,res,next)=>{
   if(!rows.length){await conn.rollback();return res.status(400).json({error:'Password reset link is invalid or expired.'});}
   const item=rows[0],hash=await bcrypt.hash(input.password,12);
   await conn.execute('UPDATE users SET password_hash=? WHERE id=?',[hash,item.user_id]);
+  await conn.execute('DELETE FROM sessions WHERE data LIKE ?',['%'+item.user_id+'%']);
   await conn.execute("UPDATE auth_tokens SET used_at=NOW() WHERE user_id=? AND purpose='PASSWORD_RESET' AND used_at IS NULL",[item.user_id]);
   await conn.commit();
   await audit({actorId:item.user_id,action:'PASSWORD_RESET',targetType:'USER',targetId:item.user_id,ip:req.ip});
