@@ -11,7 +11,7 @@ const getUser=async(req:Request,env:Env):Promise<User|null>=>{
 const membership=async(env:Env,orgId:string,userId:string)=>env.DB.prepare("SELECT role FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE'").bind(orgId,userId).first<{role:Role}>();
 const audit=(env:Env,orgId:string,userId:string,action:string,id:string,metadata?:unknown)=>env.DB.prepare("INSERT INTO audit_logs (organization_id,actor_user_id,action,target_type,target_id,metadata) VALUES (?,?,?,'DATASET',?,?)").bind(orgId,userId,action,id,metadata===undefined?null:JSON.stringify(metadata)).run();
 const parseCsv=(buffer:ArrayBuffer)=>{
- const records=parse(new Uint8Array(buffer),{columns:true,skip_empty_lines:true,bom:true,trim:true,relax_column_count:false,skip_records_with_error:false});
+ const records=parse(new TextDecoder().decode(new Uint8Array(buffer)),{columns:true,skip_empty_lines:true,bom:true,trim:true,relax_column_count:false,skip_records_with_error:false});
  if(!records.length)throw new Error("EMPTY");
  const columns=Object.keys(records[0]);
  if(!columns.length||columns.length>200||columns.some(c=>!c.trim()))throw new Error("HEADERS");
