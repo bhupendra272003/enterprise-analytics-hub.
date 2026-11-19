@@ -20,7 +20,7 @@ def profile(rows, headers):
     numeric_cells = valid_numeric = 0
     for key in headers:
         values = [str(row.get(key, "")).strip() for row in rows if str(row.get(key, "")).strip()]
-        if values and sum(is_number(v) for v in values) / len(values) >= 0.9:
+        if values and sum(is_number(v) for v in values) / len(values) >= 0.5:
             numeric_cells += len(values)
             valid_numeric += sum(is_number(v) for v in values)
     completeness = 100 if total == 0 else (total - missing) / total * 100
@@ -95,8 +95,8 @@ def main():
         values = [float(row[key]) for row in rows if is_number(row[key])]
         if len(values) >= 4 and len(values) / max(1, sum(1 for row in rows if row[key].strip())) >= 0.9:
             ordered = sorted(values)
-            q1 = statistics.median(ordered[:len(ordered)//2])
-            q3 = statistics.median(ordered[(len(ordered)+1)//2:])
+            q1 = statistics.median(ordered[:(len(ordered)+1)//2])
+            q3 = statistics.median(ordered[len(ordered)//2:])
             spread = q3 - q1
             count = sum(1 for value in values if value < q1 - 1.5 * spread or value > q3 + 1.5 * spread)
             if count:
