@@ -1,6 +1,6 @@
 'use client';
 import {FormEvent,useState} from 'react';
-const API=process.env.NEXT_PUBLIC_API_URL||'http://localhost:4000';
+const API=process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:4000');
 export default function ForgotPasswordPage(){
  const [email,setEmail]=useState(''),[message,setMessage]=useState(''),[resetUrl,setResetUrl]=useState(''),[busy,setBusy]=useState(false);
  async function submit(e:FormEvent){e.preventDefault();setBusy(true);setMessage('');try{const r=await fetch(API+'/api/auth/forgot-password',{method:'POST',headers:{'Content-Type':'application/json','X-Hub-Request':'1'},body:JSON.stringify({email})});const d=await r.json();setMessage(d.message||d.error||'Request completed.');setResetUrl(d.resetUrl||'');}catch{setMessage('Unable to connect to NEXUS.');}finally{setBusy(false);}}
