@@ -1,6 +1,6 @@
 'use client';
 import {FormEvent,useEffect,useState} from 'react';
-const API=process.env.NEXT_PUBLIC_API_URL||'http://localhost:4000';
+const API=process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:4000');
 export default function ResetPasswordPage(){
  const [token,setToken]=useState(''),[password,setPassword]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false);
  useEffect(()=>setToken(new URLSearchParams(window.location.search).get('token')||''),[]);
