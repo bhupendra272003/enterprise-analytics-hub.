@@ -21,7 +21,7 @@ jobs:
         run: |
           test -n "$CF_TOKEN" || { echo "::error::Missing CLOUDFLARE_API_TOKEN repository secret"; exit 1; }
           test -n "$CF_ACCOUNT_ID" || { echo "::error::Missing CLOUDFLARE_ACCOUNT_ID repository secret"; exit 1; }
-      - name: Create or reuse D1, R2 and Queue resources
+      - name: Create or reuse D1 and Queue resources
         id: resources
         env:
           CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -47,19 +47,13 @@ jobs:
           }
           echo "Reusing the existing nexus-analytics D1 database."
           
-          r2_list=$(api "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/r2/buckets")
-          r2_exists=$(echo "$r2_list" | jq -r '.result.buckets[]? | select(.name=="nexus-analytics-datasets") | .name' | head -n1)
-          if [ -z "$r2_exists" ]; then
-            api -X POST -d '{"name":"nexus-analytics-datasets"}' "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/r2/buckets" >/dev/null
-          fi
-
           queue_list=$(api "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/queues")
           queue_exists=$(echo "$queue_list" | jq -r '.result[]? | select(.queue_name=="nexus-dataset-jobs") | .queue_name' | head -n1)
           if [ -z "$queue_exists" ]; then
             api -X POST -d '{"queue_name":"nexus-dataset-jobs"}' "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/queues" >/dev/null
           fi
           echo "d1_id=$d1_id" >> "$GITHUB_OUTPUT"
-          echo "D1 database, R2 bucket and Queue are ready."
+          echo "D1 database and Queue are ready. Dataset files use the Workers Free KV namespace configured in Wrangler."
       - name: Apply D1 migrations
         working-directory: apps/api-worker
         env:
