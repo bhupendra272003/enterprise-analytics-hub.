@@ -133,3 +133,13 @@ button,input{font:inherit}.shell{max-width:1440px;margin:auto;padding:0 6.1vw;mi
 .anomaly-history-list article small{font-size:10px;color:#8395ac}
 .anomaly-history-list article>span{font-size:10px;color:#aab8cb;white-space:nowrap}
 @media(max-width:700px){.anomaly-history-list article{grid-template-columns:1fr auto}.anomaly-history-list article>span{grid-column:1}.anomaly-history-list article button{grid-column:2;grid-row:1/3}}
+
+
+/* Dataset background job status */
+.background-job-panel{margin:18px 0;padding:18px 20px;border:1px solid var(--line,rgba(148,163,184,.2));border-radius:16px;background:var(--panel,rgba(15,23,42,.28))}
+.job-progress-track{height:8px;margin:14px 0 9px;overflow:hidden;border-radius:99px;background:rgba(148,163,184,.18)}
+.job-progress-track span{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#38bdf8,#818cf8);transition:width .35s ease}
+.job-progress-meta{display:flex;flex-wrap:wrap;gap:12px;align-items:center;color:var(--muted,#94a3b8);font-size:12px}
+.job-progress-meta b{color:var(--foreground,#e2e8f0);font-size:14px}
+.background-job-panel .small-action{margin-top:12px}
+@media(max-width:640px){.background-job-panel{padding:14px}.job-progress-meta{gap:8px}}
