@@ -1,4 +1,5 @@
 import { handleOrganizations } from "./organizations";
+import { handleProjects } from "./projects";
 import bcrypt from "bcryptjs";
 
 interface Env {
@@ -240,7 +241,7 @@ export default {
       return new Response(null, { status: 204, headers: {
         "access-control-allow-origin": env.APP_ORIGIN,
         "access-control-allow-credentials": "true",
-        "access-control-allow-methods": "GET,POST,OPTIONS",
+        "access-control-allow-methods": "GET,POST,PATCH,OPTIONS",
         "access-control-allow-headers": "Content-Type,X-Hub-Request",
         "access-control-max-age": "86400",
         "vary": "Origin"
@@ -256,7 +257,7 @@ export default {
       if (origin !== env.APP_ORIGIN || request.headers.get("X-Hub-Request") !== "1")
         return json({ error: "Request origin validation failed." }, 403, headers);
     }
-    if (url.pathname === "/api/organizations" || url.pathname.startsWith("/api/organizations/")) {
+    if (url.pathname.startsWith("/api/projects/") || url.pathname.startsWith("/api/tasks/") || (url.pathname.startsWith("/api/organizations/") && url.pathname.endsWith("/projects"))) {\n      const response = await handleProjects(request, env, url.pathname);\n      if (response) {\n        const merged = new Headers(response.headers);\n        for (const [key, value] of Object.entries(headers)) merged.set(key, value);\n        return new Response(response.body, { status: response.status, headers: merged });\n      }\n    }\n    if (url.pathname === "/api/organizations" || url.pathname.startsWith("/api/organizations/")) {
       const response = await handleOrganizations(request, env, url.pathname);
       if (response) {
         const merged = new Headers(response.headers);
