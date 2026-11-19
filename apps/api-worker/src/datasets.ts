@@ -1,6 +1,6 @@
 import { parse } from "csv-parse/sync";
 type Env={DB:D1Database;DATASETS:KVNamespace};
-const readStored=async(env:Env,key:string)=>{const bytes=await readStored(env,key,"arrayBuffer");if(!bytes)return null;return {arrayBuffer:async()=>bytes,text:async()=>new TextDecoder().decode(bytes),body:new Response(bytes).body};};
+const readStored=async(env:Env,key:string):Promise<{arrayBuffer:()=>Promise<ArrayBuffer>}|null>=>{const bytes=await env.DATASETS.get(key,"arrayBuffer");return bytes?{arrayBuffer:async()=>bytes}:null;};
 const MAX_SYNC_CSV_BYTES=256*1024;
 const syncLimitError=()=>json({error:"This CSV is larger than the current synchronous processing limit (256 KB). Background CSV jobs are being prepared; please use a smaller CSV for now."},413);
 type User={id:string;account_status:string};
