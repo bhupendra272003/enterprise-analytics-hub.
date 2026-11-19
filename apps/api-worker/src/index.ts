@@ -8,7 +8,7 @@ import { handleReports } from "./reports";
 
 interface Env {
   DB: D1Database;
-  DATASETS: R2Bucket;
+  DATASETS: KVNamespace;
   DATASET_JOBS: Queue<{ jobId: string }>;
   APP_ORIGIN: string;
   SESSION_TTL_SECONDS?: string;
