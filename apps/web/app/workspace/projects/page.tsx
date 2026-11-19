@@ -1,6 +1,6 @@
 'use client';
 import {FormEvent,useEffect,useState} from 'react';
-const API=process.env.NEXT_PUBLIC_API_URL||'http://localhost:4000';
+const API=process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:4000');
 type Org={id:string;name:string;role:string};type Project={id:string;name:string;description:string;status:string;priority:string};type Task={id:string;title:string;status:string;priority:string;dueDate?:string;assigneeId?:string|null;assigneeName?:string;canUpdate:boolean};type Member={id:string;fullName:string};
 async function call(path:string,options:RequestInit={}){const r=await fetch(API+path,{...options,credentials:'include',headers:{'Content-Type':'application/json','X-Hub-Request':'1',...(options.headers||{})}});const d=await r.json();if(!r.ok)throw new Error(d.error||'Request failed');return d;}
 export default function ProjectsPage(){
