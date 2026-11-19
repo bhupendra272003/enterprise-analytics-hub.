@@ -19,7 +19,7 @@ export async function handleDatasetJobs(req:Request,env:Env,path:string):Promise
   if(body.type!=="PROFILE")return json({error:"PROFILE is currently the only enabled background job type."},400);
   const id=crypto.randomUUID();
   await env.DB.prepare("INSERT INTO dataset_jobs (id,organization_id,dataset_id,requested_by,job_type,status,progress,stage,payload_json,max_attempts) VALUES (?,?,?,?,'PROFILE','QUEUED',0,'QUEUED','{}',3)").bind(id,ds.organization_id,ds.id,user.id).run();
-  try{const sent=await env.DATASET_JOBS.send({jobId:id});await env.DB.prepare("UPDATE dataset_jobs SET queue_message_id=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(sent?.id||null,id).run();}
+  try{await env.DATASET_JOBS.send({jobId:id});await env.DB.prepare("UPDATE dataset_jobs SET updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(id).run();}
   catch{await env.DB.prepare("UPDATE dataset_jobs SET status='FAILED',stage='QUEUE_UNAVAILABLE',error_code='QUEUE_SEND_FAILED',error_message='The queue is temporarily unavailable.',completed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(id).run();return json({error:"The job could not be queued. Please try again later."},503);}
   await env.DB.prepare("INSERT INTO audit_logs (organization_id,actor_user_id,action,target_type,target_id,metadata) VALUES (?,?,?,'DATASET_JOB',?,?)").bind(ds.organization_id,user.id,"DATASET_JOB_QUEUED",id,JSON.stringify({type:"PROFILE",datasetId:ds.id})).run();
   return json({job:{id,type:"PROFILE",status:"QUEUED",progress:0,stage:"QUEUED"}},202);
