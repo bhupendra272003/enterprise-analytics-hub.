@@ -4,8 +4,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  variables: write
+  contents: write
 
 jobs:
   provision:
@@ -70,11 +69,24 @@ jobs:
           open(path, "w").write(json.dumps(data, indent=2) + "\n")
           PY
           npx --yes wrangler@latest d1 migrations apply nexus-analytics --remote
-      - name: Save D1 identifier as repository variable
+      - name: Save D1 identifier in Wrangler configuration
         env:
-          GH_TOKEN: ${{ github.token }}
           D1_ID: ${{ steps.resources.outputs.d1_id }}
-        run: gh variable set CLOUDFLARE_D1_DATABASE_ID --body "$D1_ID"
+        run: |
+          python - <<'PY'
+          import json, os
+          path = "apps/api-worker/wrangler.jsonc"
+          data = json.load(open(path))
+          data["d1_databases"][0]["database_id"] = os.environ["D1_ID"]
+          open(path, "w").write(json.dumps(data, indent=2) + "\\n")
+          PY
+          if ! git diff --quiet -- apps/api-worker/wrangler.jsonc; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add apps/api-worker/wrangler.jsonc
+            git commit -m "Configure Cloudflare D1 database identifier"
+            git push
+          fi
       - name: Publish setup summary
         env:
           D1_ID: ${{ steps.resources.outputs.d1_id }}
@@ -82,7 +94,7 @@ jobs:
           {
             echo "## Cloudflare resources provisioned"
             echo "- D1 database: `nexus-analytics`"
-            echo "- D1 identifier saved as repository variable: `CLOUDFLARE_D1_DATABASE_ID`"
+            echo "- D1 identifier saved in `apps/api-worker/wrangler.jsonc`"
             echo "- R2 bucket: `nexus-analytics-datasets`"
             echo "- Queue: `nexus-dataset-jobs`"
             echo "- D1 migrations applied remotely."
