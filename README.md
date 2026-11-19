@@ -21,7 +21,7 @@ A multi-tenant analytics and team collaboration platform. The repository include
 ## Local setup
 
 ### 1. Database
-Create a MySQL 8 database and run `database/schema.sql`. The fresh-install schema includes identity, access requests, projects, tasks, datasets and reports. For an existing database, apply the scripts in `database/migrations/` in numeric order; migration scripts use `IF NOT EXISTS` for their tables. Migration 008 adds persisted dataset validation run history.
+Create a MySQL 8 database and run `database/schema.sql`. The fresh-install schema includes identity, access requests, projects, tasks, datasets, immutable dataset versions, validation history and reports. For an existing database, apply the scripts in `database/migrations/` in numeric order; migration scripts use `IF NOT EXISTS` for their tables. Migration 008 adds persisted dataset validation run history.
 
 ### 2. API
 Copy `apps/api/.env.example` to `apps/api/.env`, configure local database credentials and a random session secret of at least 32 characters. Configure SMTP credentials for production email verification and password recovery; development mode returns one-time links in the UI when SMTP is not configured.
