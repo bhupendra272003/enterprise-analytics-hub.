@@ -32,10 +32,14 @@ export async function handleOrganizations(request: Request, env: Env, path: stri
     const pending=await env.DB.prepare("SELECT id FROM organization_access_requests WHERE organization_id=? AND user_id=? AND status='PENDING'").bind(orgId,user.id).first();
     if(pending) return reply({error:"Your access request is already pending."},409);
     const id=crypto.randomUUID();
-    await env.DB.batch([
-      env.DB.prepare("INSERT INTO organization_access_requests (id,organization_id,user_id,status) VALUES (?,?,?,'PENDING')").bind(id,orgId,user.id),
-      env.DB.prepare("INSERT INTO audit_logs (organization_id,actor_user_id,action,target_type,target_id) VALUES (?,?, 'ACCESS_REQUEST_SUBMITTED','ACCESS_REQUEST',?)").bind(orgId,user.id,id)
-    ]);
+    try {
+      await env.DB.batch([
+        env.DB.prepare("INSERT INTO organization_access_requests (id,organization_id,user_id,status) VALUES (?,?,?,'PENDING')").bind(id,orgId,user.id),
+        env.DB.prepare("INSERT INTO audit_logs (organization_id,actor_user_id,action,target_type,target_id) VALUES (?,?, 'ACCESS_REQUEST_SUBMITTED','ACCESS_REQUEST',?)").bind(orgId,user.id,id)
+      ]);
+    } catch {
+      return reply({error:"Your access request is already pending."},409);
+    }
     const {results:admins}=await env.DB.prepare("SELECT user_id FROM memberships WHERE organization_id=? AND role IN ('OWNER','ADMIN') AND membership_status='ACTIVE'").bind(orgId).all<{user_id:string}>();
     for(const admin of admins) await env.DB.prepare("INSERT INTO notifications (id,user_id,organization_id,type,title,message,href) VALUES (?,?,?,'ACCESS_REQUEST','New access request','A user requested to join your organization.','/workspace/team')").bind(crypto.randomUUID(),admin.user_id,orgId).run();
     return reply({message:"Access request submitted. An organization administrator can now review it."},201);
@@ -107,8 +111,7 @@ export async function handleOrganizations(request: Request, env: Env, path: stri
     if(!access||access.status!=="PENDING") return reply({error:"Pending access request not found."},404);
     if(body.decision==="APPROVE") {
       await env.DB.batch([
-        env.DB.prepare("INSERT INTO memberships (id,organization_id,user_id,role,membership_status) VALUES (?,?,?,?,'ACTIVE') ON CONFLICT(organization_id,user_id) DO UPDATE SET role=excluded.role,membership_status='ACTIVE'").bind(crypto.randomUUID(),orgId,access.user_id,body.role),
-        env.DB.prepare("UPDATE users SET account_status='ACTIVE',updated_at=CURRENT_TIMESTAMP WHERE id=? AND account_status='PENDING'").bind(access.user_id)
+        env.DB.prepare("INSERT INTO memberships (id,organization_id,user_id,role,membership_status) VALUES (?,?,?,?,'ACTIVE') ON CONFLICT(organization_id,user_id) DO UPDATE SET role=excluded.role,membership_status='ACTIVE'").bind(crypto.randomUUID(),orgId,access.user_id,body.role)
       ]);
     }
     await env.DB.batch([
