@@ -1,6 +1,6 @@
 'use client';
 import { FormEvent, useEffect, useState } from 'react';
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+const API = process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:4000');
 export default function AcceptInvite() {
  const [token,setToken]=useState(''); const [status,setStatus]=useState('Checking invitation…'); const [busy,setBusy]=useState(false); const [done,setDone]=useState(false); const [mode,setMode]=useState<'existing'|'new'>('existing'); const [fullName,setFullName]=useState(''); const [password,setPassword]=useState('');
  useEffect(()=>{const value=new URLSearchParams(window.location.search).get('token')||'';setToken(value);setStatus(value.length>=32?'Invitation link detected. Continue with your existing account or create one using the invited email address.':'This invitation link is missing its token.');},[]);
