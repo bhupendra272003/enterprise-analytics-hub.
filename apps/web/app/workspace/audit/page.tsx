@@ -1,6 +1,6 @@
 'use client';
 import {useEffect,useState} from 'react';
-const API=process.env.NEXT_PUBLIC_API_URL||'http://localhost:4000';
+const API=process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:4000');
 type Org={id:string;name:string;role:string};type Event={id:number;action:string;targetType?:string;targetId?:string;actorName?:string;actorEmail?:string;createdAt:string;metadata?:unknown;ipAddress?:string};
 export default function AuditPage(){
  const [orgs,setOrgs]=useState<Org[]>([]),[org,setOrg]=useState(''),[events,setEvents]=useState<Event[]>([]),[notice,setNotice]=useState('Loading audit activity…');
