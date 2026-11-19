@@ -58,7 +58,7 @@ const passwordHash = async (password: string) => {
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
   const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations: PASSWORD_ITERATIONS }, key, 256);
   const hex = (value: Uint8Array) => Array.from(value, b => b.toString(16).padStart(2, "0")).join("");
-  return `pbkdf2-sha256${PASSWORD_ITERATIONS}${hex(salt)}${hex(new Uint8Array(bits))}`;
+  return `pbkdf2-sha256$${PASSWORD_ITERATIONS}$${hex(salt)}$${hex(new Uint8Array(bits))}`;
 };
 const verifyPassword = async (password: string, encoded: string) => {
   const [scheme, rounds, saltHex, expectedHex] = encoded.split("$");
