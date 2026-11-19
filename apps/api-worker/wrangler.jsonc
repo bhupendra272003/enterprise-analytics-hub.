@@ -30,10 +30,10 @@
       }
     ]
   },
-  "r2_buckets": [
+  "kv_namespaces": [
     {
       "binding": "DATASETS",
-      "bucket_name": "nexus-analytics-datasets"
+      "id": "e414470b1924438ab954703d10f4edd0"
     }
   ],
   "vars": {
