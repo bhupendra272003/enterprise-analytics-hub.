@@ -143,3 +143,42 @@ button,input{font:inherit}.shell{max-width:1440px;margin:auto;padding:0 6.1vw;mi
 .job-progress-meta b{color:var(--foreground,#e2e8f0);font-size:14px}
 .background-job-panel .small-action{margin-top:12px}
 @media(max-width:640px){.background-job-panel{padding:14px}.job-progress-meta{gap:8px}}
+
+
+/* Module 02 — responsive organization directory */
+.people-heading{align-items:flex-start;gap:14px}
+.people-subtitle{margin:7px 0 0;color:#8796a4;font-size:11px;line-height:1.5}
+.people-heading-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.directory-refresh,.directory-clear{border:1px solid #344452;border-radius:7px;background:#0b131b;color:#c4d0dc;padding:8px 11px;font-size:10px;cursor:pointer}
+.directory-refresh:hover,.directory-clear:hover{border-color:#86ad58;color:#d5f5b2}
+.directory-refresh:disabled{opacity:.55;cursor:wait}
+.people-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin:0 0 18px}
+.people-metrics article{min-width:0;padding:13px 14px;border:1px solid #263541;border-radius:9px;background:linear-gradient(145deg,#111b25,#0b1219)}
+.people-metrics small,.people-metrics b,.people-metrics span{display:block}
+.people-metrics small{font:8px 'DM Mono',monospace;letter-spacing:.8px;color:#8493a0}
+.people-metrics b{font:700 23px Manrope,sans-serif;color:#eaf2f7;margin:7px 0 3px}
+.people-metrics article:nth-child(2) b{color:#b7f36b}
+.people-metrics article:nth-child(3) b{color:#f0bd78}
+.people-metrics article:nth-child(4) b{color:#a8c5f5}
+.people-metrics span{font-size:9px;color:#82919e;line-height:1.4}
+.directory-toolbar{display:grid;grid-template-columns:minmax(180px,1.5fr) minmax(120px,.7fr) minmax(130px,.8fr) auto;gap:9px;align-items:end;padding:13px;margin:0 0 10px;border:1px solid #253440;border-radius:9px;background:#0b131b}
+.directory-toolbar label{display:grid;gap:6px;min-width:0;font:8px 'DM Mono',monospace;letter-spacing:.8px;color:#8796a4}
+.directory-toolbar input,.directory-toolbar select{width:100%;min-width:0;height:37px;border:1px solid #2b3b48;border-radius:6px;background:#111b25;color:#e8f0f6;padding:0 10px;font:10px 'DM Sans',sans-serif;outline:none}
+.directory-toolbar input:focus,.directory-toolbar select:focus{border-color:#8fb85d;box-shadow:0 0 0 2px rgba(183,243,107,.08)}
+.directory-toolbar input::placeholder{color:#647382}
+.directory-clear{height:37px;white-space:nowrap}
+.directory-result-count{font-size:9px;color:#80909e;margin:0 0 9px}
+.directory-result-count b{color:#dce7ee}
+.directory-member{display:flex;align-items:center;gap:10px;min-width:180px}
+.directory-member>span:last-child{min-width:0}
+.directory-member b,.directory-member small{display:block;overflow-wrap:anywhere}
+.directory-member b{font-size:11px;color:#e9f0f5}
+.directory-member small{font-size:9px;color:#81909e;margin-top:4px}
+.directory-avatar{width:30px;height:30px;flex:0 0 30px;display:grid;place-items:center;border:1px solid #425b36;border-radius:9px;background:rgba(183,243,107,.08);color:#c8f49f;font:700 11px Manrope,sans-serif}
+.directory-status{font-size:9px;color:#a2afba}
+.membership-badge{display:inline-flex;align-items:center;gap:6px;font:8px 'DM Mono',monospace;letter-spacing:.5px;white-space:nowrap}
+.membership-badge i{width:6px;height:6px;border-radius:50%;background:#91a0ad}
+.membership-badge.active{color:#bde994}.membership-badge.active i{background:#a7e36a;box-shadow:0 0 8px #8fce58}
+.membership-badge.suspended{color:#efb18b}.membership-badge.suspended i{background:#e99b70}
+@media(max-width:900px){.directory-toolbar{grid-template-columns:1fr 1fr}.directory-search{grid-column:1/-1}.directory-clear{justify-self:start}.people-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:620px){.people-panel{padding:14px}.people-heading{display:grid}.people-heading-actions{justify-content:space-between}.people-metrics{gap:7px}.people-metrics article{padding:11px}.people-metrics b{font-size:20px}.directory-toolbar{grid-template-columns:1fr;padding:10px}.directory-search{grid-column:auto}.directory-clear{width:100%}.people-table-wrap{overflow-x:auto}.people-table{min-width:720px}.requests-title{margin-top:25px}.request-card{align-items:flex-start;flex-direction:column}.request-actions{width:100%;display:grid;grid-template-columns:1fr 1fr 1fr}.request-actions select{grid-column:1/-1;width:100%}}
