@@ -2,6 +2,7 @@
 import csv
 import json
 import math
+import os
 import statistics
 import sys
 from collections import Counter
@@ -106,6 +107,7 @@ def main():
         writer = csv.DictWriter(handle, fieldnames=headers, extrasaction="ignore")
         writer.writeheader()
         writer.writerows(rows)
+    os.chmod(destination, 0o600)
 
     print(json.dumps({"before": before, "after": after, "removedDuplicates": removed_duplicates,
                       "filledCells": filled_cells, "fillStrategy": strategy,
