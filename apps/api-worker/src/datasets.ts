@@ -72,7 +72,7 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
   if(!["none","zero","mean","median","mode"].includes(fillMissing))return json({error:"Unsupported missing-value strategy."},400);
   const source=await env.DATASETS.get(dataset.storage_path);if(!source)return json({error:"Stored dataset file is missing."},500);
   let parsed;try{parsed=parseCsv(await source.arrayBuffer());}catch{return json({error:"The stored CSV is invalid."},400);}
-  const columns=parsed.columns,rows=parsed.records.map((r:any)=>Object.fromEntries(columns.map(k=>[k,String(r[k]??"")])));
+  const columns: string[]=parsed.columns,rows:Record<string,string>[]=parsed.records.map((r:Record<string,unknown>)=>Object.fromEntries(columns.map(k=>[k,String(r[k]??"")])));
   const before=quality(rows,columns);
   if(trimWhitespace)for(const row of rows)for(const k of columns)row[k]=row[k].trim();
   let removedDuplicates=0;
