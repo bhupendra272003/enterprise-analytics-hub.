@@ -26,7 +26,6 @@ jobs:
         env:
           CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CF_D1_DATABASE_ID: ${{ secrets.CLOUDFLARE_D1_DATABASE_ID }}
         run: |
           set -euo pipefail
           api() {
@@ -35,24 +34,19 @@ jobs:
               -H "Content-Type: application/json" "$@"
           }
 
-          # Prefer a supplied ID for the existing database. Otherwise discover it by name.
-          d1_id="${CF_D1_DATABASE_ID:-}"
-          if [ -z "$d1_id" ]; then
-            echo "Discovering existing D1 database nexus-analytics..."
-            d1_list=$(api "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/d1/database?name=nexus-analytics&per_page=100") || {
-              echo "::error::Cloudflare D1 discovery failed after retries. If the database already exists, add its ID as CLOUDFLARE_D1_DATABASE_ID repository secret to bypass discovery."
-              exit 1
-            }
-            d1_id=$(echo "$d1_list" | jq -r '.result[]? | select(.name=="nexus-analytics") | .uuid' | head -n1)
-          fi
-          if [ -z "$d1_id" ]; then
-            echo "D1 database not found; creating nexus-analytics..."
-            d1_created=$(api -X POST -d '{"name":"nexus-analytics"}' "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/d1/database")
-            d1_id=$(echo "$d1_created" | jq -r '.result.uuid // empty')
-          fi
-          test -n "$d1_id" || { echo "::error::Could not create or find D1 database"; exit 1; }
-          echo "Using D1 database ID supplied/discovered successfully."
-
+          # Reuse the confirmed existing D1 database ID from Wrangler config.
+          d1_id=$(python - <<'PY'
+          import json
+          config = json.load(open("apps/api-worker/wrangler.jsonc"))
+          print(config["d1_databases"][0]["database_id"])
+          PY
+          )
+          test -n "$d1_id" && [ "$d1_id" != "REPLACE_WITH_CLOUDFLARE_D1_DATABASE_ID" ] || {
+            echo "::error::Existing D1 database ID is missing from apps/api-worker/wrangler.jsonc"
+            exit 1
+          }
+          echo "Reusing the existing nexus-analytics D1 database."
+          
           r2_list=$(api "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/r2/buckets")
           r2_exists=$(echo "$r2_list" | jq -r '.result.buckets[]? | select(.name=="nexus-analytics-datasets") | .name' | head -n1)
           if [ -z "$r2_exists" ]; then
