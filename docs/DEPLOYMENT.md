@@ -1,55 +1,57 @@
-# NEXUS deployment guide
+# NEXUS ANALYTICS — Production deployment
 
-This repository is deployable, but it is not currently deployed. Use separate frontend and API services with a shared registrable domain so the browser treats their session cookies as same-site.
+This guide uses Vercel for the Next.js frontend and Render for the Express API. The browser calls the API through a same-origin Vercel rewrite so the session cookie remains first-party even when the API runs on Render.
 
-## Recommended topology
+## 1. Database (managed MySQL 8)
 
-- Frontend: Vercel or another Next.js host at `https://app.example.com`
-- API: Node.js 20 service at `https://api.example.com`
-- Database: managed MySQL 8 with TLS and network allow-listing
-- Dataset storage: private persistent disk or managed object storage (never a public web directory)
-- Email: SMTP provider for verification, password recovery and invitation delivery
+1. Create a managed MySQL 8 instance (Aiven MySQL or an equivalent provider).
+2. Create a dedicated least-privilege application user and database.
+3. Enable TLS, restrict inbound access to the API service where the provider supports it, and enable automated backups.
+4. For a new database, apply `database/schema.sql`.
+5. For an existing database, apply every migration in `database/migrations/` in numeric order (001 through 009). Do not skip 007, 008 or 009: they create dataset version, validation-run and anomaly-run history.
+6. Keep the database hostname, port, database name, username and password ready for the Render environment. Never commit credentials.
 
-## Database
+## 2. Deploy the API on Render
 
-1. Create an empty MySQL 8 database and a least-privilege application user.
-2. Apply `database/schema.sql` for a new installation.
-3. For an existing installation, apply `database/migrations/001_organization_access_requests.sql` through `006_auth_tokens.sql` in numeric order.
-4. Restrict database network access to the API service and keep automated backups enabled.
+1. Connect this GitHub repository to Render and create a Web Service from the root `render.yaml` Blueprint.
+2. Confirm the service uses the Dockerfile at `apps/api/Dockerfile`, health check path `/health`, and a private persistent disk mounted at `/var/data`.
+3. Set the required secrets in Render:
+   - `SESSION_SECRET`: random value of at least 32 characters
+   - `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`
+   - `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`
+4. Set `APP_ORIGIN` to the final Vercel frontend URL (for example `https://your-app.vercel.app`) and `INVITE_BASE_URL` to that URL plus `/accept-invite`.
+5. Set `COOKIE_SECURE=true` and `COOKIE_SAME_SITE=strict`.
+6. Deploy and verify `https://YOUR-API.onrender.com/health` returns JSON with status `ok`.
 
-## API service
+Do not enable production registration until SMTP verification and password-recovery emails have been tested.
 
-Set the working directory to `apps/api`, install dependencies with `npm install`, and use `npm start`.
+## 3. Deploy the frontend on Vercel
 
-Required environment variables:
-- `NODE_ENV=production`
-- `PORT` (provided by the hosting platform)
-- `APP_ORIGIN=https://app.example.com`
-- `COOKIE_SECURE=true`
-- `COOKIE_SAME_SITE=strict`
-- `SESSION_SECRET` (random secret, at least 32 characters)
-- `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`
-- `INVITE_BASE_URL=https://app.example.com/accept-invite`
-- `DATA_STORAGE_DIR=/var/data/nexus-datasets` (mount a private persistent disk at the parent path)
-- `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`
+1. Import the same GitHub repository into Vercel.
+2. Set the Root Directory to `apps/web`.
+3. Add these environment variables for Production:
+   - `NEXT_PUBLIC_API_URL`: the exact public Vercel frontend origin, e.g. `https://your-app.vercel.app` (no trailing slash)
+   - `API_PROXY_TARGET`: the Render API origin, e.g. `https://your-api.onrender.com` (no trailing slash)
+4. Deploy. The Next.js rewrite proxies `/api/*` to Render while keeping browser requests and the session cookie on the Vercel origin.
+5. Update Render `APP_ORIGIN` and `INVITE_BASE_URL` to the exact Vercel URL if Vercel assigned a different URL, then redeploy the API.
 
-Do not deploy production registration without a working SMTP configuration. The API returns a development verification/reset URL only outside production.
+Do not set `NEXT_PUBLIC_API_URL` to the Render domain. It must be the frontend's own origin for first-party session cookies.
 
-## Frontend
+## 4. Production verification
 
-Set the working directory to `apps/web`, install dependencies with `npm install`, build with `npm run build`, and start with `npm start`.
+- Register a new account and verify the email from the SMTP inbox.
+- Sign in, create an organization, request/approve membership and accept an invitation.
+- Test roles with separate accounts and at least two organizations to verify tenant isolation.
+- Create projects/tasks and test permission boundaries.
+- Upload a CSV, restart/redeploy the API, and verify the file still exists on the private persistent disk.
+- Test cleaning, validation, version comparison/restore and saved anomaly history.
+- Test password reset, session revocation, notifications, audit activity and Power BI report links.
+- Confirm CSV files cannot be fetched from a public URL.
+- Test a backup restore before real customer data is stored.
 
-Set `NEXT_PUBLIC_API_URL=https://api.example.com` at build time.
+## Important limitations and launch safeguards
 
-## Session and domain notes
-
-The frontend and API use different subdomains but share `example.com`; they are same-site, while CORS still requires the exact frontend origin. Avoid unrelated hosting domains for the production frontend/API pair because browser third-party-cookie restrictions can prevent session cookies from working. If a different topology is unavoidable, test cookie behavior in every supported browser before launch; `SameSite=None` requires HTTPS and is not guaranteed to bypass third-party-cookie blocking.
-
-## Pre-launch verification
-
-- Run the GitHub Actions workflow and confirm both API syntax and Next.js build jobs pass.
-- Apply migrations and test registration, email verification, login, organization approval, invitation acceptance, member suspension, project/task permissions, CSV upload/profile, report links, notifications and audit activity.
-- Verify tenant isolation with at least two organizations and multiple roles.
-- Confirm CSV uploads persist across API restarts and are not reachable as public static files.
-- Complete CSRF review, MFA, rate-limit review, monitoring, backups/restore test, dependency audit and security review.
-- Keep Power BI access controlled in Power BI itself. NEXUS currently stores secure report links; it does not mint Power BI embed tokens.
+- NEXUS stores Power BI report links; it does not currently mint secure Power BI embed tokens.
+- The API currently uses a private local-disk storage adapter; the Render persistent disk is required. Do not scale the API to multiple instances until storage is moved to shared object storage.
+- Complete an independent CSRF/security review, dependency audit, tenant-isolation test and backup/restore drill before onboarding real customer data.
+- Keep all credentials in provider secret settings, never in GitHub files or chat.
