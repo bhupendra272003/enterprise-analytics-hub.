@@ -103,7 +103,7 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
   const source=await env.DATASETS.get(dataset.storage_path);if(!source)return json({error:"Stored dataset file is missing."},500);
   let parsed;try{parsed=parseCsv(await source.arrayBuffer());}catch{return json({error:"The stored CSV is invalid."},400);}
   const columns=parsed.columns.map(name=>{
-   const values=parsed.records.map((r:any)=>String(r[name]??"").trim()),present=values.filter(v=>v!==""),numeric=present.map(Number).filter(Number.isFinite),numericType=present.length>0&&numeric.length/present.length>=.9,distinct=new Set(present).size;
+   const values:string[]=parsed.records.map((r:any)=>String(r[name]??"").trim()),present=values.filter((v:string)=>v!==""),numeric=present.map(Number).filter((v:number)=>Number.isFinite(v)),numericType=present.length>0&&numeric.length/present.length>=.9,distinct=new Set(present).size;
    return {name,type:present.length===0?"EMPTY":numericType?"NUMERIC":"TEXT",total:values.length,missing:values.length-present.length,distinct,...(numericType?{min:Math.min(...numeric),max:Math.max(...numeric),mean:Number((numeric.reduce((a:number,b:number)=>a+b,0)/numeric.length).toFixed(3))}:{})};
   });
   return json({profile:{datasetId:dataset.id,name:dataset.name,rowCount:parsed.records.length,columnCount:parsed.columns.length,columns}});
