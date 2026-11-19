@@ -374,6 +374,28 @@ router.get('/datasets/:datasetId/validation-runs',async(req,res,next)=>{
   }catch(e){next(e);}
 });
 
+
+router.get('/datasets/:datasetId/quality-dashboard',async(req,res,next)=>{
+  try{
+    const [datasets]=await pool.execute('SELECT organization_id FROM datasets WHERE id=? LIMIT 1',[req.params.datasetId]);
+    if(!datasets.length)return res.status(404).json({error:'Dataset not found.'});
+    const [members]=await pool.execute("SELECT id FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE' LIMIT 1",[datasets[0].organization_id,req.user.id]);
+    if(!members.length)return res.status(403).json({error:'Insufficient organization permissions.'});
+    const [rows]=await pool.execute('SELECT id,version_number AS versionNumber,status,issue_count AS issueCount,result_json AS resultJson,created_at AS createdAt FROM dataset_validation_runs WHERE dataset_id=? ORDER BY created_at DESC LIMIT 30',[req.params.datasetId]);
+    const runs=rows.map(row=>{
+      const result=typeof row.resultJson==='string'?JSON.parse(row.resultJson):row.resultJson;
+      const denominator=Number(result.rowCount||0)*Number(result.checkedColumns||0);
+      const score=denominator>0?Math.max(0,Number((100-(Number(row.issueCount)/denominator)*100).toFixed(2))):null;
+      return {id:row.id,versionNumber:Number(row.versionNumber),status:row.status,issueCount:Number(row.issueCount),rowCount:Number(result.rowCount||0),checkedColumns:Number(result.checkedColumns||0),score,issueCounts:result.issueCounts||{},createdAt:row.createdAt};
+    });
+    const scored=runs.filter(run=>run.score!==null);
+    const totalRuns=runs.length,passedRuns=runs.filter(run=>run.status==='PASSED').length;
+    const issueBreakdown={REQUIRED:0,TYPE:0,ALLOWED_VALUE:0,MIN_MAX:0,UNIQUE:0};
+    for(const run of runs)for(const [key,value] of Object.entries(run.issueCounts))issueBreakdown[key]=(issueBreakdown[key]||0)+Number(value||0);
+    res.json({summary:{totalRuns,passedRuns,failedRuns:totalRuns-passedRuns,passRate:totalRuns?Number((passedRuns/totalRuns*100).toFixed(1)):0,averageScore:scored.length?Number((scored.reduce((sum,run)=>sum+run.score,0)/scored.length).toFixed(1)):null,totalIssues:runs.reduce((sum,run)=>sum+run.issueCount,0)},issueBreakdown,trend:runs.slice().reverse()});
+  }catch(e){next(e);}
+});
+
 router.get('/datasets/:datasetId/profile',async(req,res,next)=>{
   try{
     const [rows]=await pool.execute('SELECT id,name,storage_path,organization_id FROM datasets WHERE id=? LIMIT 1',[req.params.datasetId]);
