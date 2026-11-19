@@ -1,3 +1,4 @@
+import { handleOrganizations } from "./organizations";
 import bcrypt from "bcryptjs";
 
 interface Env {
@@ -254,6 +255,14 @@ export default {
     if (request.method !== "GET" && request.method !== "HEAD") {
       if (origin !== env.APP_ORIGIN || request.headers.get("X-Hub-Request") !== "1")
         return json({ error: "Request origin validation failed." }, 403, headers);
+    }
+    if (url.pathname === "/api/organizations" || url.pathname.startsWith("/api/organizations/")) {
+      const response = await handleOrganizations(request, env, url.pathname);
+      if (response) {
+        const merged = new Headers(response.headers);
+        for (const [key, value] of Object.entries(headers)) merged.set(key, value);
+        return new Response(response.body, { status: response.status, headers: merged });
+      }
     }
     if (url.pathname.startsWith("/api/auth/")) {
       const path = url.pathname.slice("/api/auth".length);
