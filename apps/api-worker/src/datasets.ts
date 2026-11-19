@@ -152,6 +152,25 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
   return json({summary:{totalRuns:runs.length,passedRuns:passed,failedRuns:runs.length-passed,passRate:runs.length?Number((passed/runs.length*100).toFixed(1)):0,averageScore:scored.length?Number((scored.reduce((s:number,r:any)=>s+r.score,0)/scored.length).toFixed(1)):null,totalIssues:runs.reduce((s:number,r:any)=>s+r.issueCount,0)},issueBreakdown,trend:runs.slice().reverse()});
  }
  if(sub==="preview"&&req.method==="GET")return json({dataset:{id:dataset.id,name:dataset.name,columns:JSON.parse(dataset.columns_json),preview:JSON.parse(dataset.preview_json)}});
+ if(sub==="versions/compare/rows"&&req.method==="GET"){
+  const from=Number(url.searchParams.get("from")),to=Number(url.searchParams.get("to")),key=(url.searchParams.get("key")||"").trim();
+  if(!Number.isInteger(from)||!Number.isInteger(to)||from<1||to<1||from===to)return json({error:"Choose two different valid version numbers."},400);
+  if(!key||key.length>200)return json({error:"Choose a valid key column."},400);
+  const [a,b]=await Promise.all([env.DB.prepare("SELECT storage_path,columns_json FROM dataset_versions WHERE dataset_id=? AND version_number=?").bind(datasetId,from).first<any>(),env.DB.prepare("SELECT storage_path,columns_json FROM dataset_versions WHERE dataset_id=? AND version_number=?").bind(datasetId,to).first<any>()]);
+  if(!a||!b)return json({error:"Dataset or selected version not found."},404);
+  const oldColumns=JSON.parse(a.columns_json),newColumns=JSON.parse(b.columns_json);
+  if(!oldColumns.includes(key)||!newColumns.includes(key))return json({error:"The selected key column must exist in both versions."},400);
+  const [oldObj,newObj]=await Promise.all([env.DATASETS.get(a.storage_path),env.DATASETS.get(b.storage_path)]);
+  if(!oldObj||!newObj)return json({error:"A stored dataset version is missing."},500);
+  let oldRows:any[],newRows:any[];try{oldRows=parseCsv(await oldObj.arrayBuffer()).records;newRows=parseCsv(await newObj.arrayBuffer()).records;}catch{return json({error:"A stored CSV version is invalid and cannot be compared."},400);}
+  const index=(rows:any[],label:string)=>{const map=new Map<string,any>();for(const row of rows){const value=String(row[key]??"").trim();if(!value)return {error:label+" contains blank values in the selected key column."};if(map.has(value))return {error:label+" contains duplicate values in the selected key column. Choose a unique identifier."};map.set(value,row);}return {map};};
+  const oldIndex=index(oldRows,"The earlier version"),newIndex=index(newRows,"The later version");
+  if("error" in oldIndex)return json({error:oldIndex.error},400);if("error" in newIndex)return json({error:newIndex.error},400);
+  const added:any[]=[],removed:any[]=[],modified:any[]=[];let addedCount=0,removedCount=0,modifiedCount=0;
+  for(const [value,row] of newIndex.map){if(!oldIndex.map.has(value)){addedCount++;if(added.length<20)added.push({key:value,record:row});continue;}const before=oldIndex.map.get(value),changed=[...new Set([...Object.keys(before),...Object.keys(row)])].filter(k=>String(before[k]??"")!==String(row[k]??""));if(changed.length){modifiedCount++;if(modified.length<20)modified.push({key:value,changedColumns:changed,before:Object.fromEntries(changed.map(k=>[k,before[k]??""])),after:Object.fromEntries(changed.map(k=>[k,row[k]??""]))});}}
+  for(const [value,row] of oldIndex.map)if(!newIndex.map.has(value)){removedCount++;if(removed.length<20)removed.push({key:value,record:row});}
+  return json({rowComparison:{fromVersion:from,toVersion:to,keyColumn:key,fromRows:oldRows.length,toRows:newRows.length,addedCount,removedCount,modifiedCount,unchangedCount:Math.max(0,oldRows.length-removedCount-modifiedCount),sampleLimit:20,added,removed,modified}});
+ }
  if(sub==="versions"&&req.method==="GET"){
   const {results}=await env.DB.prepare("SELECT v.id,v.version_number AS versionNumber,v.file_size AS fileSize,v.row_count AS rowCount,v.column_count AS columnCount,v.change_note AS changeNote,v.created_at AS createdAt,u.full_name AS uploadedBy FROM dataset_versions v JOIN users u ON u.id=v.uploaded_by WHERE v.dataset_id=? ORDER BY v.version_number DESC").bind(datasetId).all();
   return json({versions:results});
