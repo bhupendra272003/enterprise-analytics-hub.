@@ -67,7 +67,7 @@ jobs:
           path = "wrangler.jsonc"
           data = json.load(open(path))
           data["d1_databases"][0]["database_id"] = os.environ["D1_ID"]
-          open(path, "w").write(json.dumps(data, indent=2) + "\\n")
+          open(path, "w").write(json.dumps(data, indent=2) + "\n")
           PY
           npx --yes wrangler@latest d1 migrations apply nexus-analytics --remote
       - name: Save D1 identifier as repository variable
