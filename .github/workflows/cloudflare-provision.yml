@@ -78,7 +78,7 @@ jobs:
           path = "apps/api-worker/wrangler.jsonc"
           data = json.load(open(path))
           data["d1_databases"][0]["database_id"] = os.environ["D1_ID"]
-          open(path, "w").write(json.dumps(data, indent=2) + "\\n")
+          open(path, "w").write(json.dumps(data, indent=2) + "\n")
           PY
           if ! git diff --quiet -- apps/api-worker/wrangler.jsonc; then
             git config user.name "github-actions[bot]"
