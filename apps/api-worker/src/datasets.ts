@@ -1,5 +1,6 @@
 import { parse } from "csv-parse/sync";
-type Env={DB:D1Database;DATASETS:R2Bucket};
+type Env={DB:D1Database;DATASETS:KVNamespace};
+const readStored=async(env:Env,key:string)=>{const bytes=await readStored(env,key,"arrayBuffer");if(!bytes)return null;return {arrayBuffer:async()=>bytes,text:async()=>new TextDecoder().decode(bytes),body:new Response(bytes).body};};
 const MAX_SYNC_CSV_BYTES=256*1024;
 const syncLimitError=()=>json({error:"This CSV is larger than the current synchronous processing limit (256 KB). Background CSV jobs are being prepared; please use a smaller CSV for now."},413);
 type User={id:string;account_status:string};
@@ -54,7 +55,7 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
   let bytes:ArrayBuffer;try{bytes=await file.arrayBuffer();}catch{return json({error:"The CSV file could not be read."},400);}
   let parsed;try{parsed=parseCsv(bytes);}catch(e){if(e instanceof Error&&e.message==="TOO_LARGE")return syncLimitError();return json({error:e instanceof Error&&e.message==="EMPTY"?"The CSV contains a header but no data rows.":"The CSV file is invalid. Check its header and row structure."},400);}
   const id=crypto.randomUUID(),key=orgId+"/"+id+"/v1.csv";
-  await env.DATASETS.put(key,bytes,{httpMetadata:{contentType:"text/csv"},customMetadata:{organizationId:orgId,datasetId:id,version:"1"}});
+  await env.DATASETS.put(key,bytes);
   try{
    await env.DB.batch([
     env.DB.prepare("INSERT INTO datasets (id,organization_id,name,original_filename,storage_path,file_size,row_count,column_count,columns_json,preview_json,uploaded_by) VALUES (?,?,?,?,?,?,?,?,?,?,?)").bind(id,orgId,name,file.name.split(/[\\/]/).pop()!.slice(0,255),key,file.size,parsed.records.length,parsed.columns.length,JSON.stringify(parsed.columns),JSON.stringify(parsed.preview),user.id),
@@ -76,7 +77,7 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
   let body:any={};try{body=await req.json();}catch{return json({error:"Invalid cleaning options."},400);}
   const trimWhitespace=body.trimWhitespace!==false,removeDuplicates=body.removeDuplicates!==false,fillMissing=body.fillMissing??"none";
   if(!["none","zero","mean","median","mode"].includes(fillMissing))return json({error:"Unsupported missing-value strategy."},400);
-  const source=await env.DATASETS.get(dataset.storage_path);if(!source)return json({error:"Stored dataset file is missing."},500);
+  const source=await readStored(env,dataset.storage_path);if(!source)return json({error:"Stored dataset file is missing."},500);
   let parsed;try{parsed=parseCsv(await source.arrayBuffer());}catch{return json({error:"The stored CSV is invalid."},400);}
   const columns: string[]=parsed.columns,rows:Record<string,string>[]=parsed.records.map((r:Record<string,unknown>)=>Object.fromEntries(columns.map(k=>[k,String(r[k]??"")])));
   const before=quality(rows,columns);
@@ -96,7 +97,7 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
   const after=quality(rows,columns),outliersByColumn:Record<string,number>={};
   for(const k of columns){const nonempty=rows.map(r=>r[k]).filter(v=>v.trim()),nums=nonempty.filter(isNum).map(Number);if(nums.length>=4&&nums.length/Math.max(1,nonempty.length)>=.9){const s=nums.slice().sort((a,b)=>a-b),median=(a:number[])=>{const n=Math.floor(a.length/2);return a.length%2?a[n]:(a[n-1]+a[n])/2;},q1=median(s.slice(0,Math.ceil(s.length/2))),q3=median(s.slice(Math.floor(s.length/2))),iqr=q3-q1,count=nums.filter(v=>v<q1-1.5*iqr||v>q3+1.5*iqr).length;if(count)outliersByColumn[k]=count;}}
   const latest=await env.DB.prepare("SELECT COALESCE(MAX(version_number),0) AS v FROM dataset_versions WHERE dataset_id=?").bind(datasetId).first<{v:number}>(),version=Number(latest?.v||0)+1,key=dataset.organization_id+"/"+datasetId+"/v"+version+"-cleaned.csv",output=csvEncode(rows,columns),bytes=new TextEncoder().encode(output);
-  await env.DATASETS.put(key,bytes,{httpMetadata:{contentType:"text/csv"},customMetadata:{organizationId:dataset.organization_id,datasetId,version:String(version),cleaned:"true"}});
+  await env.DATASETS.put(key,bytes);
   const report={before,after,removedDuplicates,filledCells,fillStrategy:fillMissing,outliersByColumn,columns,preview:rows.slice(0,10)};
   try{await env.DB.batch([
    env.DB.prepare("INSERT INTO dataset_versions (id,dataset_id,version_number,storage_path,file_size,row_count,column_count,columns_json,preview_json,uploaded_by,change_note) VALUES (?,?,?,?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(),datasetId,version,key,bytes.length,rows.length,columns.length,JSON.stringify(columns),JSON.stringify(report.preview),user.id,"Cloudflare cleaning · quality score "+before.qualityScore+" → "+after.qualityScore),
@@ -106,7 +107,7 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
   return json({versionNumber:version,report},201);
  }
  if(sub==="profile"&&req.method==="GET"){
-  const source=await env.DATASETS.get(dataset.storage_path);if(!source)return json({error:"Stored dataset file is missing."},500);
+  const source=await readStored(env,dataset.storage_path);if(!source)return json({error:"Stored dataset file is missing."},500);
   let parsed;try{parsed=parseCsv(await source.arrayBuffer());}catch{return json({error:"The stored CSV is invalid."},400);}
   const columns=parsed.columns.map(name=>{
    const values:string[]=parsed.records.map((r:any)=>String(r[name]??"").trim()),present=values.filter((v:string)=>v!==""),numeric=present.map(Number).filter((v:number)=>Number.isFinite(v)),numericType=present.length>0&&numeric.length/present.length>=.9,distinct=new Set(present).size;
@@ -128,7 +129,7 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
   if(!version)return json({error:"Dataset version not found."},404);
   const columns=JSON.parse(version.columns_json),unknown=configured.filter((x:string)=>!columns.includes(x));if(unknown.length)return json({error:"Rules reference columns that do not exist: "+unknown.join(", ")},400);
   for(const [column,range] of Object.entries(numericRanges) as [string,any][])if((range.min!==undefined&&typeof range.min!=="number")||(range.max!==undefined&&typeof range.max!=="number")||(range.min!==undefined&&range.max!==undefined&&range.min>range.max))return json({error:"Invalid numeric range for "+column+"."},400);
-  const obj=await env.DATASETS.get(version.storage_path);if(!obj)return json({error:"Stored dataset version is missing."},500);
+  const obj=await readStored(env,version.storage_path);if(!obj)return json({error:"Stored dataset version is missing."},500);
   let records:any[];try{records=parseCsv(await obj.arrayBuffer()).records;}catch{return json({error:"The selected CSV version is invalid."},400);}
   const issueCounts:Record<string,number>={REQUIRED:0,TYPE:0,ALLOWED_VALUE:0,MIN_MAX:0,UNIQUE:0},samples:any[]=[],seen=new Map<string,Set<string>>(uniqueColumns.map((k:string)=>[k,new Set<string>()]));
   const add=(rowNumber:number,column:string,rule:string,value:unknown,message:string)=>{issueCounts[rule]++;if(samples.length<100)samples.push({rowNumber,column,rule,value:String(value??"").slice(0,160),message});};
@@ -164,7 +165,7 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
   if(!Number.isInteger(from)||!Number.isInteger(to)||from<1||to<1||from===to)return json({error:"Choose two different valid versions."},400);
   const [a,b]=await Promise.all([env.DB.prepare("SELECT storage_path,columns_json FROM dataset_versions WHERE dataset_id=? AND version_number=?").bind(datasetId,from).first<any>(),env.DB.prepare("SELECT storage_path,columns_json FROM dataset_versions WHERE dataset_id=? AND version_number=?").bind(datasetId,to).first<any>()]);
   if(!a||!b)return json({error:"Dataset or selected version not found."},404);
-  const [oa,ob]=await Promise.all([env.DATASETS.get(a.storage_path),env.DATASETS.get(b.storage_path)]);if(!oa||!ob)return json({error:"A stored dataset version is missing."},500);
+  const [oa,ob]=await Promise.all([readStored(env,a.storage_path),readStored(env,b.storage_path)]);if(!oa||!ob)return json({error:"A stored dataset version is missing."},500);
   let oldRows:any[],newRows:any[];try{oldRows=parseCsv(await oa.arrayBuffer()).records;newRows=parseCsv(await ob.arrayBuffer()).records;}catch{return json({error:"A stored CSV version is invalid and cannot be scanned."},400);}
   const oldCols:string[]=JSON.parse(a.columns_json),newCols:string[]=JSON.parse(b.columns_json),common=oldCols.filter(k=>newCols.includes(k)),anomalies:any[]=[];
   const rate=(n:number,total:number)=>total?n/total:0,add=(type:string,column:string|null,severity:string,title:string,description:string,metric:any,sample:any[]=[])=>(anomalies.push({type,column,severity,title,description,metric,sample:sample.slice(0,8)}));
@@ -205,7 +206,7 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
   if(!a||!b)return json({error:"Dataset or selected version not found."},404);
   const oldColumns=JSON.parse(a.columns_json),newColumns=JSON.parse(b.columns_json);
   if(!oldColumns.includes(key)||!newColumns.includes(key))return json({error:"The selected key column must exist in both versions."},400);
-  const [oldObj,newObj]=await Promise.all([env.DATASETS.get(a.storage_path),env.DATASETS.get(b.storage_path)]);
+  const [oldObj,newObj]=await Promise.all([readStored(env,a.storage_path),readStored(env,b.storage_path)]);
   if(!oldObj||!newObj)return json({error:"A stored dataset version is missing."},500);
   let oldRows:any[],newRows:any[];try{oldRows=parseCsv(await oldObj.arrayBuffer()).records;newRows=parseCsv(await newObj.arrayBuffer()).records;}catch{return json({error:"A stored CSV version is invalid and cannot be compared."},400);}
   const index=(rows:any[],label:string)=>{const map=new Map<string,any>();for(const row of rows){const value=String(row[key]??"").trim();if(!value)return {error:label+" contains blank values in the selected key column."};if(map.has(value))return {error:label+" contains duplicate values in the selected key column. Choose a unique identifier."};map.set(value,row);}return {map};};
@@ -238,7 +239,7 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
   let parsed;try{parsed=parseCsv(bytes);}catch(e){if(e instanceof Error&&e.message==="TOO_LARGE")return syncLimitError();return json({error:"The CSV file is invalid. Check its header and row structure."},400);}
   const latest=await env.DB.prepare("SELECT COALESCE(MAX(version_number),0) AS v FROM dataset_versions WHERE dataset_id=?").bind(datasetId).first<{v:number}>();
   const version=Number(latest?.v||0)+1,key=dataset.organization_id+"/"+datasetId+"/v"+version+".csv";
-  await env.DATASETS.put(key,bytes,{httpMetadata:{contentType:"text/csv"},customMetadata:{organizationId:dataset.organization_id,datasetId,version:String(version)}});
+  await env.DATASETS.put(key,bytes);
   try{
    await env.DB.batch([
     env.DB.prepare("INSERT INTO dataset_versions (id,dataset_id,version_number,storage_path,file_size,row_count,column_count,columns_json,preview_json,uploaded_by,change_note) VALUES (?,?,?,?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(),datasetId,version,key,file.size,parsed.records.length,parsed.columns.length,JSON.stringify(parsed.columns),JSON.stringify(parsed.preview),user.id,note.slice(0,500)),
@@ -259,8 +260,8 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
   if(!source)return json({error:"Version not found."},404);
   const latest=await env.DB.prepare("SELECT COALESCE(MAX(version_number),0) AS v FROM dataset_versions WHERE dataset_id=?").bind(datasetId).first<{v:number}>();
   const next=Number(latest?.v||0)+1,key=dataset.organization_id+"/"+datasetId+"/v"+next+".csv";
-  const object=await env.DATASETS.get(source.storage_path);if(!object)return json({error:"Stored dataset version is missing."},500);
-  await env.DATASETS.put(key,object.body,{httpMetadata:{contentType:"text/csv"},customMetadata:{organizationId:dataset.organization_id,datasetId,version:String(next)}});
+  const object=await readStored(env,source.storage_path);if(!object)return json({error:"Stored dataset version is missing."},500);
+  await env.DATASETS.put(key,await object.arrayBuffer());
   await env.DB.batch([
    env.DB.prepare("INSERT INTO dataset_versions (id,dataset_id,version_number,storage_path,file_size,row_count,column_count,columns_json,preview_json,uploaded_by,change_note) VALUES (?,?,?,?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(),datasetId,next,key,source.file_size,source.row_count,source.column_count,source.columns_json,source.preview_json,user.id,"Restored from version "+version),
    env.DB.prepare("UPDATE datasets SET storage_path=?,file_size=?,row_count=?,column_count=?,columns_json=?,preview_json=?,uploaded_by=? WHERE id=?").bind(key,source.file_size,source.row_count,source.column_count,source.columns_json,source.preview_json,user.id,datasetId)
