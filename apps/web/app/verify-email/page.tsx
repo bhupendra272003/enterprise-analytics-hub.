@@ -1,6 +1,6 @@
 'use client';
 import {useEffect,useState} from 'react';
-const API=process.env.NEXT_PUBLIC_API_URL||'http://localhost:4000';
+const API=process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:4000');
 export default function VerifyEmailPage(){
  const [message,setMessage]=useState('Verifying your email…');
  useEffect(()=>{const token=new URLSearchParams(window.location.search).get('token');if(!token){setMessage('Verification token is missing.');return;}fetch(API+'/api/auth/verify-email',{method:'POST',headers:{'Content-Type':'application/json','X-Hub-Request':'1'},body:JSON.stringify({token})}).then(async r=>{const d=await r.json();setMessage(d.message||d.error||'Verification could not be completed.');}).catch(()=>setMessage('Unable to connect to NEXUS.'));},[]);
