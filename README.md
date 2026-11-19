@@ -17,7 +17,6 @@ A multi-tenant analytics and team collaboration platform. The repository include
 - `docs/ARCHITECTURE.md`: architecture and roadmap
 - `docs/API-TESTING.md`: local API smoke-test sequence
 - `docs/DEPLOYMENT.md`: production hosting and environment guide
-- `docs/DEPLOYMENT.md`: production hosting and environment guide
 
 ## Local setup
 
@@ -73,7 +72,7 @@ For local development, configure the API `APP_ORIGIN=http://localhost:3000` and 
 - `/workspace/team`: organization creation, invitations, member directory, member role changes, suspension and access approval queue
 - `/workspace/access`: browse organizations and request membership
 - `/workspace/projects`: create projects, add tasks and update task status
-- `/workspace/data`: upload CSV files, inspect metadata, preview 10 rows and run a basic column profile
+- `/workspace/data`: upload CSV files, inspect metadata, preview 10 rows, run column profiles, upload new versions, compare schema/row counts and restore prior versions as a new version
 - `/workspace/audit`: review organization audit activity (OWNER/ADMIN)
 - `/workspace/reports`: manage the organization's Power BI report-link catalog
 - `/workspace/notifications`: review and mark in-app notifications
@@ -88,7 +87,7 @@ For production, set `COOKIE_SECURE=true`, use HTTPS, and configure `APP_ORIGIN` 
 In-app notifications are generated for access requests and decisions, invitation activity, task assignments and newly registered reports. The inbox is user-scoped and supports read/unread state. SMTP is used for email verification, password recovery and invitation delivery when configured.
 
 ## Data storage note
-CSV uploads are stored outside the public web directory. The default local disk adapter is suitable for development only; configure a persistent private volume or replace the storage adapter with managed object storage before production. Dataset preview currently exposes only the first 10 rows. Dataset version history is now recorded for each source upload. Python cleaning jobs, version restore/compare, retention controls and managed object storage remain the next data-engineering layer.
+CSV uploads are stored outside the public web directory. The default local disk adapter is suitable for development only; configure a persistent private volume or replace the storage adapter with managed object storage before production. Dataset preview currently exposes only the first 10 rows. Dataset version history is recorded for each source upload. Re-uploads create immutable snapshots; the workspace can compare row counts and column names between versions and restore an older snapshot as a new version. Python cleaning jobs, row-level data diffs, retention controls and managed object storage remain future data-engineering work.
 
 ## Important production checklist
 This is a development foundation, not production-certified software. Before public deployment, complete mature CSRF protection, MFA, automated invitation email delivery, tenant-isolation tests, security review, backups, monitoring and managed secret storage. Configure strict CORS and secure cookies for the deployed domains. Never commit real credentials or customer data.
@@ -98,11 +97,11 @@ This is a development foundation, not production-certified software. Before publ
 2. Team directory and invitation flow — initial UI/API implemented
 3. Projects and task tracking — initial UI/API implemented
 4. Organization audit activity — initial read-only console/API implemented
-5. CSV data catalog, basic column profiling and immutable initial version history — implemented foundation
+5. CSV data catalog, column profiling, immutable version history, schema/row-count comparison and restore-as-new-version — implemented foundation
 6. Power BI report-link catalog — initial registry implemented
 7. In-app notifications and account recovery — initial implementation
 8. Authorized data connectors and ingestion
-9. Extend immutable raw snapshots with re-upload, compare, restore and retention workflows
+9. Add row-level diffs, snapshot retention policies and managed object storage
 10. Governed SQL/Python analyst workspace and cleaning pipeline
 11. Power BI secure embedding and dashboard integration
 12. MFA, alerts, backups and security hardening
