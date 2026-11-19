@@ -16,6 +16,7 @@ export const config = {
   cookieSameSite: process.env.COOKIE_SAME_SITE || 'strict',
   sessionSecret: process.env.SESSION_SECRET,
   dataStorageDir: process.env.DATA_STORAGE_DIR || './storage/datasets',
+  pythonExecutable: process.env.PYTHON_EXECUTABLE || (process.platform === 'win32' ? 'python' : 'python3'),
   inviteBaseUrl: process.env.INVITE_BASE_URL || 'http://localhost:3000/accept-invite',
   db: { host: process.env.DB_HOST, port: Number(process.env.DB_PORT || 3306), database: process.env.DB_NAME, user: process.env.DB_USER, password: process.env.DB_PASSWORD }
 };
