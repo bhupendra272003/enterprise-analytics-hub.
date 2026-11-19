@@ -19,7 +19,7 @@ const parseCsv=(buffer:ArrayBuffer)=>{
 };
 const allowed=(role:Role)=>["OWNER","ADMIN","MANAGER","ANALYST"].includes(role);
 const isNum=(v:string)=>v.trim()!==""&&Number.isFinite(Number(v));
-const csvEncode=(rows:Record<string,string>[],columns:string[])=>[columns,...rows.map(r=>columns.map(k=>r[k]??""))].map(row=>row.map(v=>{const s=String(v);return /[",\\r\\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}).join(",")).join("\\r\\n")+"\\r\\n";
+const csvEncode=(rows:Record<string,string>[],columns:string[])=>[columns,...rows.map(r=>columns.map(k=>r[k]??""))].map(row=>row.map(v=>{const s=String(v);return /[",\r\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}).join(",")).join("\r\n")+"\r\n";
 const quality=(rows:Record<string,string>[],columns:string[])=>{
  const cells=rows.length*columns.length,missing=rows.reduce((n,r)=>n+columns.filter(k=>!String(r[k]??"").trim()).length,0);
  const unique=new Set(rows.map(r=>JSON.stringify(columns.map(k=>r[k]??"")))).size;
@@ -126,7 +126,7 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
   let records:any[];try{records=parseCsv(await obj.arrayBuffer()).records;}catch{return json({error:"The selected CSV version is invalid."},400);}
   const issueCounts:Record<string,number>={REQUIRED:0,TYPE:0,ALLOWED_VALUE:0,MIN_MAX:0,UNIQUE:0},samples:any[]=[],seen=new Map<string,Set<string>>(uniqueColumns.map((k:string)=>[k,new Set<string>()]));
   const add=(rowNumber:number,column:string,rule:string,value:unknown,message:string)=>{issueCounts[rule]++;if(samples.length<100)samples.push({rowNumber,column,rule,value:String(value??"").slice(0,160),message});};
-  const validDate=(v:string)=>/^\\d{4}-\\d{2}-\\d{2}$/.test(v)&&!Number.isNaN(Date.parse(v))&&new Date(v).toISOString().slice(0,10)===v;
+  const validDate=(v:string)=>v.length===10&&v[4]==="-"&&v[7]==="-"&&!Number.isNaN(Date.parse(v))&&new Date(v).toISOString().slice(0,10)===v;
   records.forEach((record:any,index:number)=>{
    const row=index+2;
    for(const k of required)if(!String(record[k]??"").trim())add(row,k,"REQUIRED",record[k],"Required value is missing.");
