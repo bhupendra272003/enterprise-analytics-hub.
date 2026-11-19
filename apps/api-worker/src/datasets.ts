@@ -66,8 +66,8 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
  const datasetId=idMatch[1],sub=idMatch[2]||"";
  const dataset=await env.DB.prepare("SELECT id,organization_id,name,original_filename,storage_path,file_size,row_count,column_count,columns_json,preview_json FROM datasets WHERE id=?").bind(datasetId).first<any>();
  if(!dataset)return json({error:"Dataset not found."},404);
- if(["clean","profile","validate","anomalies","quality-dashboard","compare"].includes(sub)&&Number(dataset.file_size)>MAX_SYNC_CSV_BYTES)return syncLimitError();
  const m=await membership(env,dataset.organization_id,user.id);if(!m)return json({error:"Insufficient organization permissions."},403);
+ if(["clean","profile","validate","anomalies","quality-dashboard","compare"].includes(sub)&&Number(dataset.file_size)>MAX_SYNC_CSV_BYTES)return syncLimitError();
  if(sub==="clean"&&req.method==="POST"){
   if(!allowed(m.role))return json({error:"Your role cannot create cleaned dataset versions."},403);
   let body:any={};try{body=await req.json();}catch{return json({error:"Invalid cleaning options."},400);}
