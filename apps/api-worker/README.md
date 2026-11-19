@@ -36,7 +36,13 @@ The checked-in `wrangler.jsonc` intentionally contains placeholders for the D1 d
 
 ## Migration boundary
 
-This Worker currently handles authentication only. Organization/team, invitations, projects/tasks, datasets, cleaning, validation/anomaly scans, reports, notifications and audit browsing still need route-by-route D1 implementations. The existing MySQL Express API remains the local/legacy implementation until the new Worker reaches feature parity and integration tests pass.
+The Worker now contains D1-backed route migrations for authentication, organizations/team, invitations, projects/tasks, datasets, cleaning, validation/anomaly scans, reports and notifications. The existing MySQL Express API remains the local/legacy implementation until feature parity and integration tests are verified.
+
+### CSV processing safety
+
+- Synchronous CSV uploads and new versions are temporarily limited to 256 KB. This conservative cap avoids parsing and transforming large files inside a request-bound Worker invocation.
+- Cleaning, profiling, validation, anomaly scans, quality dashboard calculations and row comparisons reject stored datasets above that cap with HTTP 413.
+- This is an interim safety guard, not the final large-file design. Before raising the limit, implement a durable background-job pipeline (queue + D1 job state + bounded R2 chunk processing), resumable progress, retries and cancellation. Do not simply increase the byte limit: the current CSV parser and analytics routines materialize full datasets in memory.
 
 Do not switch production traffic to this Worker yet. Before activation:
 1. Create the D1 database and apply all migrations in `database/d1`.
