@@ -1,5 +1,7 @@
 import { parse } from "csv-parse/sync";
 type Env={DB:D1Database;DATASETS:R2Bucket};
+const MAX_SYNC_CSV_BYTES=256*1024;
+const syncLimitError=()=>json({error:"This CSV is larger than the current synchronous processing limit (256 KB). Background CSV jobs are being prepared; please use a smaller CSV for now."},413);
 type User={id:string;account_status:string};
 type Role="OWNER"|"ADMIN"|"MANAGER"|"ANALYST"|"VIEWER";
 const json=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store"}});
@@ -45,7 +47,7 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
   const orgId=orgList[1],m=await membership(env,orgId,user.id);if(!m||!allowed(m.role))return json({error:"Insufficient organization permissions."},403);
   let form:FormData;try{form=await req.formData();}catch{return json({error:"Choose a CSV file to upload."},400);}
   const file=form.get("file"),name=typeof form.get("name")==="string"?(form.get("name") as string).trim():"";
-  if(!(file instanceof File)||!file.size||file.size>15*1024*1024||!file.name.toLowerCase().endsWith(".csv"))return json({error:"Choose a CSV file up to 15 MB."},400);
+  if(!(file instanceof File)||!file.size||file.size>MAX_SYNC_CSV_BYTES||!file.name.toLowerCase().endsWith(".csv"))return json({error:"Choose a CSV file up to 256 KB for now."},400);
   if(name.length<2||name.length>120)return json({error:"Dataset name must be 2–120 characters."},400);
   let parsed;try{parsed=parseCsv(await file.arrayBuffer());}catch(e){return json({error:e instanceof Error&&e.message==="EMPTY"?"The CSV contains a header but no data rows.":"The CSV file is invalid. Check its header and row structure."},400);}
   const id=crypto.randomUUID(),key=orgId+"/"+id+"/v1.csv",bytes=await file.arrayBuffer();
@@ -64,6 +66,7 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
  const datasetId=idMatch[1],sub=idMatch[2]||"";
  const dataset=await env.DB.prepare("SELECT id,organization_id,name,original_filename,storage_path,file_size,row_count,column_count,columns_json,preview_json FROM datasets WHERE id=?").bind(datasetId).first<any>();
  if(!dataset)return json({error:"Dataset not found."},404);
+ if(["clean","profile","validate","anomalies","quality-dashboard","compare"].includes(sub)&&Number(dataset.file_size)>MAX_SYNC_CSV_BYTES)return syncLimitError();
  const m=await membership(env,dataset.organization_id,user.id);if(!m)return json({error:"Insufficient organization permissions."},403);
  if(sub==="clean"&&req.method==="POST"){
   if(!allowed(m.role))return json({error:"Your role cannot create cleaned dataset versions."},403);
