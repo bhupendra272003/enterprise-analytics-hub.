@@ -116,6 +116,64 @@ router.get('/datasets/:datasetId/versions/compare',async(req,res,next)=>{
   }catch(e){next(e);}
 });
 
+router.get('/datasets/:datasetId/versions/compare/rows',async(req,res,next)=>{
+  try{
+    const from=Number(req.query.from),to=Number(req.query.to),key=typeof req.query.key==='string'?req.query.key.trim():'';
+    if(!Number.isInteger(from)||!Number.isInteger(to)||from<1||to<1||from===to)return res.status(400).json({error:'Choose two different valid version numbers.'});
+    if(!key||key.length>200)return res.status(400).json({error:'Choose a valid key column.'});
+    const [rows]=await pool.execute('SELECT d.organization_id,a.storage_path AS fromPath,a.columns_json AS fromSchema,b.storage_path AS toPath,b.columns_json AS toSchema FROM datasets d JOIN dataset_versions a ON a.dataset_id=d.id AND a.version_number=? JOIN dataset_versions b ON b.dataset_id=d.id AND b.version_number=? WHERE d.id=? LIMIT 1',[from,to,req.params.datasetId]);
+    if(!rows.length)return res.status(404).json({error:'Dataset or selected version not found.'});
+    const [members]=await pool.execute("SELECT id FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE' LIMIT 1",[rows[0].organization_id,req.user.id]);
+    if(!members.length)return res.status(403).json({error:'Insufficient organization permissions.'});
+    const parseSchema=value=>typeof value==='string'?JSON.parse(value):value;
+    const oldColumns=parseSchema(rows[0].fromSchema)||[],newColumns=parseSchema(rows[0].toSchema)||[];
+    if(!oldColumns.includes(key)||!newColumns.includes(key))return res.status(400).json({error:'The selected key column must exist in both versions.'});
+    const parseOptions={columns:true,skip_empty_lines:true,bom:true,trim:true,relax_column_count:false,skip_records_with_error:false};
+    const oldRecords=parse(await readFile(rows[0].fromPath),parseOptions);
+    const newRecords=parse(await readFile(rows[0].toPath),parseOptions);
+    const indexRecords=(records,label)=>{
+      const index=new Map();
+      for(const record of records){
+        const value=String(record[key]??'').trim();
+        if(!value)return {error:label+' contains blank values in the selected key column.'};
+        if(index.has(value))return {error:label+' contains duplicate values in the selected key column. Choose a unique identifier.'};
+        index.set(value,record);
+      }
+      return {index};
+    };
+    const oldIndex=indexRecords(oldRecords,'The earlier version');
+    if(oldIndex.error)return res.status(400).json({error:oldIndex.error});
+    const newIndex=indexRecords(newRecords,'The later version');
+    if(newIndex.error)return res.status(400).json({error:newIndex.error});
+    const added=[],removed=[],modified=[];
+    for(const [value,record] of newIndex.index){
+      if(!oldIndex.index.has(value)){
+        if(added.length<20)added.push({key:value,record});
+        continue;
+      }
+      const before=oldIndex.index.get(value);
+      const changedColumns=[...new Set([...Object.keys(before),...Object.keys(record)])].filter(column=>String(before[column]??'')!==String(record[column]??''));
+      if(changedColumns.length&&modified.length<20)modified.push({key:value,changedColumns,before:Object.fromEntries(changedColumns.map(column=>[column,before[column]??''])),after:Object.fromEntries(changedColumns.map(column=>[column,record[column]??'']))});
+    }
+    for(const [value,record] of oldIndex.index){
+      if(!newIndex.index.has(value)&&removed.length<20)removed.push({key:value,record});
+    }
+    let addedCount=0,removedCount=0,modifiedCount=0;
+    for(const value of newIndex.index.keys()){
+      if(!oldIndex.index.has(value))addedCount++;
+      else{
+        const before=oldIndex.index.get(value),after=newIndex.index.get(value);
+        if([...new Set([...Object.keys(before),...Object.keys(after)])].some(column=>String(before[column]??'')!==String(after[column]??'')))modifiedCount++;
+      }
+    }
+    for(const value of oldIndex.index.keys())if(!newIndex.index.has(value))removedCount++;
+    res.json({rowComparison:{fromVersion:from,toVersion:to,keyColumn:key,fromRows:oldRecords.length,toRows:newRecords.length,addedCount,removedCount,modifiedCount,unchangedCount:Math.max(0,oldRecords.length-removedCount-modifiedCount),sampleLimit:20,added,removed,modified}});
+  }catch(e){
+    if(e?.code?.startsWith('CSV_'))return res.status(400).json({error:'A stored CSV version is invalid and cannot be compared.'});
+    next(e);
+  }
+});
+
 router.post('/datasets/:datasetId/versions/:versionNumber/restore',async(req,res,next)=>{
   let connection,restoredPath;
   try{
