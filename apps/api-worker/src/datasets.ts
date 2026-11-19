@@ -152,6 +152,45 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
   return json({summary:{totalRuns:runs.length,passedRuns:passed,failedRuns:runs.length-passed,passRate:runs.length?Number((passed/runs.length*100).toFixed(1)):0,averageScore:scored.length?Number((scored.reduce((s:number,r:any)=>s+r.score,0)/scored.length).toFixed(1)):null,totalIssues:runs.reduce((s:number,r:any)=>s+r.issueCount,0)},issueBreakdown,trend:runs.slice().reverse()});
  }
  if(sub==="preview"&&req.method==="GET")return json({dataset:{id:dataset.id,name:dataset.name,columns:JSON.parse(dataset.columns_json),preview:JSON.parse(dataset.preview_json)}});
+ if(sub==="anomalies"&&req.method==="POST"){
+  if(!allowed(m.role))return json({error:"Insufficient organization permissions."},403);
+  const from=Number(url.searchParams.get("from")),to=Number(url.searchParams.get("to"));
+  if(!Number.isInteger(from)||!Number.isInteger(to)||from<1||to<1||from===to)return json({error:"Choose two different valid versions."},400);
+  const [a,b]=await Promise.all([env.DB.prepare("SELECT storage_path,columns_json FROM dataset_versions WHERE dataset_id=? AND version_number=?").bind(datasetId,from).first<any>(),env.DB.prepare("SELECT storage_path,columns_json FROM dataset_versions WHERE dataset_id=? AND version_number=?").bind(datasetId,to).first<any>()]);
+  if(!a||!b)return json({error:"Dataset or selected version not found."},404);
+  const [oa,ob]=await Promise.all([env.DATASETS.get(a.storage_path),env.DATASETS.get(b.storage_path)]);if(!oa||!ob)return json({error:"A stored dataset version is missing."},500);
+  let oldRows:any[],newRows:any[];try{oldRows=parseCsv(await oa.arrayBuffer()).records;newRows=parseCsv(await ob.arrayBuffer()).records;}catch{return json({error:"A stored CSV version is invalid and cannot be scanned."},400);}
+  const oldCols:string[]=JSON.parse(a.columns_json),newCols:string[]=JSON.parse(b.columns_json),common=oldCols.filter(k=>newCols.includes(k)),anomalies:any[]=[];
+  const rate=(n:number,total:number)=>total?n/total:0,add=(type:string,column:string|null,severity:string,title:string,description:string,metric:any,sample:any[]=[])=>(anomalies.push({type,column,severity,title,description,metric,sample:sample.slice(0,8)}));
+  const median=(values:number[])=>{const n=Math.floor(values.length/2);return values.length%2?values[n]:(values[n-1]+values[n])/2;};
+  for(const column of common){
+   const oldValues=oldRows.map(r=>String(r[column]??"").trim()),newValues=newRows.map(r=>String(r[column]??"").trim()),oldMissing=oldValues.filter(v=>!v).length,newMissing=newValues.filter(v=>!v).length,oldMissingRate=rate(oldMissing,oldValues.length),newMissingRate=rate(newMissing,newValues.length);
+   if(newMissing-oldMissing>=3&&newMissingRate-oldMissingRate>=.1){const delta=Number(((newMissingRate-oldMissingRate)*100).toFixed(1));add("MISSINGNESS",column,delta>=25?"HIGH":"MEDIUM","Missing values increased","Missing rate rose from "+(oldMissingRate*100).toFixed(1)+"% to "+(newMissingRate*100).toFixed(1)+"%.",{before:oldMissing,after:newMissing,deltaPercentagePoints:delta},newValues.map((v,i)=>!v?{row:i+2}:null).filter(Boolean));}
+   const oldPresent=oldValues.filter(Boolean),newPresent=newValues.filter(Boolean),oldNumeric=oldPresent.map(Number).filter(Number.isFinite),newNumeric=newPresent.map(Number).filter(Number.isFinite),oldRatio=rate(oldNumeric.length,oldPresent.length),newRatio=rate(newNumeric.length,newPresent.length);
+   if(oldNumeric.length>=8&&newNumeric.length>=8&&oldRatio>=.8&&newRatio>=.8){
+    const sorted=oldNumeric.slice().sort((x,y)=>x-y),q1=median(sorted.slice(0,Math.floor(sorted.length/2))),q3=median(sorted.slice(Math.ceil(sorted.length/2))),iqr=q3-q1;
+    if(iqr>0){const low=q1-1.5*iqr,high=q3+1.5*iqr,oldOut=oldNumeric.filter(v=>v<low||v>high).length,current=newNumeric.filter(v=>v<low||v>high),oldRate=rate(oldOut,oldNumeric.length),currentRate=rate(current.length,newNumeric.length);
+     if(current.length>=3&&currentRate>=.05&&currentRate-oldRate>=.03){const delta=Number(((currentRate-oldRate)*100).toFixed(1));add("NUMERIC_OUTLIERS",column,currentRate>=.15?"HIGH":"MEDIUM","Unusual numeric values detected",current.length+" values fall outside the earlier version IQR bounds ("+low.toFixed(2)+" to "+high.toFixed(2)+").",{beforeRate:Number((oldRate*100).toFixed(1)),afterRate:Number((currentRate*100).toFixed(1)),deltaPercentagePoints:delta,bounds:{low:Number(low.toFixed(4)),high:Number(high.toFixed(4))}},current.slice(0,8).map(value=>({value})));}}
+   }else if(oldRatio<.8&&newRatio<.8&&oldPresent.length>=20&&newPresent.length>=20){
+    const count=(values:string[])=>{const map=new Map<string,number>();for(const v of values)map.set(v,(map.get(v)||0)+1);return map;},oc=count(oldPresent),nc=count(newPresent);
+    if(oc.size<=50&&nc.size<=50){const cats=new Set([...oc.keys(),...nc.keys()]),distance=[...cats].reduce((sum,v)=>sum+Math.abs(rate(oc.get(v)||0,oldPresent.length)-rate(nc.get(v)||0,newPresent.length)),0)/2;
+     if(distance>=.25){const changed=[...cats].map(value=>({value,before:Number((rate(oc.get(value)||0,oldPresent.length)*100).toFixed(1)),after:Number((rate(nc.get(value)||0,newPresent.length)*100).toFixed(1))})).sort((x,y)=>Math.abs(y.after-y.before)-Math.abs(x.after-x.before)).slice(0,5);add("CATEGORY_SHIFT",column,distance>=.4?"HIGH":"MEDIUM","Category distribution shifted","Category mix changed substantially (total variation distance "+(distance*100).toFixed(1)+"%).",{distance:Number(distance.toFixed(3)),topChanges:changed},changed);}}
+   }
+  }
+  const rowDelta=oldRows.length?(newRows.length-oldRows.length)/oldRows.length:0;
+  if(Math.abs(rowDelta)>=.2)add("ROW_COUNT_CHANGE",null,Math.abs(rowDelta)>=.5?"HIGH":"MEDIUM",rowDelta>0?"Dataset row count increased":"Dataset row count decreased","Rows changed from "+oldRows.length.toLocaleString()+" to "+newRows.length.toLocaleString()+" ("+(rowDelta>0?"+":"")+(rowDelta*100).toFixed(1)+"%).",{before:oldRows.length,after:newRows.length,changePercentage:Number((rowDelta*100).toFixed(1))});
+  const duplicate=(rows:any[])=>{const seen=new Set<string>();let n=0;for(const row of rows){const sig=JSON.stringify(Object.keys(row).sort().map(k=>row[k]??""));if(seen.has(sig))n++;else seen.add(sig);}return {count:n,rate:rate(n,rows.length)};},od=duplicate(oldRows),nd=duplicate(newRows);
+  if(nd.count-od.count>=3&&nd.rate-od.rate>=.05)add("DUPLICATE_SPIKE",null,nd.rate>=.15?"HIGH":"MEDIUM","Duplicate rows increased","Duplicate-row rate rose from "+(od.rate*100).toFixed(1)+"% to "+(nd.rate*100).toFixed(1)+"%.",{before:od.count,after:nd.count,beforeRate:Number((od.rate*100).toFixed(1)),afterRate:Number((nd.rate*100).toFixed(1))});
+  const order={HIGH:0,MEDIUM:1,LOW:2};anomalies.sort((x,y)=>order[x.severity as keyof typeof order]-order[y.severity as keyof typeof order]);
+  const report={fromVersion:from,toVersion:to,fromRows:oldRows.length,toRows:newRows.length,columnsAnalyzed:common.length,anomalyCount:anomalies.length,highCount:anomalies.filter(x=>x.severity==="HIGH").length,mediumCount:anomalies.filter(x=>x.severity==="MEDIUM").length,anomalies,methodology:{numeric:"1.5×IQR fences from the earlier version; flag at least 3 later values and a 3 percentage-point outlier-rate increase.",missingness:"Flag at least 3 additional missing cells and a 10 percentage-point missing-rate increase.",category:"Total variation distance ≥0.25 for low-cardinality text columns with at least 20 populated values.",rowCount:"Flag an absolute row-count change of at least 20%.",duplicates:"Flag at least 3 additional duplicate rows and a 5 percentage-point duplicate-rate increase."}};
+  await env.DB.prepare("INSERT INTO dataset_anomaly_runs (id,dataset_id,from_version,to_version,executed_by,anomaly_count,high_count,medium_count,result_json) VALUES (?,?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(),datasetId,from,to,user.id,report.anomalyCount,report.highCount,report.mediumCount,JSON.stringify(report)).run();
+  await audit(env,dataset.organization_id,user.id,"DATASET_ANOMALY_SCANNED",datasetId,{fromVersion:from,toVersion:to,anomalyCount:report.anomalyCount,highCount:report.highCount});
+  return json({report},201);
+ }
+ if(sub==="anomaly-runs"&&req.method==="GET"){
+  const {results}=await env.DB.prepare("SELECT r.id,r.from_version AS fromVersion,r.to_version AS toVersion,r.anomaly_count AS anomalyCount,r.high_count AS highCount,r.medium_count AS mediumCount,r.result_json AS resultJson,r.created_at AS createdAt,u.full_name AS executedBy FROM dataset_anomaly_runs r JOIN users u ON u.id=r.executed_by WHERE r.dataset_id=? ORDER BY r.created_at DESC LIMIT 20").bind(datasetId).all<any>();
+  return json({runs:results.map((r:any)=>({...r,result:JSON.parse(r.resultJson)}))});
+ }
  if(sub==="versions/compare/rows"&&req.method==="GET"){
   const from=Number(url.searchParams.get("from")),to=Number(url.searchParams.get("to")),key=(url.searchParams.get("key")||"").trim();
   if(!Number.isInteger(from)||!Number.isInteger(to)||from<1||to<1||from===to)return json({error:"Choose two different valid version numbers."},400);
