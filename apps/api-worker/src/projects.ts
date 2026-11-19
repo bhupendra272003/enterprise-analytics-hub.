@@ -28,7 +28,7 @@ export async function handleProjects(request: Request, env: Env, path: string): 
   if(!user) return json({error:"Authentication required."},401);
   if(user.account_status==="SUSPENDED") return json({error:"This account has been suspended."},403);
 
-  const orgProjects=path.match(/^\\/api\\/organizations\\/([^/]+)\\/projects$/);
+  const orgProjects=path.match(/^\/api\/organizations\/([^/]+)\/projects$/);
   if(orgProjects && request.method==="GET") {
     const orgId=orgProjects[1], member=await memberOf(env,orgId,user.id);
     if(!member) return json({error:"Insufficient organization permissions."},403);
@@ -53,7 +53,7 @@ export async function handleProjects(request: Request, env: Env, path: string): 
     return json({project:{id,name,description,priority,dueDate:dueDate??null,status:"PLANNING"}},201);
   }
 
-  const projectTasks=path.match(/^\\/api\\/projects\\/([^/]+)\\/tasks$/);
+  const projectTasks=path.match(/^\/api\/projects\/([^/]+)\/tasks$/);
   if(projectTasks && request.method==="GET") {
     const projectId=projectTasks[1];
     const project=await env.DB.prepare("SELECT organization_id FROM projects WHERE id=?").bind(projectId).first<{organization_id:string}>();
@@ -91,7 +91,7 @@ export async function handleProjects(request: Request, env: Env, path: string): 
     return json({task:{id,title,description,priority,dueDate:dueDate??null,assigneeId:assigneeId??null,status:"TODO"}},201);
   }
 
-  const taskMatch=path.match(/^\\/api\\/tasks\\/([^/]+)$/);
+  const taskMatch=path.match(/^\/api\/tasks\/([^/]+)$/);
   if(taskMatch && request.method==="PATCH") {
     const taskId=taskMatch[1];
     let body:any; try{body=await request.json();}catch{return json({error:"Invalid JSON body."},400);}
