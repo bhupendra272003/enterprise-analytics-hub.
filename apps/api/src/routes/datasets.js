@@ -108,8 +108,8 @@ router.get('/datasets/:datasetId/versions/compare',async(req,res,next)=>{
     if(!Number.isInteger(from)||!Number.isInteger(to)||from<1||to<1||from===to)return res.status(400).json({error:'Choose two different valid version numbers.'});
     const [rows]=await pool.execute('SELECT d.organization_id,a.row_count AS fromRows,a.column_count AS fromColumns,a.columns_json AS fromSchema,b.row_count AS toRows,b.column_count AS toColumns,b.columns_json AS toSchema FROM datasets d JOIN dataset_versions a ON a.dataset_id=d.id AND a.version_number=? JOIN dataset_versions b ON b.dataset_id=d.id AND b.version_number=? WHERE d.id=? LIMIT 1',[from,to,req.params.datasetId]);
     if(!rows.length)return res.status(404).json({error:'Dataset or selected version not found.'});
-    const [members]=await pool.execute("SELECT id FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE' LIMIT 1",[rows[0].organization_id,req.user.id]);
-    if(!members.length)return res.status(403).json({error:'Insufficient organization permissions.'});
+    const [members]=await pool.execute("SELECT role FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE' LIMIT 1",[rows[0].organization_id,req.user.id]);
+    if(!members.length||!['OWNER','ADMIN','MANAGER','ANALYST'].includes(members[0].role))return res.status(403).json({error:'Insufficient organization permissions.'});
     const parseSchema=value=>typeof value==='string'?JSON.parse(value):value;
     const oldColumns=parseSchema(rows[0].fromSchema)||[],newColumns=parseSchema(rows[0].toSchema)||[];
     res.json({comparison:{fromVersion:from,toVersion:to,fromRows:Number(rows[0].fromRows),toRows:Number(rows[0].toRows),rowDelta:Number(rows[0].toRows)-Number(rows[0].fromRows),fromColumns:Number(rows[0].fromColumns),toColumns:Number(rows[0].toColumns),addedColumns:newColumns.filter(x=>!oldColumns.includes(x)),removedColumns:oldColumns.filter(x=>!newColumns.includes(x)),unchangedColumns:oldColumns.filter(x=>newColumns.includes(x))}});
@@ -397,7 +397,7 @@ router.get('/datasets/:datasetId/quality-dashboard',async(req,res,next)=>{
 });
 
 
-router.get('/datasets/:datasetId/anomalies',async(req,res,next)=>{
+router.post('/datasets/:datasetId/anomalies',async(req,res,next)=>{
   try{
     const from=Number(req.query.from),to=Number(req.query.to);
     if(!Number.isInteger(from)||!Number.isInteger(to)||from<1||to<1||from===to)return res.status(400).json({error:'Choose two different valid versions.'});
@@ -462,11 +462,26 @@ router.get('/datasets/:datasetId/anomalies',async(req,res,next)=>{
     if(newDup.count-oldDup.count>=3&&newDup.rate-oldDup.rate>=0.05)add('DUPLICATE_SPIKE',null,newDup.rate>=0.15?'HIGH':'MEDIUM','Duplicate rows increased','Duplicate-row rate rose from '+(oldDup.rate*100).toFixed(1)+'% to '+(newDup.rate*100).toFixed(1)+'%.',{before:oldDup.count,after:newDup.count,beforeRate:Number((oldDup.rate*100).toFixed(1)),afterRate:Number((newDup.rate*100).toFixed(1))});
     const severityOrder={HIGH:0,MEDIUM:1,LOW:2};
     anomalies.sort((a,b)=>severityOrder[a.severity]-severityOrder[b.severity]);
-    res.json({report:{fromVersion:from,toVersion:to,fromRows:oldRecords.length,toRows:newRecords.length,columnsAnalyzed:common.length,anomalyCount:anomalies.length,highCount:anomalies.filter(item=>item.severity==='HIGH').length,mediumCount:anomalies.filter(item=>item.severity==='MEDIUM').length,anomalies,methodology:{numeric:'1.5×IQR fences from the earlier version; flag at least 3 later values and a 3 percentage-point outlier-rate increase.',missingness:'Flag at least 3 additional missing cells and a 10 percentage-point missing-rate increase.',category:'Total variation distance ≥0.25 for low-cardinality text columns with at least 20 populated values.',rowCount:'Flag an absolute row-count change of at least 20%.',duplicates:'Flag at least 3 additional duplicate rows and a 5 percentage-point duplicate-rate increase.'}}});
+    const report={fromVersion:from,toVersion:to,fromRows:oldRecords.length,toRows:newRecords.length,columnsAnalyzed:common.length,anomalyCount:anomalies.length,highCount:anomalies.filter(item=>item.severity==='HIGH').length,mediumCount:anomalies.filter(item=>item.severity==='MEDIUM').length,anomalies,methodology:{numeric:'1.5×IQR fences from the earlier version; flag at least 3 later values and a 3 percentage-point outlier-rate increase.',missingness:'Flag at least 3 additional missing cells and a 10 percentage-point missing-rate increase.',category:'Total variation distance ≥0.25 for low-cardinality text columns with at least 20 populated values.',rowCount:'Flag an absolute row-count change of at least 20%.',duplicates:'Flag at least 3 additional duplicate rows and a 5 percentage-point duplicate-rate increase.'}};
+    await pool.execute('INSERT INTO dataset_anomaly_runs (id,dataset_id,from_version,to_version,executed_by,anomaly_count,high_count,medium_count,result_json) VALUES (?,?,?,?,?,?,?,?,?)',[randomUUID(),req.params.datasetId,from,to,req.user.id,report.anomalyCount,report.highCount,report.mediumCount,JSON.stringify(report)]);
+    await audit({orgId:rows[0].organization_id,actorId:req.user.id,action:'DATASET_ANOMALY_SCANNED',targetType:'DATASET',targetId:req.params.datasetId,metadata:{fromVersion:from,toVersion:to,anomalyCount:report.anomalyCount,highCount:report.highCount},ip:req.ip});
+    res.status(201).json({report});
   }catch(e){
     if(e?.code?.startsWith('CSV_'))return res.status(400).json({error:'A stored CSV version is invalid and cannot be scanned.'});
     next(e);
   }
+});
+
+
+router.get('/datasets/:datasetId/anomaly-runs',async(req,res,next)=>{
+  try{
+    const [datasets]=await pool.execute('SELECT organization_id FROM datasets WHERE id=? LIMIT 1',[req.params.datasetId]);
+    if(!datasets.length)return res.status(404).json({error:'Dataset not found.'});
+    const [members]=await pool.execute("SELECT id FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE' LIMIT 1",[datasets[0].organization_id,req.user.id]);
+    if(!members.length)return res.status(403).json({error:'Insufficient organization permissions.'});
+    const [runs]=await pool.execute('SELECT r.id,r.from_version AS fromVersion,r.to_version AS toVersion,r.anomaly_count AS anomalyCount,r.high_count AS highCount,r.medium_count AS mediumCount,r.result_json AS resultJson,r.created_at AS createdAt,u.full_name AS executedBy FROM dataset_anomaly_runs r JOIN users u ON u.id=r.executed_by WHERE r.dataset_id=? ORDER BY r.created_at DESC LIMIT 20',[req.params.datasetId]);
+    res.json({runs:runs.map(run=>({...run,result:typeof run.resultJson==='string'?JSON.parse(run.resultJson):run.resultJson}))});
+  }catch(e){next(e);}
 });
 
 router.get('/datasets/:datasetId/profile',async(req,res,next)=>{
