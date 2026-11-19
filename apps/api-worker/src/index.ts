@@ -4,7 +4,6 @@ import { handleInvitations } from "./invitations";
 import { handleNotifications } from "./notifications";
 import { handleDatasets } from "./datasets";
 import { handleReports } from "./reports";
-import bcrypt from "bcryptjs";
 
 interface Env {
   DB: D1Database;
@@ -52,6 +51,26 @@ const sessionCookie = (value: string, maxAge: number) =>
 
 const clearSessionCookie = () =>
   "hub.sid=; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=0";
+
+const PASSWORD_ITERATIONS = 310000;
+const passwordHash = async (password: string) => {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations: PASSWORD_ITERATIONS }, key, 256);
+  const hex = (value: Uint8Array) => Array.from(value, b => b.toString(16).padStart(2, "0")).join("");
+  return `pbkdf2-sha256${PASSWORD_ITERATIONS}${hex(salt)}${hex(new Uint8Array(bits))}`;
+};
+const verifyPassword = async (password: string, encoded: string) => {
+  const [scheme, rounds, saltHex, expectedHex] = encoded.split("$");
+  if (scheme !== "pbkdf2-sha256" || !/^\\d+$/.test(rounds || "") || !/^[a-f0-9]{32}$/.test(saltHex || "") || !/^[a-f0-9]{64}$/.test(expectedHex || "")) return false;
+  const iterations = Number(rounds);
+  if (iterations < 100000 || iterations > 600000) return false;
+  const salt = new Uint8Array(saltHex.match(/.{2}/g)!.map(v => parseInt(v, 16)));
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
+  const bits = new Uint8Array(await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations }, key, 256));
+  const expected = expectedHex.match(/.{2}/g)!.map(v => parseInt(v, 16));
+  return bits.length === expected.length && bits.reduce((diff, value, index) => diff | (value ^ expected[index]), 0) === 0;
+};
 
 const validEmail = (value: unknown): value is string =>
   typeof value === "string" && value.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -130,9 +149,9 @@ async function handleAuth(request: Request, env: Env, path: string): Promise<Res
     const existing = await env.DB.prepare("SELECT id FROM users WHERE email=?").bind(email).first();
     if (existing) return json({ error: "An account with this email already exists." }, 409);
     const id = crypto.randomUUID();
-    const passwordHash = await bcrypt.hash(password, 12);
+    const encodedPassword = await passwordHash(password);
     await env.DB.prepare("INSERT INTO users (id,full_name,email,password_hash,account_status) VALUES (?,?,?,?,'PENDING')")
-      .bind(id, fullName, email, passwordHash).run();
+      .bind(id, fullName, email, encodedPassword).run();
     const token = await createToken(env, id, "EMAIL_VERIFY");
     const url = env.APP_ORIGIN + "/verify-email?token=" + encodeURIComponent(token);
     let sent = false;
@@ -149,7 +168,7 @@ async function handleAuth(request: Request, env: Env, path: string): Promise<Res
     if (!validEmail(email) || !password || password.length > 128) return json({ error: "Invalid email or password." }, 400);
     if (!await authRateLimit(request, env, "login", email)) return json({ error: "Too many attempts. Try again later." }, 429);
     const user = await env.DB.prepare("SELECT id,full_name,email,password_hash,account_status,email_verified_at FROM users WHERE email=? LIMIT 1").bind(email).first<UserRow>();
-    if (!user || !await bcrypt.compare(password, user.password_hash)) return json({ error: "Invalid email or password." }, 401);
+    if (!user || !await verifyPassword(password, user.password_hash)) return json({ error: "Invalid email or password." }, 401);
     if (user.account_status === "SUSPENDED") return json({ error: "This account has been suspended." }, 403);
     if (!user.email_verified_at) return json({ error: "Verify your email before signing in. You can request a new verification link." }, 403);
     const sid = randomToken();
@@ -223,9 +242,9 @@ async function handleAuth(request: Request, env: Env, path: string): Promise<Res
     const hash = await sha256(token);
     const row = await env.DB.prepare("SELECT id,user_id FROM auth_tokens WHERE token_hash=? AND purpose='PASSWORD_RESET' AND used_at IS NULL AND expires_at > CURRENT_TIMESTAMP LIMIT 1").bind(hash).first<{id:string;user_id:string}>();
     if (!row) return json({ error: "Password reset link is invalid or expired." }, 400);
-    const passwordHash = await bcrypt.hash(password, 12);
+    const encodedPassword = await passwordHash(password);
     await env.DB.batch([
-      env.DB.prepare("UPDATE users SET password_hash=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(passwordHash, row.user_id),
+      env.DB.prepare("UPDATE users SET password_hash=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(encodedPassword, row.user_id),
       env.DB.prepare("DELETE FROM sessions WHERE user_id=?").bind(row.user_id),
       env.DB.prepare("UPDATE auth_tokens SET used_at=CURRENT_TIMESTAMP WHERE user_id=? AND purpose='PASSWORD_RESET' AND used_at IS NULL").bind(row.user_id)
     ]);
