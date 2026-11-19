@@ -78,6 +78,7 @@ router.post('/datasets/:datasetId/versions',upload.single('file'),async(req,res,
     await connection.execute('UPDATE datasets SET original_filename=?,storage_path=?,file_size=?,row_count=?,column_count=?,columns_json=?,preview_json=?,uploaded_by=? WHERE id=?',
       [path.basename(req.file.originalname).slice(0,255),storedPath,req.file.size,records.length,columns.length,JSON.stringify(columns),JSON.stringify(preview),req.user.id,req.params.datasetId]);
     await connection.commit();
+    storedPath=null;
     await audit({orgId:rows[0].organization_id,actorId:req.user.id,action:'DATASET_VERSION_UPLOADED',targetType:'DATASET',targetId:req.params.datasetId,metadata:{versionNumber,rowCount:records.length,columnCount:columns.length},ip:req.ip});
     res.status(201).json({version:{versionNumber,rowCount:records.length,columnCount:columns.length,columns,preview}});
   }catch(e){
@@ -137,6 +138,7 @@ router.post('/datasets/:datasetId/versions/:versionNumber/restore',async(req,res
     await connection.execute('UPDATE datasets SET storage_path=?,file_size=?,row_count=?,column_count=?,columns_json=?,preview_json=?,uploaded_by=? WHERE id=?',
       [restoredPath,source[0].file_size,source[0].row_count,source[0].column_count,source[0].columns_json,source[0].preview_json,req.user.id,req.params.datasetId]);
     await connection.commit();
+    restoredPath=null;
     await audit({orgId:datasets[0].organization_id,actorId:req.user.id,action:'DATASET_VERSION_RESTORED',targetType:'DATASET',targetId:req.params.datasetId,metadata:{restoredFrom:versionNumber,newVersion:nextVersion},ip:req.ip});
     res.status(201).json({restoredFrom:versionNumber,newVersion:nextVersion});
   }catch(e){
