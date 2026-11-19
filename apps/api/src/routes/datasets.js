@@ -50,7 +50,7 @@ router.post('/organizations/:orgId/datasets',datasetRole,upload.single('file'),a
   }catch(e){if(storedPath)await unlink(storedPath).catch(()=>{});if(e?.code?.startsWith('CSV_'))return res.status(400).json({error:'The CSV file is invalid. Check its header and row structure.'});next(e);}
 });
 
-router.post('/datasets/:datasetId/versions',datasetRole,upload.single('file'),async(req,res,next)=>{
+router.post('/datasets/:datasetId/versions',upload.single('file'),async(req,res,next)=>{
   let storedPath;
   let connection;
   try{
