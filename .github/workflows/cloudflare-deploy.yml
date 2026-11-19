@@ -50,12 +50,12 @@ jobs:
           url=$(grep -Eo 'https://[A-Za-z0-9.-]+\.workers\.dev' deploy.log | tail -n1)
           test -n "$url" || { echo "::error::Could not detect the API workers.dev URL"; exit 1; }
           echo "url=$url" >> "$GITHUB_OUTPUT"
-      - name: Rebuild frontend with API proxy target
+      - name: Rebuild frontend with direct API URL
         working-directory: apps/web
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          API_PROXY_TARGET: ${{ steps.api.outputs.url }}
+          NEXT_PUBLIC_API_URL: ${{ steps.api.outputs.url }}
         run: |
           set -euo pipefail
           npx opennextjs-cloudflare build
