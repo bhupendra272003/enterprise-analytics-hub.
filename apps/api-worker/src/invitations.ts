@@ -11,6 +11,13 @@ const getUser=async(req:Request,env:Env):Promise<User|null>=>{
 const member=async(env:Env,orgId:string,userId:string)=>env.DB.prepare("SELECT role FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE'").bind(orgId,userId).first<{role:Role}>();
 const audit=(env:Env,orgId:string,userId:string,action:string,id:string,metadata?:unknown)=>env.DB.prepare("INSERT INTO audit_logs (organization_id,actor_user_id,action,target_type,target_id,metadata) VALUES (?,?,?,'INVITATION',?,?)").bind(orgId,userId,action,id,metadata===undefined?null:JSON.stringify(metadata)).run();
 const hash=async(value:string)=>Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(value)))).map(v=>v.toString(16).padStart(2,"0")).join("");
+const hashPassword=async(password:string)=>{
+ const salt=crypto.getRandomValues(new Uint8Array(16));
+ const key=await crypto.subtle.importKey("raw",new TextEncoder().encode(password),"PBKDF2",false,["deriveBits"]);
+ const bits=new Uint8Array(await crypto.subtle.deriveBits({name:"PBKDF2",hash:"SHA-256",salt,iterations:310000},key,256));
+ const hex=(v:Uint8Array)=>Array.from(v,b=>b.toString(16).padStart(2,"0")).join("");
+ return `pbkdf2-sha256$310000${hex(salt)}${hex(bits)}`;
+};
 const validEmail=(v:unknown):v is string=>typeof v==="string"&&v.length<=254&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 async function sendInvite(env:Env,to:string,url:string){
  if(!env.MAIL_API_KEY||!env.MAIL_FROM)return false;
@@ -46,8 +53,7 @@ export async function handleInvitations(req:Request,env:Env,path:string):Promise
   if(!invite)return json({error:"Invitation is invalid or expired."},400);
   const existing=await env.DB.prepare("SELECT id FROM users WHERE email=?").bind(invite.email.toLowerCase()).first();
   if(existing)return json({error:"An account already exists for this email. Sign in first, then accept the invitation."},409);
-  const salt=crypto.getRandomValues(new Uint8Array(16));
-  const passwordHash=await (async()=>{const {default:bcrypt}=await import("bcryptjs");return bcrypt.hash(password,12);})();
+  const passwordHash=await hashPassword(password);
   const userId=crypto.randomUUID(),sessionId=crypto.randomUUID();
   try{
    await env.DB.batch([
