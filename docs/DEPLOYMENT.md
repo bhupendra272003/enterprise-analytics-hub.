@@ -18,6 +18,7 @@ This guide uses Vercel for the Next.js frontend and Render for the Express API. 
 3. Set the required secrets in Render:
    - `SESSION_SECRET`: random value of at least 32 characters
    - `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`
+   - `DB_SSL_CA`: the managed MySQL provider's CA certificate (PEM text); required when the provider enforces TLS
    - `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`
 4. Set `APP_ORIGIN` to the final Vercel frontend URL (for example `https://your-app.vercel.app`) and `INVITE_BASE_URL` to that URL plus `/accept-invite`.
 5. Set `COOKIE_SECURE=true` and `COOKIE_SAME_SITE=strict`.
