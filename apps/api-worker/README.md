@@ -39,16 +39,21 @@ The checked-in `wrangler.jsonc` intentionally contains placeholders for the D1 d
 
 The Worker now contains D1-backed route migrations for authentication, organizations/team, invitations, projects/tasks, datasets, cleaning, validation/anomaly scans, reports and notifications. The existing MySQL Express API remains the local/legacy implementation until feature parity and integration tests are verified.
 
-### CSV processing safety
+### Dataset background jobs
 
-- Synchronous CSV uploads and new versions are temporarily limited to 256 KB. This conservative cap avoids parsing and transforming large files inside a request-bound Worker invocation.
-- Cleaning, profiling, validation, anomaly scans, quality dashboard calculations and row comparisons reject stored datasets above that cap with HTTP 413.
-- This is an interim safety guard, not the final large-file design. Before raising the limit, implement a durable background-job pipeline (queue + D1 job state + bounded R2 chunk processing), resumable progress, retries and cancellation. Do not simply increase the byte limit: the current CSV parser and analytics routines materialize full datasets in memory.
+- D1 migration `0004_dataset_jobs.sql` stores job state, progress, attempts, results and errors. Queue messages contain only a job ID; CSV contents remain in private R2.
+- `POST /api/datasets/:datasetId/jobs` currently accepts `{ "type": "PROFILE" }`. `GET /api/datasets/:datasetId/jobs` lists recent jobs; `GET /api/dataset-jobs/:jobId` returns status/result; `POST /api/dataset-jobs/:jobId/cancel` requests cancellation. Routes enforce active organization membership.
+- PROFILE is the only enabled queue processor in this first slice. Cleaning, validation, anomaly detection and row comparison are not queue jobs yet.
+- Queue delivery retries are tracked; exhausted retries transition the D1 job to FAILED. This protects against jobs remaining indefinitely in RETRYING.
+- The 256 KB CSV safety limit remains in place. PROFILE currently reads the bounded CSV into memory; it is not yet a large-file streaming/chunk processor. Do not raise the limit until streaming checkpoints, idempotency and retry recovery are implemented and tested.
+
+### Cloudflare resource provisioning
+
+The manual GitHub Actions workflow `.github/workflows/cloudflare-provision.yml` creates or reuses the D1 database, private R2 bucket and Queue, applies D1 migrations, and saves the D1 identifier as the repository variable `CLOUDFLARE_D1_DATABASE_ID`. It requires the existing repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. Run it from **GitHub → Actions → Provision Cloudflare Free Resources → Run workflow**. It does not deploy the Worker or configure email.
 
 Do not switch production traffic to this Worker yet. Before activation:
-1. Create the D1 database and apply all migrations in `database/d1`.
-2. Create the private R2 bucket.
-3. Set the actual frontend origin and API proxy target.
-4. Configure and verify the email sender and `MAIL_API_KEY` secret.
-5. Add integration tests for auth, session cookies, expiry, token reuse, password reset, and CORS.
-6. Migrate the remaining route groups and test tenant isolation before cutover.
+1. Run the resource provisioning workflow and confirm all remote D1 migrations are applied.
+2. Set the actual frontend origin and API proxy target.
+3. Configure and verify the email sender and `MAIL_API_KEY` secret.
+4. Add integration tests for auth, session cookies, expiry, token reuse, password reset, CORS and dataset job lifecycle.
+5. Migrate the remaining route groups and test tenant isolation before cutover.
