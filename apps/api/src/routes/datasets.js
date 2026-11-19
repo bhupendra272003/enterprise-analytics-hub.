@@ -369,8 +369,8 @@ router.get('/datasets/:datasetId/validation-runs',async(req,res,next)=>{
     if(!datasets.length)return res.status(404).json({error:'Dataset not found.'});
     const [members]=await pool.execute("SELECT id FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE' LIMIT 1",[datasets[0].organization_id,req.user.id]);
     if(!members.length)return res.status(403).json({error:'Insufficient organization permissions.'});
-    const [runs]=await pool.execute('SELECT r.id,r.version_number AS versionNumber,r.status,r.issue_count AS issueCount,r.created_at AS createdAt,u.full_name AS executedBy FROM dataset_validation_runs r JOIN users u ON u.id=r.executed_by WHERE r.dataset_id=? ORDER BY r.created_at DESC LIMIT 20',[req.params.datasetId]);
-    res.json({runs});
+    const [runs]=await pool.execute('SELECT r.id,r.version_number AS versionNumber,r.status,r.issue_count AS issueCount,r.rules_json AS rulesJson,r.created_at AS createdAt,u.full_name AS executedBy FROM dataset_validation_runs r JOIN users u ON u.id=r.executed_by WHERE r.dataset_id=? ORDER BY r.created_at DESC LIMIT 20',[req.params.datasetId]);
+    res.json({runs:runs.map(run=>({...run,rules:typeof run.rulesJson==='string'?JSON.parse(run.rulesJson):run.rulesJson}))});
   }catch(e){next(e);}
 });
 
