@@ -1,5 +1,6 @@
 import { handleOrganizations } from "./organizations";
 import { handleProjects } from "./projects";
+import { handleInvitations } from "./invitations";
 import bcrypt from "bcryptjs";
 
 interface Env {
@@ -256,6 +257,15 @@ export default {
     if (request.method !== "GET" && request.method !== "HEAD") {
       if (origin !== env.APP_ORIGIN || request.headers.get("X-Hub-Request") !== "1")
         return json({ error: "Request origin validation failed." }, 403, headers);
+    }
+    if (url.pathname.startsWith("/api/invitations/") || (url.pathname.startsWith("/api/organizations/") && url.pathname.endsWith("/invitations"))) {
+      const response = await handleInvitations(request, env, url.pathname);
+      if (response) {
+        const merged = new Headers(response.headers);
+        for (const [key, value] of Object.entries(headers)) merged.set(key, value);
+        if (response.headers.has("set-cookie")) merged.set("set-cookie", response.headers.get("set-cookie")!);
+        return new Response(response.body, { status: response.status, headers: merged });
+      }
     }
     if (url.pathname.startsWith("/api/projects/") || url.pathname.startsWith("/api/tasks/") || (url.pathname.startsWith("/api/organizations/") && url.pathname.endsWith("/projects"))) {
       const response = await handleProjects(request, env, url.pathname);
