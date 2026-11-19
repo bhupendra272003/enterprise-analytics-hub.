@@ -396,6 +396,79 @@ router.get('/datasets/:datasetId/quality-dashboard',async(req,res,next)=>{
   }catch(e){next(e);}
 });
 
+
+router.get('/datasets/:datasetId/anomalies',async(req,res,next)=>{
+  try{
+    const from=Number(req.query.from),to=Number(req.query.to);
+    if(!Number.isInteger(from)||!Number.isInteger(to)||from<1||to<1||from===to)return res.status(400).json({error:'Choose two different valid versions.'});
+    const [rows]=await pool.execute('SELECT d.organization_id,a.storage_path AS fromPath,a.columns_json AS fromSchema,b.storage_path AS toPath,b.columns_json AS toSchema FROM datasets d JOIN dataset_versions a ON a.dataset_id=d.id AND a.version_number=? JOIN dataset_versions b ON b.dataset_id=d.id AND b.version_number=? WHERE d.id=? LIMIT 1',[from,to,req.params.datasetId]);
+    if(!rows.length)return res.status(404).json({error:'Dataset or selected version not found.'});
+    const [members]=await pool.execute("SELECT id FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE' LIMIT 1",[rows[0].organization_id,req.user.id]);
+    if(!members.length)return res.status(403).json({error:'Insufficient organization permissions.'});
+    const parseSchema=value=>typeof value==='string'?JSON.parse(value):value;
+    const oldColumns=parseSchema(rows[0].fromSchema)||[],newColumns=parseSchema(rows[0].toSchema)||[];
+    const options={columns:true,skip_empty_lines:true,bom:true,trim:false,relax_column_count:false};
+    const oldRecords=parse(await readFile(rows[0].fromPath),options);
+    const newRecords=parse(await readFile(rows[0].toPath),options);
+    const anomalies=[];
+    const add=(type,column,severity,title,description,metric,sample=[])=>anomalies.push({type,column,severity,title,description,metric,sample:sample.slice(0,8)});
+    const rate=(count,total)=>total?count/total:0;
+    const common=oldColumns.filter(column=>newColumns.includes(column));
+    for(const column of common){
+      const oldValues=oldRecords.map(row=>String(row[column]??'').trim());
+      const newValues=newRecords.map(row=>String(row[column]??'').trim());
+      const oldMissing=oldValues.filter(value=>!value).length,newMissing=newValues.filter(value=>!value).length;
+      const oldMissingRate=rate(oldMissing,oldValues.length),newMissingRate=rate(newMissing,newValues.length);
+      if(newMissing-oldMissing>=3&&newMissingRate-oldMissingRate>=0.1){
+        const delta=Number(((newMissingRate-oldMissingRate)*100).toFixed(1));
+        add('MISSINGNESS',column,delta>=25?'HIGH':'MEDIUM','Missing values increased','Missing rate rose from '+(oldMissingRate*100).toFixed(1)+'% to '+(newMissingRate*100).toFixed(1)+'%.',{before:oldMissing,after:newMissing,deltaPercentagePoints:delta},newValues.map((value,index)=>!value?{row:index+2}:null).filter(Boolean));
+      }
+      const oldPresent=oldValues.filter(Boolean),newPresent=newValues.filter(Boolean);
+      const oldNumeric=oldPresent.map(Number).filter(Number.isFinite),newNumeric=newPresent.map(Number).filter(Number.isFinite);
+      const oldNumericRatio=oldPresent.length?oldNumeric.length/oldPresent.length:0,newNumericRatio=newPresent.length?newNumeric.length/newPresent.length:0;
+      if(oldNumeric.length>=8&&newNumeric.length>=8&&oldNumericRatio>=0.8&&newNumericRatio>=0.8){
+        const sorted=oldNumeric.slice().sort((a,b)=>a-b);
+        const medianOf=values=>{const middle=Math.floor(values.length/2);return values.length%2?values[middle]:(values[middle-1]+values[middle])/2;};
+        const lower=sorted.slice(0,Math.floor(sorted.length/2)),upper=sorted.slice(Math.ceil(sorted.length/2));
+        const q1=medianOf(lower),q3=medianOf(upper),iqr=q3-q1;
+        if(iqr>0){
+          const low=q1-1.5*iqr,high=q3+1.5*iqr;
+          const oldOutliers=oldNumeric.filter(value=>value<low||value>high).length;
+          const currentOutliers=newNumeric.filter(value=>value<low||value>high);
+          const oldRate=rate(oldOutliers,oldNumeric.length),currentRate=rate(currentOutliers.length,newNumeric.length);
+          if(currentOutliers.length>=3&&currentRate>=0.05&&currentRate-oldRate>=0.03){
+            const delta=Number(((currentRate-oldRate)*100).toFixed(1));
+            add('NUMERIC_OUTLIERS',column,currentRate>=0.15?'HIGH':'MEDIUM','Unusual numeric values detected',currentOutliers.length+' values fall outside the earlier version IQR bounds ('+low.toFixed(2)+' to '+high.toFixed(2)+').',{beforeRate:Number((oldRate*100).toFixed(1)),afterRate:Number((currentRate*100).toFixed(1)),deltaPercentagePoints:delta,bounds:{low:Number(low.toFixed(4)),high:Number(high.toFixed(4))}},currentOutliers.slice(0,8).map(value=>({value})));
+          }
+        }
+      }else if(oldNumericRatio<0.8&&newNumericRatio<0.8&&oldPresent.length>=20&&newPresent.length>=20){
+        const oldCounts=new Map(),newCounts=new Map();
+        oldPresent.forEach(value=>oldCounts.set(value,(oldCounts.get(value)||0)+1));
+        newPresent.forEach(value=>newCounts.set(value,(newCounts.get(value)||0)+1));
+        if(oldCounts.size<=50&&newCounts.size<=50){
+          const categories=new Set([...oldCounts.keys(),...newCounts.keys()]);
+          const distance=[...categories].reduce((sum,value)=>sum+Math.abs(rate(oldCounts.get(value)||0,oldPresent.length)-rate(newCounts.get(value)||0,newPresent.length)),0)/2;
+          if(distance>=0.25){
+            const changed=[...categories].map(value=>({value,before:Number((rate(oldCounts.get(value)||0,oldPresent.length)*100).toFixed(1)),after:Number((rate(newCounts.get(value)||0,newPresent.length)*100).toFixed(1))})).sort((a,b)=>Math.abs(b.after-b.before)-Math.abs(a.after-a.before)).slice(0,5);
+            add('CATEGORY_SHIFT',column,distance>=0.4?'HIGH':'MEDIUM','Category distribution shifted','Category mix changed substantially (total variation distance '+(distance*100).toFixed(1)+'%).',{distance:Number(distance.toFixed(3)),topChanges:changed},changed);
+          }
+        }
+      }
+    }
+    const rowDelta=oldRecords.length?(newRecords.length-oldRecords.length)/oldRecords.length:0;
+    if(Math.abs(rowDelta)>=0.2)add('ROW_COUNT_CHANGE',null,Math.abs(rowDelta)>=0.5?'HIGH':'MEDIUM',rowDelta>0?'Dataset row count increased':'Dataset row count decreased','Rows changed from '+oldRecords.length.toLocaleString()+' to '+newRecords.length.toLocaleString()+' ('+(rowDelta>0?'+':'')+(rowDelta*100).toFixed(1)+'%).',{before:oldRecords.length,after:newRecords.length,changePercentage:Number((rowDelta*100).toFixed(1))});
+    const duplicateRate=records=>{const seen=new Set();let duplicates=0;for(const record of records){const key=JSON.stringify(Object.keys(record).sort().map(column=>record[column]??''));if(seen.has(key))duplicates++;else seen.add(key);}return {count:duplicates,rate:rate(duplicates,records.length)};};
+    const oldDup=duplicateRate(oldRecords),newDup=duplicateRate(newRecords);
+    if(newDup.count-oldDup.count>=3&&newDup.rate-oldDup.rate>=0.05)add('DUPLICATE_SPIKE',null,newDup.rate>=0.15?'HIGH':'MEDIUM','Duplicate rows increased','Duplicate-row rate rose from '+(oldDup.rate*100).toFixed(1)+'% to '+(newDup.rate*100).toFixed(1)+'%.',{before:oldDup.count,after:newDup.count,beforeRate:Number((oldDup.rate*100).toFixed(1)),afterRate:Number((newDup.rate*100).toFixed(1))});
+    const severityOrder={HIGH:0,MEDIUM:1,LOW:2};
+    anomalies.sort((a,b)=>severityOrder[a.severity]-severityOrder[b.severity]);
+    res.json({report:{fromVersion:from,toVersion:to,fromRows:oldRecords.length,toRows:newRecords.length,columnsAnalyzed:common.length,anomalyCount:anomalies.length,highCount:anomalies.filter(item=>item.severity==='HIGH').length,mediumCount:anomalies.filter(item=>item.severity==='MEDIUM').length,anomalies,methodology:{numeric:'1.5×IQR fences from the earlier version; flag at least 3 later values and a 3 percentage-point outlier-rate increase.',missingness:'Flag at least 3 additional missing cells and a 10 percentage-point missing-rate increase.',category:'Total variation distance ≥0.25 for low-cardinality text columns with at least 20 populated values.',rowCount:'Flag an absolute row-count change of at least 20%.',duplicates:'Flag at least 3 additional duplicate rows and a 5 percentage-point duplicate-rate increase.'}}});
+  }catch(e){
+    if(e?.code?.startsWith('CSV_'))return res.status(400).json({error:'A stored CSV version is invalid and cannot be scanned.'});
+    next(e);
+  }
+});
+
 router.get('/datasets/:datasetId/profile',async(req,res,next)=>{
   try{
     const [rows]=await pool.execute('SELECT id,name,storage_path,organization_id FROM datasets WHERE id=? LIMIT 1',[req.params.datasetId]);
