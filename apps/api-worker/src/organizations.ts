@@ -13,9 +13,33 @@ const audit = async (env: Env, orgId: string, actor: string, action: string, tar
   env.DB.prepare("INSERT INTO audit_logs (organization_id,actor_user_id,action,target_type,target_id,metadata) VALUES (?,?,?,?,?,?)").bind(orgId,actor,action,targetType,targetId,metadata ? JSON.stringify(metadata) : null).run();
 
 export async function handleOrganizations(request: Request, env: Env, path: string): Promise<Response | null> {
+  if (path === "/api/organizations/directory" && request.method === "GET") {
+    const {results}=await env.DB.prepare("SELECT id,name,slug FROM organizations ORDER BY name LIMIT 200").all();
+    return reply({organizations:results});
+  }
   const user = await getUser(request,env);
   if (!user) return reply({error:"Authentication required."},401);
   if (user.account_status === "SUSPENDED") return reply({error:"This account has been suspended."},403);
+
+  const requestAccessMatch=path.match(/^\/api\/organizations\/([^/]+)\/request-access$/);
+  if(requestAccessMatch && request.method==="POST") {
+    const orgId=requestAccessMatch[1];
+    if(!user.email_verified_at) return reply({error:"Verify your email before requesting organization access."},403);
+    const org=await env.DB.prepare("SELECT id FROM organizations WHERE id=?").bind(orgId).first();
+    if(!org) return reply({error:"Organization not found."},404);
+    const active=await env.DB.prepare("SELECT id FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE'").bind(orgId,user.id).first();
+    if(active) return reply({error:"You are already an active member of this organization."},409);
+    const pending=await env.DB.prepare("SELECT id FROM organization_access_requests WHERE organization_id=? AND user_id=? AND status='PENDING'").bind(orgId,user.id).first();
+    if(pending) return reply({error:"Your access request is already pending."},409);
+    const id=crypto.randomUUID();
+    await env.DB.batch([
+      env.DB.prepare("INSERT INTO organization_access_requests (id,organization_id,user_id,status) VALUES (?,?,?,'PENDING')").bind(id,orgId,user.id),
+      env.DB.prepare("INSERT INTO audit_logs (organization_id,actor_user_id,action,target_type,target_id) VALUES (?,?, 'ACCESS_REQUEST_SUBMITTED','ACCESS_REQUEST',?)").bind(orgId,user.id,id)
+    ]);
+    const {results:admins}=await env.DB.prepare("SELECT user_id FROM memberships WHERE organization_id=? AND role IN ('OWNER','ADMIN') AND membership_status='ACTIVE'").bind(orgId).all<{user_id:string}>();
+    for(const admin of admins) await env.DB.prepare("INSERT INTO notifications (id,user_id,organization_id,type,title,message,href) VALUES (?,?,?,'ACCESS_REQUEST','New access request','A user requested to join your organization.','/workspace/team')").bind(crypto.randomUUID(),admin.user_id,orgId).run();
+    return reply({message:"Access request submitted. An organization administrator can now review it."},201);
+  }
 
   if (path === "/api/organizations" && request.method === "GET") {
     const {results} = await env.DB.prepare("SELECT o.id,o.name,o.slug,m.role FROM organizations o JOIN memberships m ON m.organization_id=o.id WHERE m.user_id=? AND m.membership_status='ACTIVE' ORDER BY o.name").bind(user.id).all();
