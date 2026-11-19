@@ -16,7 +16,8 @@ This Worker is the first D1-backed API migration slice. It currently implements 
 
 The Worker expects:
 - `DB`: D1 database binding.
-- `DATASETS`: private R2 bucket binding (reserved for the dataset route migration).
+- `DATASETS`: private R2 bucket binding.
+- `DATASET_JOBS`: Cloudflare Queue producer binding for durable dataset jobs.
 - `APP_ORIGIN`: exact HTTPS origin of the deployed frontend, with no trailing slash.
 - `SESSION_TTL_SECONDS`: session lifetime; capped at 8 hours.
 - `MAIL_API_KEY`: secret for the Resend email API.
