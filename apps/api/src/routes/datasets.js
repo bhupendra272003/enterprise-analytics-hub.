@@ -403,8 +403,8 @@ router.post('/datasets/:datasetId/anomalies',async(req,res,next)=>{
     if(!Number.isInteger(from)||!Number.isInteger(to)||from<1||to<1||from===to)return res.status(400).json({error:'Choose two different valid versions.'});
     const [rows]=await pool.execute('SELECT d.organization_id,a.storage_path AS fromPath,a.columns_json AS fromSchema,b.storage_path AS toPath,b.columns_json AS toSchema FROM datasets d JOIN dataset_versions a ON a.dataset_id=d.id AND a.version_number=? JOIN dataset_versions b ON b.dataset_id=d.id AND b.version_number=? WHERE d.id=? LIMIT 1',[from,to,req.params.datasetId]);
     if(!rows.length)return res.status(404).json({error:'Dataset or selected version not found.'});
-    const [members]=await pool.execute("SELECT id FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE' LIMIT 1",[rows[0].organization_id,req.user.id]);
-    if(!members.length)return res.status(403).json({error:'Insufficient organization permissions.'});
+    const [members]=await pool.execute("SELECT role FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE' LIMIT 1",[rows[0].organization_id,req.user.id]);
+    if(!members.length||!['OWNER','ADMIN','MANAGER','ANALYST'].includes(members[0].role))return res.status(403).json({error:'Insufficient organization permissions.'});
     const parseSchema=value=>typeof value==='string'?JSON.parse(value):value;
     const oldColumns=parseSchema(rows[0].fromSchema)||[],newColumns=parseSchema(rows[0].toSchema)||[];
     const options={columns:true,skip_empty_lines:true,bom:true,trim:false,relax_column_count:false};
