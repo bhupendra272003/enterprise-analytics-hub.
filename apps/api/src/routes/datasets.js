@@ -50,6 +50,44 @@ router.post('/organizations/:orgId/datasets',datasetRole,upload.single('file'),a
   }catch(e){if(storedPath)await unlink(storedPath).catch(()=>{});if(e?.code?.startsWith('CSV_'))return res.status(400).json({error:'The CSV file is invalid. Check its header and row structure.'});next(e);}
 });
 
+router.post('/datasets/:datasetId/versions',datasetRole,upload.single('file'),async(req,res,next)=>{
+  let storedPath;
+  let connection;
+  try{
+    if(!req.file)return res.status(400).json({error:'Choose a CSV file for the new version.'});
+    const input=z.object({changeNote:z.string().trim().max(500).optional()}).parse(req.body);
+    const records=parse(req.file.buffer,{columns:true,skip_empty_lines:true,bom:true,trim:true,relax_column_count:false,skip_records_with_error:false});
+    if(!records.length)return res.status(400).json({error:'The CSV contains a header but no data rows.'});
+    const columns=Object.keys(records[0]);
+    if(!columns.length||columns.some(x=>!x.trim())||columns.length>200)return res.status(400).json({error:'The CSV must contain between 1 and 200 valid columns.'});
+    const preview=records.slice(0,10).map(record=>Object.fromEntries(columns.map(column=>[column,String(record[column]??'').slice(0,500)])));
+    connection=await pool.getConnection();
+    await connection.beginTransaction();
+    const [rows]=await connection.execute('SELECT id,organization_id FROM datasets WHERE id=? FOR UPDATE',[req.params.datasetId]);
+    if(!rows.length){await connection.rollback();return res.status(404).json({error:'Dataset not found.'});}
+    const [members]=await connection.execute("SELECT role FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE' LIMIT 1",[rows[0].organization_id,req.user.id]);
+    if(!members.length||!['OWNER','ADMIN','MANAGER','ANALYST'].includes(members[0].role)){await connection.rollback();return res.status(403).json({error:'You do not have permission to upload a dataset version.'});}
+    const [latest]=await connection.execute('SELECT COALESCE(MAX(version_number),0) AS currentVersion FROM dataset_versions WHERE dataset_id=?',[req.params.datasetId]);
+    const versionNumber=Number(latest[0].currentVersion)+1;
+    const root=path.resolve(config.dataStorageDir);
+    await mkdir(root,{recursive:true});
+    storedPath=path.join(root,randomUUID()+'.csv');
+    await writeFile(storedPath,req.file.buffer,{flag:'wx',mode:0o600});
+    await connection.execute('INSERT INTO dataset_versions (id,dataset_id,version_number,storage_path,file_size,row_count,column_count,columns_json,preview_json,uploaded_by,change_note) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+      [randomUUID(),req.params.datasetId,versionNumber,storedPath,req.file.size,records.length,columns.length,JSON.stringify(columns),JSON.stringify(preview),req.user.id,input.changeNote||'Source file updated']);
+    await connection.execute('UPDATE datasets SET original_filename=?,storage_path=?,file_size=?,row_count=?,column_count=?,columns_json=?,preview_json=?,uploaded_by=? WHERE id=?',
+      [path.basename(req.file.originalname).slice(0,255),storedPath,req.file.size,records.length,columns.length,JSON.stringify(columns),JSON.stringify(preview),req.user.id,req.params.datasetId]);
+    await connection.commit();
+    await audit({orgId:rows[0].organization_id,actorId:req.user.id,action:'DATASET_VERSION_UPLOADED',targetType:'DATASET',targetId:req.params.datasetId,metadata:{versionNumber,rowCount:records.length,columnCount:columns.length},ip:req.ip});
+    res.status(201).json({version:{versionNumber,rowCount:records.length,columnCount:columns.length,columns,preview}});
+  }catch(e){
+    if(connection)await connection.rollback().catch(()=>{});
+    if(storedPath)await unlink(storedPath).catch(()=>{});
+    if(e?.code?.startsWith('CSV_'))return res.status(400).json({error:'The CSV file is invalid. Check its header and row structure.'});
+    next(e);
+  }finally{connection?.release();}
+});
+
 router.get('/datasets/:datasetId/versions',async(req,res,next)=>{
   try{
     const [dataset]=await pool.execute('SELECT organization_id FROM datasets WHERE id=? LIMIT 1',[req.params.datasetId]);
