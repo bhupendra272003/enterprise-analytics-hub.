@@ -26,7 +26,7 @@ Every organization-owned API operation checks the signed-in user's active member
 
 ## Data lifecycle
 
-The current CSV adapter stores source files outside the public web directory and persists metadata plus a small preview in MySQL. It is a development/local-disk implementation; production requires a persistent private volume or managed object storage. Versioned immutable snapshots, Python cleaning workers, quality rules and retention controls are planned but not yet implemented.
+The current CSV adapter stores source files outside the public web directory and persists metadata plus a small preview in MySQL. Each initial upload is registered as immutable version 1 in `dataset_versions`, including its own storage path, row/column counts, schema and preview. The adapter remains development/local-disk; production requires a persistent private volume or managed object storage. Re-upload, compare/restore, Python cleaning workers, quality rules and retention controls remain planned.
 
 ## Security controls currently present
 
@@ -46,7 +46,7 @@ Complete a dedicated CSRF review and token strategy, MFA, automated security/dep
 ## Roadmap
 
 1. Complete identity and access management with MFA and security review.
-2. Add persistent object storage, dataset versions and immutable raw snapshots.
+2. Add persistent object storage, dataset re-upload/version comparison/restore and immutable raw snapshot retention.
 3. Add Python profiling/cleaning jobs and governed analyst workspace.
 4. Add approved data connectors and scheduled ingestion.
 5. Add secure Power BI embedding and dashboard integration.
