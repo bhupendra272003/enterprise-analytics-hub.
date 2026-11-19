@@ -99,6 +99,58 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
   await audit(env,dataset.organization_id,user.id,"DATASET_CLEANED",datasetId,{versionNumber:version,beforeScore:before.qualityScore,afterScore:after.qualityScore,removedDuplicates,filledCells});
   return json({versionNumber:version,report},201);
  }
+ if(sub==="profile"&&req.method==="GET"){
+  const source=await env.DATASETS.get(dataset.storage_path);if(!source)return json({error:"Stored dataset file is missing."},500);
+  let parsed;try{parsed=parseCsv(await source.arrayBuffer());}catch{return json({error:"The stored CSV is invalid."},400);}
+  const columns=parsed.columns.map(name=>{
+   const values=parsed.records.map((r:any)=>String(r[name]??"").trim()),present=values.filter(v=>v!==""),numeric=present.map(Number).filter(Number.isFinite),numericType=present.length>0&&numeric.length/present.length>=.9,distinct=new Set(present).size;
+   return {name,type:present.length===0?"EMPTY":numericType?"NUMERIC":"TEXT",total:values.length,missing:values.length-present.length,distinct,...(numericType?{min:Math.min(...numeric),max:Math.max(...numeric),mean:Number((numeric.reduce((a:number,b:number)=>a+b,0)/numeric.length).toFixed(3))}:{})};
+  });
+  return json({profile:{datasetId:dataset.id,name:dataset.name,rowCount:parsed.records.length,columnCount:parsed.columns.length,columns}});
+ }
+ if(sub==="validate"&&req.method==="POST"){
+  if(!allowed(m.role))return json({error:"Your role cannot run dataset validation."},403);
+  let body:any={};try{body=await req.json();}catch{return json({error:"Invalid validation rules."},400);}
+  const rules=body.rules??{},required=Array.isArray(rules.required)?rules.required:[],types=rules.types&&typeof rules.types==="object"?rules.types:{},allowedValues=rules.allowedValues&&typeof rules.allowedValues==="object"?rules.allowedValues:{},numericRanges=rules.numericRanges&&typeof rules.numericRanges==="object"?rules.numericRanges:{},uniqueColumns=Array.isArray(rules.uniqueColumns)?rules.uniqueColumns:[];
+  if(required.length>200||uniqueColumns.length>200||Object.keys(types).length>200||Object.keys(allowedValues).length>200||Object.keys(numericRanges).length>200)return json({error:"Validation rules exceed the supported limit."},400);
+  if(Object.values(types).some((v:any)=>!["TEXT","NUMBER","DATE","BOOLEAN"].includes(v)))return json({error:"Unsupported column data type."},400);
+  const configured=[...new Set([...required,...Object.keys(types),...Object.keys(allowedValues),...Object.keys(numericRanges),...uniqueColumns])];
+  if(configured.some((v:any)=>typeof v!=="string"||v.length>200))return json({error:"Invalid column name in validation rules."},400);
+  const versionNumber=body.versionNumber===undefined?null:Number(body.versionNumber);
+  if(versionNumber!==null&&(!Number.isInteger(versionNumber)||versionNumber<1))return json({error:"Invalid dataset version."},400);
+  const version=await env.DB.prepare("SELECT version_number,storage_path,columns_json FROM dataset_versions WHERE dataset_id=? AND version_number=COALESCE(?,(SELECT MAX(version_number) FROM dataset_versions WHERE dataset_id=?))").bind(datasetId,versionNumber,datasetId).first<any>();
+  if(!version)return json({error:"Dataset version not found."},404);
+  const columns=JSON.parse(version.columns_json),unknown=configured.filter((x:string)=>!columns.includes(x));if(unknown.length)return json({error:"Rules reference columns that do not exist: "+unknown.join(", ")},400);
+  for(const [column,range] of Object.entries(numericRanges) as [string,any][])if((range.min!==undefined&&typeof range.min!=="number")||(range.max!==undefined&&typeof range.max!=="number")||(range.min!==undefined&&range.max!==undefined&&range.min>range.max))return json({error:"Invalid numeric range for "+column+"."},400);
+  const obj=await env.DATASETS.get(version.storage_path);if(!obj)return json({error:"Stored dataset version is missing."},500);
+  let records:any[];try{records=parseCsv(await obj.arrayBuffer()).records;}catch{return json({error:"The selected CSV version is invalid."},400);}
+  const issueCounts:Record<string,number>={REQUIRED:0,TYPE:0,ALLOWED_VALUE:0,MIN_MAX:0,UNIQUE:0},samples:any[]=[],seen=new Map<string,Set<string>>(uniqueColumns.map((k:string)=>[k,new Set<string>()]));
+  const add=(rowNumber:number,column:string,rule:string,value:unknown,message:string)=>{issueCounts[rule]++;if(samples.length<100)samples.push({rowNumber,column,rule,value:String(value??"").slice(0,160),message});};
+  const validDate=(v:string)=>/^\\d{4}-\\d{2}-\\d{2}$/.test(v)&&!Number.isNaN(Date.parse(v))&&new Date(v).toISOString().slice(0,10)===v;
+  records.forEach((record:any,index:number)=>{
+   const row=index+2;
+   for(const k of required)if(!String(record[k]??"").trim())add(row,k,"REQUIRED",record[k],"Required value is missing.");
+   for(const [k,type] of Object.entries(types) as [string,string][]) {const v=String(record[k]??"");if(v.trim()==="")continue;const t=v.trim(),ok=type==="TEXT"||type==="NUMBER"&&Number.isFinite(Number(t))||type==="DATE"&&validDate(t)||type==="BOOLEAN"&&["true","false","1","0","yes","no"].includes(t.toLowerCase());if(!ok)add(row,k,"TYPE",v,"Expected "+type.toLowerCase()+" value.");}
+   for(const [k,values] of Object.entries(allowedValues) as [string,string[]][]) {const v=String(record[k]??"").trim();if(v&&Array.isArray(values)&&values.length&&!values.includes(v))add(row,k,"ALLOWED_VALUE",v,"Value is not in the approved list.");}
+   for(const [k,range] of Object.entries(numericRanges) as [string,any][]) {const raw=String(record[k]??"").trim();if(!raw||!Number.isFinite(Number(raw)))continue;const v=Number(raw);if((range.min!==undefined&&v<range.min)||(range.max!==undefined&&v>range.max))add(row,k,"MIN_MAX",raw,"Value is outside the configured numeric range.");}
+   for(const k of uniqueColumns){const v=String(record[k]??"").trim();if(!v)continue;const set=seen.get(k)!;if(set.has(v))add(row,k,"UNIQUE",v,"Duplicate value in a column marked unique.");else set.add(v);}
+  });
+  const issueCount=Object.values(issueCounts).reduce((a,b)=>a+b,0),result={versionNumber:Number(version.version_number),rowCount:records.length,checkedColumns:configured.length,issueCount,passed:issueCount===0,issueCounts,sampleLimit:100,samples};
+  await env.DB.prepare("INSERT INTO dataset_validation_runs (id,dataset_id,version_number,executed_by,rules_json,result_json,status,issue_count) VALUES (?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(),datasetId,version.version_number,user.id,JSON.stringify({required,types,allowedValues,numericRanges,uniqueColumns}),JSON.stringify(result),result.passed?"PASSED":"FAILED",issueCount).run();
+  await audit(env,dataset.organization_id,user.id,"DATASET_VALIDATED",datasetId,{versionNumber:result.versionNumber,issueCount,passed:result.passed});
+  return json({result},201);
+ }
+ if(sub==="validation-runs"&&req.method==="GET"){
+  const {results}=await env.DB.prepare("SELECT r.id,r.version_number AS versionNumber,r.status,r.issue_count AS issueCount,r.rules_json AS rulesJson,r.created_at AS createdAt,u.full_name AS executedBy FROM dataset_validation_runs r JOIN users u ON u.id=r.executed_by WHERE r.dataset_id=? ORDER BY r.created_at DESC LIMIT 20").bind(datasetId).all<any>();
+  return json({runs:results.map((r:any)=>({...r,rules:JSON.parse(r.rulesJson)}))});
+ }
+ if(sub==="quality-dashboard"&&req.method==="GET"){
+  const {results}=await env.DB.prepare("SELECT id,version_number AS versionNumber,status,issue_count AS issueCount,result_json AS resultJson,created_at AS createdAt FROM dataset_validation_runs WHERE dataset_id=? ORDER BY created_at DESC LIMIT 30").bind(datasetId).all<any>();
+  const runs=results.map((r:any)=>{const result=JSON.parse(r.resultJson),denominator=Number(result.rowCount||0)*Number(result.checkedColumns||0),score=denominator>0?Math.max(0,Number((100-Number(r.issueCount)/denominator*100).toFixed(2))):null;return {id:r.id,versionNumber:Number(r.versionNumber),status:r.status,issueCount:Number(r.issueCount),rowCount:Number(result.rowCount||0),checkedColumns:Number(result.checkedColumns||0),score,issueCounts:result.issueCounts||{},createdAt:r.createdAt};});
+  const scored=runs.filter((r:any)=>r.score!==null),passed=runs.filter((r:any)=>r.status==="PASSED").length,issueBreakdown:Record<string,number>={REQUIRED:0,TYPE:0,ALLOWED_VALUE:0,MIN_MAX:0,UNIQUE:0};
+  for(const run of runs)for(const [k,v] of Object.entries(run.issueCounts))issueBreakdown[k]=(issueBreakdown[k]||0)+Number(v||0);
+  return json({summary:{totalRuns:runs.length,passedRuns:passed,failedRuns:runs.length-passed,passRate:runs.length?Number((passed/runs.length*100).toFixed(1)):0,averageScore:scored.length?Number((scored.reduce((s:number,r:any)=>s+r.score,0)/scored.length).toFixed(1)):null,totalIssues:runs.reduce((s:number,r:any)=>s+r.issueCount,0)},issueBreakdown,trend:runs.slice().reverse()});
+ }
  if(sub==="preview"&&req.method==="GET")return json({dataset:{id:dataset.id,name:dataset.name,columns:JSON.parse(dataset.columns_json),preview:JSON.parse(dataset.preview_json)}});
  if(sub==="versions"&&req.method==="GET"){
   const {results}=await env.DB.prepare("SELECT v.id,v.version_number AS versionNumber,v.file_size AS fileSize,v.row_count AS rowCount,v.column_count AS columnCount,v.change_note AS changeNote,v.created_at AS createdAt,u.full_name AS uploadedBy FROM dataset_versions v JOIN users u ON u.id=v.uploaded_by WHERE v.dataset_id=? ORDER BY v.version_number DESC").bind(datasetId).all();
