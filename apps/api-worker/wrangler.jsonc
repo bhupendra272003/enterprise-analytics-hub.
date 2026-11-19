@@ -12,6 +12,10 @@
       "migrations_dir": "../../database/d1"
     }
   ],
+  "queues": {
+    "producers": [{ "binding": "DATASET_JOBS", "queue": "nexus-dataset-jobs" }],
+    "consumers": [{ "queue": "nexus-dataset-jobs", "max_batch_size": 1, "max_batch_timeout": 5, "max_retries": 3 }]
+  },
   "r2_buckets": [
     {
       "binding": "DATASETS",
