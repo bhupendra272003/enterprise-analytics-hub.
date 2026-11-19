@@ -3,11 +3,13 @@ import { handleProjects } from "./projects";
 import { handleInvitations } from "./invitations";
 import { handleNotifications } from "./notifications";
 import { handleDatasets } from "./datasets";
+import datasetJobs, { handleDatasetJobs } from "./dataset-jobs";
 import { handleReports } from "./reports";
 
 interface Env {
   DB: D1Database;
   DATASETS: R2Bucket;
+  DATASET_JOBS: Queue<{ jobId: string }>;
   APP_ORIGIN: string;
   SESSION_TTL_SECONDS?: string;
   MAIL_API_KEY?: string;
@@ -288,6 +290,14 @@ export default {
         return new Response(response.body, { status: response.status, headers: merged });
       }
     }
+    if (url.pathname.startsWith("/api/dataset-jobs/") || (url.pathname.startsWith("/api/datasets/") && url.pathname.includes("/jobs"))) {
+      const response = await handleDatasetJobs(request, env, url.pathname);
+      if (response) {
+        const merged = new Headers(response.headers);
+        for (const [key, value] of Object.entries(headers)) merged.set(key, value);
+        return new Response(response.body, { status: response.status, headers: merged });
+      }
+    }
     if (url.pathname.startsWith("/api/datasets/") || (url.pathname.startsWith("/api/organizations/") && url.pathname.endsWith("/datasets"))) {
       const response = await handleDatasets(request, env, url.pathname, url);
       if (response) {
@@ -338,5 +348,8 @@ export default {
     }
     if (url.pathname === "/health") return json({ status: "ok", service: "nexus-analytics-cloudflare-api" }, 200, headers);
     return json({ error: "Not found." }, 404, headers);
+  },
+  async queue(batch: MessageBatch<{ jobId: string }>, env: Env) {
+    await datasetJobs.queue(batch, env);
   }
 };
