@@ -18,6 +18,17 @@ const parseCsv=(buffer:ArrayBuffer)=>{
  return {records,columns,preview:records.slice(0,10).map((row:any)=>Object.fromEntries(columns.map(c=>[c,String(row[c]??"").slice(0,500)])))};
 };
 const allowed=(role:Role)=>["OWNER","ADMIN","MANAGER","ANALYST"].includes(role);
+const isNum=(v:string)=>v.trim()!==""&&Number.isFinite(Number(v));
+const csvEncode=(rows:Record<string,string>[],columns:string[])=>[columns,...rows.map(r=>columns.map(k=>r[k]??""))].map(row=>row.map(v=>{const s=String(v);return /[",\\r\\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}).join(",")).join("\\r\\n")+"\\r\\n";
+const quality=(rows:Record<string,string>[],columns:string[])=>{
+ const cells=rows.length*columns.length,missing=rows.reduce((n,r)=>n+columns.filter(k=>!String(r[k]??"").trim()).length,0);
+ const unique=new Set(rows.map(r=>JSON.stringify(columns.map(k=>r[k]??"")))).size;
+ let numericCells=0,validNumeric=0;
+ for(const k of columns){const values=rows.map(r=>String(r[k]??"").trim()).filter(Boolean);if(values.length&&values.filter(isNum).length/values.length>=.5){numericCells+=values.length;validNumeric+=values.filter(isNum).length;}}
+ const completeness=cells?(cells-missing)/cells*100:100,uniqueness=rows.length?unique/rows.length*100:100,validity=numericCells?validNumeric/numericCells*100:100;
+ return {rows:rows.length,cells,missingCells:missing,duplicateRows:rows.length-unique,completeness:Number(completeness.toFixed(2)),uniqueness:Number(uniqueness.toFixed(2)),validity:Number(validity.toFixed(2)),qualityScore:Number((completeness*.5+uniqueness*.3+validity*.2).toFixed(2))};
+};
+
 export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Promise<Response|null>{
  if(!path.startsWith("/api/organizations/")&&!path.startsWith("/api/datasets/"))return null;
  const user=await getUser(req,env);
@@ -54,6 +65,40 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
  const dataset=await env.DB.prepare("SELECT id,organization_id,name,original_filename,storage_path,file_size,row_count,column_count,columns_json,preview_json FROM datasets WHERE id=?").bind(datasetId).first<any>();
  if(!dataset)return json({error:"Dataset not found."},404);
  const m=await membership(env,dataset.organization_id,user.id);if(!m)return json({error:"Insufficient organization permissions."},403);
+ if(sub==="clean"&&req.method==="POST"){
+  if(!allowed(m.role))return json({error:"Your role cannot create cleaned dataset versions."},403);
+  let body:any={};try{body=await req.json();}catch{return json({error:"Invalid cleaning options."},400);}
+  const trimWhitespace=body.trimWhitespace!==false,removeDuplicates=body.removeDuplicates!==false,fillMissing=body.fillMissing??"none";
+  if(!["none","zero","mean","median","mode"].includes(fillMissing))return json({error:"Unsupported missing-value strategy."},400);
+  const source=await env.DATASETS.get(dataset.storage_path);if(!source)return json({error:"Stored dataset file is missing."},500);
+  let parsed;try{parsed=parseCsv(await source.arrayBuffer());}catch{return json({error:"The stored CSV is invalid."},400);}
+  const columns=parsed.columns,rows=parsed.records.map((r:any)=>Object.fromEntries(columns.map(k=>[k,String(r[k]??"")])));
+  const before=quality(rows,columns);
+  if(trimWhitespace)for(const row of rows)for(const k of columns)row[k]=row[k].trim();
+  let removedDuplicates=0;
+  if(removeDuplicates){const seen=new Set<string>();for(let i=rows.length-1;i>=0;i--){const sig=JSON.stringify(columns.map(k=>rows[i][k]));if(seen.has(sig)){rows.splice(i,1);removedDuplicates++;}else seen.add(sig);}rows.reverse();}
+  let filledCells=0;
+  if(fillMissing!=="none")for(const k of columns){
+   const values=rows.map(r=>r[k]).filter(v=>v!=="");if(!values.length)continue;
+   const numeric=values.every(isNum);let replacement="";
+   if(fillMissing==="zero")replacement="0";
+   else if(fillMissing==="mode"){const counts=new Map<string,number>();for(const v of values)counts.set(v,(counts.get(v)||0)+1);replacement=[...counts.entries()].sort((a,b)=>b[1]-a[1])[0][0];}
+   else if(numeric&&fillMissing==="mean")replacement=String(Number((values.reduce((s,v)=>s+Number(v),0)/values.length).toFixed(6)));
+   else if(numeric&&fillMissing==="median"){const sorted=values.map(Number).sort((a,b)=>a-b),mid=Math.floor(sorted.length/2);replacement=String(Number((sorted.length%2?sorted[mid]:(sorted[mid-1]+sorted[mid])/2).toFixed(6)));}
+   if(replacement!=="")for(const row of rows)if(row[k]===""){row[k]=replacement;filledCells++;}
+  }
+  const after=quality(rows,columns),outliersByColumn:Record<string,number>={};
+  for(const k of columns){const nonempty=rows.map(r=>r[k]).filter(v=>v.trim()),nums=nonempty.filter(isNum).map(Number);if(nums.length>=4&&nums.length/Math.max(1,nonempty.length)>=.9){const s=nums.slice().sort((a,b)=>a-b),median=(a:number[])=>{const n=Math.floor(a.length/2);return a.length%2?a[n]:(a[n-1]+a[n])/2;},q1=median(s.slice(0,Math.ceil(s.length/2))),q3=median(s.slice(Math.floor(s.length/2))),iqr=q3-q1,count=nums.filter(v=>v<q1-1.5*iqr||v>q3+1.5*iqr).length;if(count)outliersByColumn[k]=count;}}
+  const latest=await env.DB.prepare("SELECT COALESCE(MAX(version_number),0) AS v FROM dataset_versions WHERE dataset_id=?").bind(datasetId).first<{v:number}>(),version=Number(latest?.v||0)+1,key=dataset.organization_id+"/"+datasetId+"/v"+version+"-cleaned.csv",output=csvEncode(rows,columns),bytes=new TextEncoder().encode(output);
+  await env.DATASETS.put(key,bytes,{httpMetadata:{contentType:"text/csv"},customMetadata:{organizationId:dataset.organization_id,datasetId,version:String(version),cleaned:"true"}});
+  const report={before,after,removedDuplicates,filledCells,fillStrategy:fillMissing,outliersByColumn,columns,preview:rows.slice(0,10)};
+  try{await env.DB.batch([
+   env.DB.prepare("INSERT INTO dataset_versions (id,dataset_id,version_number,storage_path,file_size,row_count,column_count,columns_json,preview_json,uploaded_by,change_note) VALUES (?,?,?,?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(),datasetId,version,key,bytes.length,rows.length,columns.length,JSON.stringify(columns),JSON.stringify(report.preview),user.id,"Cloudflare cleaning · quality score "+before.qualityScore+" → "+after.qualityScore),
+   env.DB.prepare("UPDATE datasets SET storage_path=?,file_size=?,row_count=?,column_count=?,columns_json=?,preview_json=?,uploaded_by=? WHERE id=?").bind(key,bytes.length,rows.length,columns.length,JSON.stringify(columns),JSON.stringify(report.preview),user.id,datasetId)
+  ]);}catch{await env.DATASETS.delete(key);return json({error:"Cleaned dataset version could not be saved."},500);}
+  await audit(env,dataset.organization_id,user.id,"DATASET_CLEANED",datasetId,{versionNumber:version,beforeScore:before.qualityScore,afterScore:after.qualityScore,removedDuplicates,filledCells});
+  return json({versionNumber:version,report},201);
+ }
  if(sub==="preview"&&req.method==="GET")return json({dataset:{id:dataset.id,name:dataset.name,columns:JSON.parse(dataset.columns_json),preview:JSON.parse(dataset.preview_json)}});
  if(sub==="versions"&&req.method==="GET"){
   const {results}=await env.DB.prepare("SELECT v.id,v.version_number AS versionNumber,v.file_size AS fileSize,v.row_count AS rowCount,v.column_count AS columnCount,v.change_note AS changeNote,v.created_at AS createdAt,u.full_name AS uploadedBy FROM dataset_versions v JOIN users u ON u.id=v.uploaded_by WHERE v.dataset_id=? ORDER BY v.version_number DESC").bind(datasetId).all();
