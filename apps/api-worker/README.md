@@ -26,7 +26,7 @@ The checked-in `wrangler.jsonc` intentionally contains placeholders for the D1 d
 
 ## Authentication security
 
-- Passwords are hashed with bcrypt (cost 12).
+- Passwords are hashed with Web Crypto PBKDF2-HMAC-SHA-256 (310,000 iterations, random 128-bit salt, 256-bit derived key). Verification uses a constant-time byte comparison; this avoids shipping a JavaScript bcrypt implementation into the Workers runtime.
 - Verification and reset tokens are random, stored only as SHA-256 hashes, and expire.
 - Session identifiers are random, stored server-side in D1, and delivered as Secure, HttpOnly cookies.
 - Login rotates the session; password reset revokes all sessions for the account.
