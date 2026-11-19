@@ -13,6 +13,7 @@ const getUser=async(req:Request,env:Env):Promise<User|null>=>{
 const membership=async(env:Env,orgId:string,userId:string)=>env.DB.prepare("SELECT role FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE'").bind(orgId,userId).first<{role:Role}>();
 const audit=(env:Env,orgId:string,userId:string,action:string,id:string,metadata?:unknown)=>env.DB.prepare("INSERT INTO audit_logs (organization_id,actor_user_id,action,target_type,target_id,metadata) VALUES (?,?,?,'DATASET',?,?)").bind(orgId,userId,action,id,metadata===undefined?null:JSON.stringify(metadata)).run();
 const parseCsv=(buffer:ArrayBuffer)=>{
+ if(buffer.byteLength>MAX_SYNC_CSV_BYTES)throw new Error("TOO_LARGE");
  const records=parse(new TextDecoder().decode(new Uint8Array(buffer)),{columns:true,skip_empty_lines:true,bom:true,trim:true,relax_column_count:false,skip_records_with_error:false});
  if(!records.length)throw new Error("EMPTY");
  const columns=Object.keys(records[0]);
@@ -47,10 +48,12 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
   const orgId=orgList[1],m=await membership(env,orgId,user.id);if(!m||!allowed(m.role))return json({error:"Insufficient organization permissions."},403);
   let form:FormData;try{form=await req.formData();}catch{return json({error:"Choose a CSV file to upload."},400);}
   const file=form.get("file"),name=typeof form.get("name")==="string"?(form.get("name") as string).trim():"";
-  if(!(file instanceof File)||!file.size||file.size>MAX_SYNC_CSV_BYTES||!file.name.toLowerCase().endsWith(".csv"))return json({error:"Choose a CSV file up to 256 KB for now."},400);
+  if(!(file instanceof File)||!file.size||!file.name.toLowerCase().endsWith(".csv"))return json({error:"Choose a valid CSV file."},400);
+  if(file.size>MAX_SYNC_CSV_BYTES)return syncLimitError();
   if(name.length<2||name.length>120)return json({error:"Dataset name must be 2–120 characters."},400);
-  let parsed;try{parsed=parseCsv(await file.arrayBuffer());}catch(e){return json({error:e instanceof Error&&e.message==="EMPTY"?"The CSV contains a header but no data rows.":"The CSV file is invalid. Check its header and row structure."},400);}
-  const id=crypto.randomUUID(),key=orgId+"/"+id+"/v1.csv",bytes=await file.arrayBuffer();
+  let bytes:ArrayBuffer;try{bytes=await file.arrayBuffer();}catch{return json({error:"The CSV file could not be read."},400);}
+  let parsed;try{parsed=parseCsv(bytes);}catch(e){if(e instanceof Error&&e.message==="TOO_LARGE")return syncLimitError();return json({error:e instanceof Error&&e.message==="EMPTY"?"The CSV contains a header but no data rows.":"The CSV file is invalid. Check its header and row structure."},400);}
+  const id=crypto.randomUUID(),key=orgId+"/"+id+"/v1.csv";
   await env.DATASETS.put(key,bytes,{httpMetadata:{contentType:"text/csv"},customMetadata:{organizationId:orgId,datasetId:id,version:"1"}});
   try{
    await env.DB.batch([
@@ -229,10 +232,12 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
   if(!allowed(m.role))return json({error:"You do not have permission to upload a dataset version."},403);
   let form:FormData;try{form=await req.formData();}catch{return json({error:"Choose a CSV file for the new version."},400);}
   const file=form.get("file"),note=typeof form.get("changeNote")==="string"?(form.get("changeNote") as string).trim():"Source file updated";
-  if(!(file instanceof File)||!file.size||file.size>15*1024*1024||!file.name.toLowerCase().endsWith(".csv"))return json({error:"Choose a CSV file up to 15 MB."},400);
-  let parsed;try{parsed=parseCsv(await file.arrayBuffer());}catch{return json({error:"The CSV file is invalid. Check its header and row structure."},400);}
+  if(!(file instanceof File)||!file.size||!file.name.toLowerCase().endsWith(".csv"))return json({error:"Choose a valid CSV file."},400);
+  if(file.size>MAX_SYNC_CSV_BYTES)return syncLimitError();
+  let bytes:ArrayBuffer;try{bytes=await file.arrayBuffer();}catch{return json({error:"The CSV file could not be read."},400);}
+  let parsed;try{parsed=parseCsv(bytes);}catch(e){if(e instanceof Error&&e.message==="TOO_LARGE")return syncLimitError();return json({error:"The CSV file is invalid. Check its header and row structure."},400);}
   const latest=await env.DB.prepare("SELECT COALESCE(MAX(version_number),0) AS v FROM dataset_versions WHERE dataset_id=?").bind(datasetId).first<{v:number}>();
-  const version=Number(latest?.v||0)+1,key=dataset.organization_id+"/"+datasetId+"/v"+version+".csv",bytes=await file.arrayBuffer();
+  const version=Number(latest?.v||0)+1,key=dataset.organization_id+"/"+datasetId+"/v"+version+".csv";
   await env.DATASETS.put(key,bytes,{httpMetadata:{contentType:"text/csv"},customMetadata:{organizationId:dataset.organization_id,datasetId,version:String(version)}});
   try{
    await env.DB.batch([
