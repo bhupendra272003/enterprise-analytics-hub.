@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
-import { mkdir, writeFile, unlink, readFile } from 'node:fs/promises';
+import { mkdir, writeFile, unlink, readFile, copyFile } from 'node:fs/promises';
 import path from 'node:path';
 import multer from 'multer';
 import { parse } from 'csv-parse/sync';
@@ -97,6 +97,53 @@ router.get('/datasets/:datasetId/versions',async(req,res,next)=>{
     const [versions]=await pool.execute('SELECT v.id,v.version_number AS versionNumber,v.file_size AS fileSize,v.row_count AS rowCount,v.column_count AS columnCount,v.change_note AS changeNote,v.created_at AS createdAt,u.full_name AS uploadedBy FROM dataset_versions v JOIN users u ON u.id=v.uploaded_by WHERE v.dataset_id=? ORDER BY v.version_number DESC',[req.params.datasetId]);
     res.json({versions});
   }catch(e){next(e);}
+});
+
+router.get('/datasets/:datasetId/versions/compare',async(req,res,next)=>{
+  try{
+    const from=Number(req.query.from),to=Number(req.query.to);
+    if(!Number.isInteger(from)||!Number.isInteger(to)||from<1||to<1||from===to)return res.status(400).json({error:'Choose two different valid version numbers.'});
+    const [rows]=await pool.execute('SELECT d.organization_id,a.row_count AS fromRows,a.column_count AS fromColumns,a.columns_json AS fromSchema,b.row_count AS toRows,b.column_count AS toColumns,b.columns_json AS toSchema FROM datasets d JOIN dataset_versions a ON a.dataset_id=d.id AND a.version_number=? JOIN dataset_versions b ON b.dataset_id=d.id AND b.version_number=? WHERE d.id=? LIMIT 1',[from,to,req.params.datasetId]);
+    if(!rows.length)return res.status(404).json({error:'Dataset or selected version not found.'});
+    const [members]=await pool.execute("SELECT id FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE' LIMIT 1",[rows[0].organization_id,req.user.id]);
+    if(!members.length)return res.status(403).json({error:'Insufficient organization permissions.'});
+    const parseSchema=value=>typeof value==='string'?JSON.parse(value):value;
+    const oldColumns=parseSchema(rows[0].fromSchema)||[],newColumns=parseSchema(rows[0].toSchema)||[];
+    res.json({comparison:{fromVersion:from,toVersion:to,fromRows:Number(rows[0].fromRows),toRows:Number(rows[0].toRows),rowDelta:Number(rows[0].toRows)-Number(rows[0].fromRows),fromColumns:Number(rows[0].fromColumns),toColumns:Number(rows[0].toColumns),addedColumns:newColumns.filter(x=>!oldColumns.includes(x)),removedColumns:oldColumns.filter(x=>!newColumns.includes(x)),unchangedColumns:oldColumns.filter(x=>newColumns.includes(x))}});
+  }catch(e){next(e);}
+});
+
+router.post('/datasets/:datasetId/versions/:versionNumber/restore',async(req,res,next)=>{
+  let connection,restoredPath;
+  try{
+    const versionNumber=Number(req.params.versionNumber);
+    if(!Number.isInteger(versionNumber)||versionNumber<1)return res.status(400).json({error:'Invalid version number.'});
+    connection=await pool.getConnection();
+    await connection.beginTransaction();
+    const [datasets]=await connection.execute('SELECT id,organization_id FROM datasets WHERE id=? FOR UPDATE',[req.params.datasetId]);
+    if(!datasets.length){await connection.rollback();return res.status(404).json({error:'Dataset not found.'});}
+    const [members]=await connection.execute("SELECT role FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE' LIMIT 1",[datasets[0].organization_id,req.user.id]);
+    if(!members.length||!['OWNER','ADMIN','MANAGER','ANALYST'].includes(members[0].role)){await connection.rollback();return res.status(403).json({error:'You do not have permission to restore dataset versions.'});}
+    const [source]=await connection.execute('SELECT * FROM dataset_versions WHERE dataset_id=? AND version_number=? LIMIT 1',[req.params.datasetId,versionNumber]);
+    if(!source.length){await connection.rollback();return res.status(404).json({error:'Version not found.'});}
+    const [latest]=await connection.execute('SELECT COALESCE(MAX(version_number),0) AS currentVersion FROM dataset_versions WHERE dataset_id=?',[req.params.datasetId]);
+    const nextVersion=Number(latest[0].currentVersion)+1;
+    const root=path.resolve(config.dataStorageDir);
+    await mkdir(root,{recursive:true});
+    restoredPath=path.join(root,randomUUID()+'.csv');
+    await copyFile(source[0].storage_path,restoredPath);
+    await connection.execute('INSERT INTO dataset_versions (id,dataset_id,version_number,storage_path,file_size,row_count,column_count,columns_json,preview_json,uploaded_by,change_note) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+      [randomUUID(),req.params.datasetId,nextVersion,restoredPath,source[0].file_size,source[0].row_count,source[0].column_count,source[0].columns_json,source[0].preview_json,req.user.id,'Restored from version '+versionNumber]);
+    await connection.execute('UPDATE datasets SET storage_path=?,file_size=?,row_count=?,column_count=?,columns_json=?,preview_json=?,uploaded_by=? WHERE id=?',
+      [restoredPath,source[0].file_size,source[0].row_count,source[0].column_count,source[0].columns_json,source[0].preview_json,req.user.id,req.params.datasetId]);
+    await connection.commit();
+    await audit({orgId:datasets[0].organization_id,actorId:req.user.id,action:'DATASET_VERSION_RESTORED',targetType:'DATASET',targetId:req.params.datasetId,metadata:{restoredFrom:versionNumber,newVersion:nextVersion},ip:req.ip});
+    res.status(201).json({restoredFrom:versionNumber,newVersion:nextVersion});
+  }catch(e){
+    if(connection)await connection.rollback().catch(()=>{});
+    if(restoredPath)await unlink(restoredPath).catch(()=>{});
+    next(e);
+  }finally{connection?.release();}
 });
 
 router.get('/datasets/:datasetId/preview',async(req,res,next)=>{
