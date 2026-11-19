@@ -1,6 +1,6 @@
 'use client';
 import {FormEvent,useEffect,useState} from 'react';
-const API=process.env.NEXT_PUBLIC_API_URL||'http://localhost:4000';
+const API=process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:4000');
 type Org={id:string;name:string;role:string};type Report={id:string;title:string;description:string;reportUrl:string;createdAt:string;createdBy:string};
 export default function ReportsPage(){
  const [orgs,setOrgs]=useState<Org[]>([]),[org,setOrg]=useState(''),[reports,setReports]=useState<Report[]>([]),[show,setShow]=useState(false),[title,setTitle]=useState(''),[description,setDescription]=useState(''),[url,setUrl]=useState(''),[notice,setNotice]=useState('Loading reports…'),[busy,setBusy]=useState(false);
