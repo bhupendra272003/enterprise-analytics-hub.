@@ -62,7 +62,7 @@ const passwordHash = async (password: string) => {
 };
 const verifyPassword = async (password: string, encoded: string) => {
   const [scheme, rounds, saltHex, expectedHex] = encoded.split("$");
-  if (scheme !== "pbkdf2-sha256" || !/^\\d+$/.test(rounds || "") || !/^[a-f0-9]{32}$/.test(saltHex || "") || !/^[a-f0-9]{64}$/.test(expectedHex || "")) return false;
+  if (scheme !== "pbkdf2-sha256" || !/^\d+$/.test(rounds || "") || !/^[a-f0-9]{32}$/.test(saltHex || "") || !/^[a-f0-9]{64}$/.test(expectedHex || "")) return false;
   const iterations = Number(rounds);
   if (iterations < 100000 || iterations > 600000) return false;
   const salt = new Uint8Array(saltHex.match(/.{2}/g)!.map(v => parseInt(v, 16)));
