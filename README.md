@@ -21,7 +21,7 @@ A multi-tenant analytics and team collaboration platform. The repository include
 ## Local setup
 
 ### 1. Database
-Create a MySQL 8 database and run `database/schema.sql`. The fresh-install schema includes identity, access requests, projects, tasks, datasets and reports. For an existing database, apply the scripts in `database/migrations/` in numeric order; migration scripts use `IF NOT EXISTS` for their tables.
+Create a MySQL 8 database and run `database/schema.sql`. The fresh-install schema includes identity, access requests, projects, tasks, datasets and reports. For an existing database, apply the scripts in `database/migrations/` in numeric order; migration scripts use `IF NOT EXISTS` for their tables. Migration 008 adds persisted dataset validation run history.
 
 ### 2. API
 Copy `apps/api/.env.example` to `apps/api/.env`, configure local database credentials and a random session secret of at least 32 characters. Configure SMTP credentials for production email verification and password recovery; development mode returns one-time links in the UI when SMTP is not configured.
@@ -72,7 +72,7 @@ For local development, configure the API `APP_ORIGIN=http://localhost:3000` and 
 - `/workspace/team`: organization creation, invitations, member directory, member role changes, suspension and access approval queue
 - `/workspace/access`: browse organizations and request membership
 - `/workspace/projects`: create projects, add tasks and update task status
-- `/workspace/data`: upload CSV files, inspect metadata, preview 10 rows, run column profiles, clean CSV data with Python, inspect before/after quality scores, upload new versions, compare schema/row counts and restore prior versions as a new version
+- `/workspace/data`: upload CSV files, inspect metadata, preview 10 rows, run column profiles, clean CSV data with Python, inspect before/after quality scores, define required/type/allowed-value/range/unique rules, validate immutable versions, review issue samples and validation history, upload new versions, compare schema and row-level changes, and restore prior versions as a new version
 - `/workspace/audit`: review organization audit activity (OWNER/ADMIN)
 - `/workspace/reports`: manage the organization's Power BI report-link catalog
 - `/workspace/notifications`: review and mark in-app notifications
@@ -87,7 +87,7 @@ For production, set `COOKIE_SECURE=true`, use HTTPS, and configure `APP_ORIGIN` 
 In-app notifications are generated for access requests and decisions, invitation activity, task assignments and newly registered reports. The inbox is user-scoped and supports read/unread state. SMTP is used for email verification, password recovery and invitation delivery when configured.
 
 ## Data storage note
-CSV uploads are stored outside the public web directory. The default local disk adapter is suitable for development only; configure a persistent private volume or replace the storage adapter with managed object storage before production. Dataset preview currently exposes only the first 10 rows. Dataset version history is recorded for each source upload. Re-uploads create immutable snapshots; the workspace can compare row counts and column names between versions and restore an older snapshot as a new version. The Python cleaning engine trims whitespace, optionally removes duplicate rows, fills missing values using a selected strategy, reports potential IQR outliers without deleting them, and saves its result as a new immutable dataset version. Row-level data diffs, retention controls and managed object storage remain future data-engineering work.
+CSV uploads are stored outside the public web directory. The default local disk adapter is suitable for development only; configure a persistent private volume or replace the storage adapter with managed object storage before production. Dataset preview currently exposes only the first 10 rows. Dataset version history is recorded for each source upload. Re-uploads create immutable snapshots; the workspace can compare row counts and column names between versions and restore an older snapshot as a new version. The Python cleaning engine trims whitespace, optionally removes duplicate rows, fills missing values using a selected strategy, reports potential IQR outliers without deleting them, and saves its result as a new immutable dataset version. Dataset validation rules cover required values, expected data types, allowed values, numeric ranges and unique columns. Validation is non-destructive, records the rule set and result against an immutable version, and stores up to 100 issue samples per run while keeping full issue counts. Version comparison includes key-based row-level diffs. Retention controls and managed object storage remain future data-engineering work.
 
 ## Important production checklist
 This is a development foundation, not production-certified software. Before public deployment, complete mature CSRF protection, MFA, automated invitation email delivery, tenant-isolation tests, security review, backups, monitoring and managed secret storage. Configure strict CORS and secure cookies for the deployed domains. Never commit real credentials or customer data.
@@ -97,7 +97,7 @@ This is a development foundation, not production-certified software. Before publ
 2. Team directory and invitation flow — initial UI/API implemented
 3. Projects and task tracking — initial UI/API implemented
 4. Organization audit activity — initial read-only console/API implemented
-5. CSV data catalog, column profiling, Python cleaning, quality scoring, immutable version history, schema/row-count comparison and restore-as-new-version — implemented foundation
+5. CSV data catalog, column profiling, Python cleaning, quality scoring, immutable version history, schema and row-level comparison, restore-as-new-version, validation rules and run history — implemented foundation
 6. Power BI report-link catalog — initial registry implemented
 7. In-app notifications and account recovery — initial implementation
 8. Authorized data connectors and ingestion
