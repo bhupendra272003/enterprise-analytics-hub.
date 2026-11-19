@@ -43,9 +43,22 @@ router.post('/organizations/:orgId/datasets',datasetRole,upload.single('file'),a
     await writeFile(storedPath,req.file.buffer,{flag:'wx',mode:0o600});
     await pool.execute('INSERT INTO datasets (id,organization_id,name,original_filename,storage_path,file_size,row_count,column_count,columns_json,preview_json,uploaded_by) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
       [id,req.params.orgId,input.name,path.basename(req.file.originalname).slice(0,255),storedPath,req.file.size,records.length,columns.length,JSON.stringify(columns),JSON.stringify(preview),req.user.id]);
+    await pool.execute('INSERT INTO dataset_versions (id,dataset_id,version_number,storage_path,file_size,row_count,column_count,columns_json,preview_json,uploaded_by,change_note) VALUES (?,?,1,?,?,?,?,?,?,?,?)',
+      [randomUUID(),id,storedPath,req.file.size,records.length,columns.length,JSON.stringify(columns),JSON.stringify(preview),req.user.id,'Initial source upload']);
     await audit({orgId:req.params.orgId,actorId:req.user.id,action:'DATASET_UPLOADED',targetType:'DATASET',targetId:id,metadata:{name:input.name,rowCount:records.length,columnCount:columns.length},ip:req.ip});
     res.status(201).json({dataset:{id,name:input.name,rowCount:records.length,columnCount:columns.length,columns,preview}});
   }catch(e){if(storedPath)await unlink(storedPath).catch(()=>{});if(e?.code?.startsWith('CSV_'))return res.status(400).json({error:'The CSV file is invalid. Check its header and row structure.'});next(e);}
+});
+
+router.get('/datasets/:datasetId/versions',async(req,res,next)=>{
+  try{
+    const [dataset]=await pool.execute('SELECT organization_id FROM datasets WHERE id=? LIMIT 1',[req.params.datasetId]);
+    if(!dataset.length)return res.status(404).json({error:'Dataset not found.'});
+    const [membership]=await pool.execute("SELECT id FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE' LIMIT 1",[dataset[0].organization_id,req.user.id]);
+    if(!membership.length)return res.status(403).json({error:'Insufficient organization permissions.'});
+    const [versions]=await pool.execute('SELECT v.id,v.version_number AS versionNumber,v.file_size AS fileSize,v.row_count AS rowCount,v.column_count AS columnCount,v.change_note AS changeNote,v.created_at AS createdAt,u.full_name AS uploadedBy FROM dataset_versions v JOIN users u ON u.id=v.uploaded_by WHERE v.dataset_id=? ORDER BY v.version_number DESC',[req.params.datasetId]);
+    res.json({versions});
+  }catch(e){next(e);}
 });
 
 router.get('/datasets/:datasetId/preview',async(req,res,next)=>{
