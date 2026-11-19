@@ -1,6 +1,6 @@
 'use client';
 import {useEffect,useState} from 'react';
-const API=process.env.NEXT_PUBLIC_API_URL||'http://localhost:4000';
+const API=process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:4000');
 type Notice={id:string;organizationId?:string;type:string;title:string;message:string;href?:string;readAt?:string|null;createdAt:string};
 export default function NotificationsPage(){
  const [items,setItems]=useState<Notice[]>([]),[unread,setUnread]=useState(0),[notice,setNotice]=useState('Loading notifications…');
