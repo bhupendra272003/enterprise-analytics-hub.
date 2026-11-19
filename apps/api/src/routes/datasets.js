@@ -1,4 +1,6 @@
 import { Router } from 'express';
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { mkdir, writeFile, unlink, readFile, copyFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -160,6 +162,64 @@ router.get('/datasets/:datasetId/preview',async(req,res,next)=>{
   }catch(e){next(e);}
 });
 
+
+
+router.post('/datasets/:datasetId/clean',async(req,res,next)=>{
+  let connection,cleanedPath;
+  try{
+    const options=z.object({
+      trimWhitespace:z.boolean().default(true),
+      removeDuplicates:z.boolean().default(true),
+      fillMissing:z.enum(['none','zero','mean','median','mode']).default('none')
+    }).parse(req.body||{});
+    const [datasets]=await pool.execute('SELECT id,name,organization_id,storage_path FROM datasets WHERE id=? LIMIT 1',[req.params.datasetId]);
+    if(!datasets.length)return res.status(404).json({error:'Dataset not found.'});
+    const [members]=await pool.execute("SELECT role FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE' LIMIT 1",[datasets[0].organization_id,req.user.id]);
+    if(!members.length)return res.status(403).json({error:'Insufficient organization permissions.'});
+    if(!['OWNER','ADMIN','MANAGER','ANALYST'].includes(members[0].role))return res.status(403).json({error:'Your role cannot create cleaned dataset versions.'});
+    const root=path.resolve(config.dataStorageDir);
+    await mkdir(root,{recursive:true});
+    cleanedPath=path.join(root,randomUUID()+'.csv');
+    const script=fileURLToPath(new URL('../../python/clean_dataset.py',import.meta.url));
+    const report=await new Promise((resolve,reject)=>{
+      const child=spawn(config.pythonExecutable,[script,datasets[0].storage_path,cleanedPath,JSON.stringify(options)],{stdio:['ignore','pipe','pipe'],windowsHide:true});
+      let stdout='',stderr='';
+      child.stdout.setEncoding('utf8');child.stderr.setEncoding('utf8');
+      child.stdout.on('data',chunk=>{stdout+=chunk;if(stdout.length>5*1024*1024)child.kill();});
+      child.stderr.on('data',chunk=>{stderr+=chunk;if(stderr.length>20000)stderr=stderr.slice(-20000);});
+      child.on('error',reject);
+      child.on('close',code=>{
+        if(code!==0)return reject(new Error(stderr.trim()||'Python cleaning process failed. Check Python installation.'));
+        try{resolve(JSON.parse(stdout));}catch{reject(new Error('The cleaning engine returned an invalid report.'));}
+      });
+    });
+    const stat=await import('node:fs/promises').then(fs=>fs.stat(cleanedPath));
+    const columns=report.columns||[];
+    const preview=report.preview||[];
+    connection=await pool.getConnection();
+    await connection.beginTransaction();
+    const [locked]=await connection.execute('SELECT id,organization_id FROM datasets WHERE id=? FOR UPDATE',[req.params.datasetId]);
+    if(!locked.length){await connection.rollback();return res.status(404).json({error:'Dataset not found.'});}
+    const [currentMembership]=await connection.execute("SELECT role FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE' LIMIT 1",[locked[0].organization_id,req.user.id]);
+    if(!currentMembership.length||!['OWNER','ADMIN','MANAGER','ANALYST'].includes(currentMembership[0].role)){await connection.rollback();return res.status(403).json({error:'Dataset access changed while cleaning was running.'});}
+    const [latest]=await connection.execute('SELECT COALESCE(MAX(version_number),0) AS currentVersion FROM dataset_versions WHERE dataset_id=?',[req.params.datasetId]);
+    const versionNumber=Number(latest[0].currentVersion)+1;
+    await connection.execute('INSERT INTO dataset_versions (id,dataset_id,version_number,storage_path,file_size,row_count,column_count,columns_json,preview_json,uploaded_by,change_note) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+      [randomUUID(),req.params.datasetId,versionNumber,cleanedPath,stat.size,report.after.rows,columns.length,JSON.stringify(columns),JSON.stringify(preview),req.user.id,'Python cleaning · quality score '+report.before.qualityScore+' → '+report.after.qualityScore]);
+    await connection.execute('UPDATE datasets SET storage_path=?,file_size=?,row_count=?,column_count=?,columns_json=?,preview_json=?,uploaded_by=? WHERE id=?',
+      [cleanedPath,stat.size,report.after.rows,columns.length,JSON.stringify(columns),JSON.stringify(preview),req.user.id,req.params.datasetId]);
+    await connection.commit();
+    cleanedPath=null;
+    await audit({orgId:locked[0].organization_id,actorId:req.user.id,action:'DATASET_CLEANED',targetType:'DATASET',targetId:req.params.datasetId,metadata:{versionNumber,beforeScore:report.before.qualityScore,afterScore:report.after.qualityScore,removedDuplicates:report.removedDuplicates,filledCells:report.filledCells},ip:req.ip});
+    res.status(201).json({versionNumber,report});
+  }catch(e){
+    if(connection)await connection.rollback().catch(()=>{});
+    if(cleanedPath)await unlink(cleanedPath).catch(()=>{});
+    if(e?.message?.includes('CSV'))return res.status(400).json({error:e.message});
+    if(e?.code==='ENOENT')return res.status(500).json({error:'Python was not found. Install Python 3 or set PYTHON_EXECUTABLE in the API environment.'});
+    next(e);
+  }finally{connection?.release();}
+});
 
 router.get('/datasets/:datasetId/profile',async(req,res,next)=>{
   try{
