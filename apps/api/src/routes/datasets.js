@@ -279,6 +279,101 @@ router.post('/datasets/:datasetId/clean',async(req,res,next)=>{
   }finally{connection?.release();}
 });
 
+
+router.post('/datasets/:datasetId/validate',async(req,res,next)=>{
+  try{
+    const schema=z.object({
+      versionNumber:z.number().int().positive().optional(),
+      rules:z.object({
+        required:z.array(z.string().max(200)).max(200).default([]),
+        types:z.record(z.string(),z.enum(['TEXT','NUMBER','DATE','BOOLEAN'])).default({}),
+        allowedValues:z.record(z.string(),z.array(z.string().max(200)).max(100)).default({}),
+        numericRanges:z.record(z.string(),z.object({min:z.number().optional(),max:z.number().optional()})).default({}),
+        uniqueColumns:z.array(z.string().max(200)).max(200).default([])
+      }).default({})
+    }).parse(req.body||{});
+    const [datasets]=await pool.execute('SELECT id,name,organization_id FROM datasets WHERE id=? LIMIT 1',[req.params.datasetId]);
+    if(!datasets.length)return res.status(404).json({error:'Dataset not found.'});
+    const [members]=await pool.execute("SELECT role FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE' LIMIT 1",[datasets[0].organization_id,req.user.id]);
+    if(!members.length)return res.status(403).json({error:'Insufficient organization permissions.'});
+    if(!['OWNER','ADMIN','MANAGER','ANALYST'].includes(members[0].role))return res.status(403).json({error:'Your role cannot run dataset validation.'});
+    const [versions]=await pool.execute('SELECT version_number AS versionNumber,storage_path AS storagePath,columns_json AS columnsJson FROM dataset_versions WHERE dataset_id=? AND version_number=COALESCE(?,(SELECT MAX(version_number) FROM dataset_versions WHERE dataset_id=?)) LIMIT 1',[req.params.datasetId,schema.versionNumber??null,req.params.datasetId]);
+    if(!versions.length)return res.status(404).json({error:'Dataset version not found.'});
+    const columns=typeof versions[0].columnsJson==='string'?JSON.parse(versions[0].columnsJson):versions[0].columnsJson;
+    const rules=schema.rules;
+    const configured=[...new Set([...rules.required,...Object.keys(rules.types),...Object.keys(rules.allowedValues),...Object.keys(rules.numericRanges),...rules.uniqueColumns])];
+    const unknown=configured.filter(column=>!columns.includes(column));
+    if(unknown.length)return res.status(400).json({error:'Rules reference columns that do not exist: '+unknown.join(', ')});
+    for(const [column,range] of Object.entries(rules.numericRanges)){
+      if(range.min!==undefined&&range.max!==undefined&&range.min>range.max)return res.status(400).json({error:'Minimum cannot be greater than maximum for '+column+'.'});
+    }
+    const records=parse(await readFile(versions[0].storagePath),{columns:true,skip_empty_lines:true,bom:true,trim:false,relax_column_count:false});
+    const issueCounts={REQUIRED:0,TYPE:0,ALLOWED_VALUE:0,MIN_MAX:0,UNIQUE:0};
+    const samples=[];
+    const seen=new Map(rules.uniqueColumns.map(column=>[column,new Set()]));
+    const addIssue=(rowNumber,column,rule,value,message)=>{
+      issueCounts[rule]++;
+      if(samples.length<100)samples.push({rowNumber,column,rule,value:String(value??'').slice(0,160),message});
+    };
+    const isValidDate=value=>/^\\d{4}-\\d{2}-\\d{2}$/.test(value)&&!Number.isNaN(Date.parse(value))&&new Date(value).toISOString().slice(0,10)===value;
+    const validType=(value,type)=>{
+      if(type==='TEXT')return true;
+      if(type==='NUMBER')return value.trim()!==''&&Number.isFinite(Number(value));
+      if(type==='DATE')return isValidDate(value.trim());
+      if(type==='BOOLEAN')return ['true','false','1','0','yes','no'].includes(value.trim().toLowerCase());
+      return true;
+    };
+    records.forEach((record,index)=>{
+      const rowNumber=index+2;
+      for(const column of rules.required){
+        if(String(record[column]??'').trim()==='')addIssue(rowNumber,column,'REQUIRED',record[column],'Required value is missing.');
+      }
+      for(const [column,type] of Object.entries(rules.types)){
+        const value=String(record[column]??'');
+        if(value.trim()!==''&&!validType(value,type))addIssue(rowNumber,column,'TYPE',value,'Expected '+type.toLowerCase()+' value.');
+      }
+      for(const [column,allowed] of Object.entries(rules.allowedValues)){
+        const value=String(record[column]??'').trim();
+        if(value!==''&&allowed.length&&!allowed.includes(value))addIssue(rowNumber,column,'ALLOWED_VALUE',value,'Value is not in the approved list.');
+      }
+      for(const [column,range] of Object.entries(rules.numericRanges)){
+        const raw=String(record[column]??'').trim();
+        if(raw==='')continue;
+        const value=Number(raw);
+        if(!Number.isFinite(value))continue;
+        if((range.min!==undefined&&value<range.min)||(range.max!==undefined&&value>range.max))addIssue(rowNumber,column,'MIN_MAX',raw,'Value is outside the configured numeric range.');
+      }
+      for(const column of rules.uniqueColumns){
+        const value=String(record[column]??'').trim();
+        if(!value)continue;
+        const values=seen.get(column);
+        if(values.has(value))addIssue(rowNumber,column,'UNIQUE',value,'Duplicate value in a column marked unique.');
+        else values.add(value);
+      }
+    });
+    const issueCount=Object.values(issueCounts).reduce((sum,count)=>sum+count,0);
+    const result={versionNumber:Number(versions[0].versionNumber),rowCount:records.length,checkedColumns:configured.length,issueCount,passed:issueCount===0,issueCounts,sampleLimit:100,samples};
+    await pool.execute('INSERT INTO dataset_validation_runs (id,dataset_id,version_number,executed_by,rules_json,result_json,status,issue_count) VALUES (?,?,?,?,?,?,?,?)',
+      [randomUUID(),req.params.datasetId,result.versionNumber,req.user.id,JSON.stringify(rules),JSON.stringify(result),result.passed?'PASSED':'FAILED',issueCount]);
+    await audit({orgId:datasets[0].organization_id,actorId:req.user.id,action:'DATASET_VALIDATED',targetType:'DATASET',targetId:req.params.datasetId,metadata:{versionNumber:result.versionNumber,issueCount,passed:result.passed},ip:req.ip});
+    res.status(201).json({result});
+  }catch(e){
+    if(e?.code?.startsWith('CSV_'))return res.status(400).json({error:'The selected CSV version is invalid and cannot be validated.'});
+    next(e);
+  }
+});
+
+router.get('/datasets/:datasetId/validation-runs',async(req,res,next)=>{
+  try{
+    const [datasets]=await pool.execute('SELECT organization_id FROM datasets WHERE id=? LIMIT 1',[req.params.datasetId]);
+    if(!datasets.length)return res.status(404).json({error:'Dataset not found.'});
+    const [members]=await pool.execute("SELECT id FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE' LIMIT 1",[datasets[0].organization_id,req.user.id]);
+    if(!members.length)return res.status(403).json({error:'Insufficient organization permissions.'});
+    const [runs]=await pool.execute('SELECT r.id,r.version_number AS versionNumber,r.status,r.issue_count AS issueCount,r.created_at AS createdAt,u.full_name AS executedBy FROM dataset_validation_runs r JOIN users u ON u.id=r.executed_by WHERE r.dataset_id=? ORDER BY r.created_at DESC LIMIT 20',[req.params.datasetId]);
+    res.json({runs});
+  }catch(e){next(e);}
+});
+
 router.get('/datasets/:datasetId/profile',async(req,res,next)=>{
   try{
     const [rows]=await pool.execute('SELECT id,name,storage_path,organization_id FROM datasets WHERE id=? LIMIT 1',[req.params.datasetId]);
