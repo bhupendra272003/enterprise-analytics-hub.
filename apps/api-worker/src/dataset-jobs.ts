@@ -1,6 +1,6 @@
 type Role="OWNER"|"ADMIN"|"MANAGER"|"ANALYST"|"VIEWER";
 type Msg={jobId:string};
-type Env={DB:D1Database;DATASETS:R2Bucket;DATASET_JOBS:Queue<Msg>};
+type Env={DB:D1Database;DATASETS:KVNamespace;DATASET_JOBS:Queue<Msg>};
 const json=(v:unknown,s=200)=>new Response(JSON.stringify(v),{status:s,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store"}});
 const userFor=async(req:Request,env:Env)=>{const c=req.headers.get("Cookie")||"",sid=c.split(";").map(x=>x.trim()).find(x=>x.startsWith("hub.sid="))?.slice(8);if(!sid)return null;return env.DB.prepare("SELECT u.id,u.account_status FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.id=? AND s.expires_at>unixepoch()").bind(decodeURIComponent(sid)).first<{id:string;account_status:string}>();};
 const canRun=(r:Role)=>["OWNER","ADMIN","MANAGER","ANALYST"].includes(r);
@@ -51,8 +51,8 @@ async function runProfile(msg:Msg,env:Env){
  const claim=await env.DB.prepare("UPDATE dataset_jobs SET status='RUNNING',stage='LOADING_SOURCE',progress=10,attempt_count=attempt_count+1,started_at=COALESCE(started_at,CURRENT_TIMESTAMP),updated_at=CURRENT_TIMESTAMP WHERE id=? AND status IN ('QUEUED','RETRYING')").bind(job.id).run();if(!claim.meta.changes)return;
  try{
   const ds=await env.DB.prepare("SELECT name,storage_path,file_size FROM datasets WHERE id=? AND organization_id=?").bind(job.dataset_id,job.organization_id).first<any>();if(!ds)throw new Error("DATASET_NOT_FOUND");if(ds.file_size>262144)throw new Error("DATASET_TOO_LARGE");
-  const obj=await env.DATASETS.get(ds.storage_path);if(!obj)throw new Error("SOURCE_FILE_MISSING");
-  const {parse}=await import("csv-parse/sync");const rows=parse(await obj.text(),{columns:true,skip_empty_lines:true,bom:true,trim:true,relax_column_count:false});if(!rows.length)throw new Error("EMPTY_DATASET");
+  const source=await env.DATASETS.get(ds.storage_path,"text");if(source===null)throw new Error("SOURCE_FILE_MISSING");
+  const {parse}=await import("csv-parse/sync");const rows=parse(source,{columns:true,skip_empty_lines:true,bom:true,trim:true,relax_column_count:false});if(!rows.length)throw new Error("EMPTY_DATASET");
   const columns=Object.keys(rows[0]);if(!columns.length||columns.length>200)throw new Error("INVALID_HEADERS");
   const profile=columns.map(name=>{const vals=rows.map((r:any)=>String(r[name]??"").trim()),present=vals.filter((v:string)=>v!==""),nums=present.map(Number).filter(Number.isFinite),numeric=present.length>0&&nums.length/present.length>=.9;return {name,type:!present.length?"EMPTY":numeric?"NUMERIC":"TEXT",total:vals.length,missing:vals.length-present.length,distinct:new Set(present).size,...(numeric?{min:Math.min(...nums),max:Math.max(...nums),mean:Number((nums.reduce((a:number,b:number)=>a+b,0)/nums.length).toFixed(3))}:{})};});
   const result={datasetId:job.dataset_id,name:ds.name,rowCount:rows.length,columnCount:columns.length,columns:profile};
