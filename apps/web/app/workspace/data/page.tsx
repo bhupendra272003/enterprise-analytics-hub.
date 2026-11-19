@@ -1,6 +1,6 @@
 'use client';
 import {useEffect,useState} from 'react';
-const API=process.env.NEXT_PUBLIC_API_URL||'http://localhost:4000';
+const API=process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:4000');
 type Org={id:string;name:string;role:string};type Dataset={id:string;name:string;originalFilename:string;fileSize:number;rowCount:number;columnCount:number;createdAt:string;uploadedBy:string};
 type Preview={id:string;name:string;columns:string[];preview:Record<string,unknown>[]};type Version={id:string;versionNumber:number;fileSize:number;rowCount:number;columnCount:number;changeNote:string|null;createdAt:string;uploadedBy:string};type Profile={name:string;type:string;total:number;missing:number;distinct:number;min?:number;max?:number;mean?:number};
 export default function DataPage(){
