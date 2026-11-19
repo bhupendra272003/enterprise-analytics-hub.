@@ -28,3 +28,4 @@ jobs:
           cd apps/web
           npm install
           npm run build
+          npm run cf:build
