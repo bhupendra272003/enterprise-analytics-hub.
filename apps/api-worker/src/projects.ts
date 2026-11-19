@@ -21,7 +21,7 @@ const audit = (env: Env, orgId: string, userId: string, action: string, type: st
 const roles = ["OWNER","ADMIN","MANAGER","ANALYST","VIEWER"];
 const priorities = ["LOW","MEDIUM","HIGH","URGENT"];
 const statuses = ["TODO","IN_PROGRESS","BLOCKED","DONE"];
-const isDate = (v: unknown): v is string => typeof v==="string" && /^\\d{4}-\\d{2}-\\d{2}$/.test(v) && !Number.isNaN(Date.parse(v));
+const isDate = (v: unknown): v is string => typeof v==="string" && v.length===10 && v[4]==="-" && v[7]==="-" && !Number.isNaN(Date.parse(v)) && new Date(v).toISOString().slice(0,10)===v;
 
 export async function handleProjects(request: Request, env: Env, path: string): Promise<Response|null> {
   const user=await userFromRequest(request,env);
