@@ -18,13 +18,22 @@ async function proxy(request: Request, context: { params: Promise<{ path: string
   const incoming = new URL(request.url);
   const target = new URL(`/api/${path.map(encodeURIComponent).join("/")}${incoming.search}`, "https://nexus-analytics-api.internal");
 
+  let env: Record<string, unknown>;
   try {
-    const { env } = getCloudflareContext();
-    const api = (env as unknown as {
-      API: { fetch: (request: Request) => Promise<Response> };
-    }).API;
+    const cloudflare = await getCloudflareContext({ async: true });
+    env = cloudflare.env as unknown as Record<string, unknown>;
+  } catch {
+    return Response.json({ error: "Cloudflare runtime context is unavailable." }, { status: 502 });
+  }
+
+  const api = env.API as { fetch?: (request: Request) => Promise<Response> } | undefined;
+  if (!api || typeof api.fetch !== "function") {
+    return Response.json({ error: "NEXUS API service binding is missing from the deployed frontend Worker." }, { status: 502 });
+  }
+
+  try {
     return await api.fetch(new Request(target, request));
   } catch {
-    return Response.json({ error: "NEXUS API service binding is unavailable." }, { status: 502 });
+    return Response.json({ error: "NEXUS API service request failed." }, { status: 502 });
   }
 }
