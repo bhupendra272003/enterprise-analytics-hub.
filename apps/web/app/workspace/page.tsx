@@ -12,6 +12,10 @@ type Profile = {
 export default function Workspace() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [error, setError] = useState('Loading your secure workspace…');
+  const [orgName, setOrgName] = useState('');
+  const [orgSlug, setOrgSlug] = useState('');
+  const [orgBusy, setOrgBusy] = useState(false);
+  const [orgNotice, setOrgNotice] = useState('');
 
   useEffect(() => {
     fetch(`${API}/api/auth/me`, { credentials: 'include' })
@@ -23,6 +27,19 @@ export default function Workspace() {
       })
       .catch(err => setError(err.message || 'Unable to connect to the API.'));
   }, []);
+
+  async function createOrganization(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setOrgBusy(true); setOrgNotice('');
+    try {
+      const response = await fetch(`${API}/api/organizations`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', 'X-Hub-Request': '1' }, body: JSON.stringify({ name: orgName.trim(), slug: orgSlug.trim().toLowerCase() }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Workspace could not be created.');
+      setOrgNotice('Organization created. You are the OWNER. Refreshing workspace…');
+      window.location.reload();
+    } catch (err) { setOrgNotice(err instanceof Error ? err.message : 'Workspace creation failed.'); }
+    finally { setOrgBusy(false); }
+  }
 
   async function logout() {
     await fetch(`${API}/api/auth/logout`, {
@@ -48,7 +65,7 @@ export default function Workspace() {
         <article className="workspace-card"><small>WORK EMAIL</small><strong className="email-value">{profile.user.email}</strong><span>Signed-in account</span></article>
       </div>
       <div className="workspace-section-head"><h2>Your organizations</h2><div className="workspace-actions"><a className="manage-team-link" href="/workspace/team">Manage team & access ↗</a><a className="manage-team-link" href="/workspace/projects">Projects & tasks ↗</a><a className="manage-team-link" href="/workspace/data">Data workspace ↗</a><a className="manage-team-link" href="/workspace/reports">Reports ↗</a><a className="manage-team-link" href="/workspace/notifications">Notifications ↗</a>{profile.user.status === "PENDING" && <a className="manage-team-link" href="/workspace/access">Request organization access ↗</a>}{profile.organizations.some(org => ["OWNER", "ADMIN"].includes(org.role)) && <a className="manage-team-link" href="/workspace/audit">Audit activity ↗</a>}</div></div>
-      {profile.organizations.length ? <div className="org-list">{profile.organizations.map(org => <div className="org-row" key={org.organizationId}><span className="org-symbol">◈</span><span><b>{org.organizationName}</b><small>Organization workspace</small></span><span className="role-pill">{org.role}</span></div>)}</div> : <div className="empty-state"><span>◈</span><b>No active organization yet</b><p>Ask your manager for an invitation, or wait for an organization administrator to approve your access.</p></div>}
+      {profile.organizations.length ? <div className="org-list">{profile.organizations.map(org => <div className="org-row" key={org.organizationId}><span className="org-symbol">◈</span><span><b>{org.organizationName}</b><small>Organization workspace</small></span><span className="role-pill">{org.role}</span></div>)}</div> : <div className="empty-state"><span>◈</span><b>No active organization yet</b><p>Create your first organization to set up your owner workspace, or request access to an existing organization.</p><form className="org-create-form" onSubmit={createOrganization}><label>ORGANIZATION NAME<input value={orgName} onChange={e => setOrgName(e.target.value)} minLength={2} maxLength={160} placeholder="e.g. NEXUS Analytics" required /></label><label>WORKSPACE URL SLUG<input value={orgSlug} onChange={e => setOrgSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))} pattern="[a-z0-9-]{3,180}" minLength={3} maxLength={180} placeholder="e.g. nexus-analytics" required /></label><button className="manage-team-link" type="submit" disabled={orgBusy}>{orgBusy ? 'Creating…' : 'Create owner workspace ↗'}</button><p role="status">{orgNotice}</p></form><a className="manage-team-link" href="/workspace/access">Request access to an existing organization ↗</a></div>}
       <div className="coming-soon"><span>YOUR ANALYTICS WORKSPACE</span><b>Projects, team access and governed data</b><small>Choose a module above to manage delivery, members and analytical work.</small></div>
     </section> : <div className="workspace-error"><div className="loader-mark">N</div><h1>Workspace access</h1><p>{error}</p><a href="/">Return to sign in</a></div>}
     <footer><span>© 2026 NEXUS ANALYTICS</span><span>DATA • PEOPLE • PROGRESS</span></footer>
