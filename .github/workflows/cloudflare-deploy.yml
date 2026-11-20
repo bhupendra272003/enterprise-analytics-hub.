@@ -10,6 +10,7 @@ on:
       - 'apps/web/app/api/**'
       - 'apps/web/next.config.mjs'
       - 'apps/api-worker/src/index.ts'
+      - 'database/d1/**'
       - '.github/workflows/cloudflare-deploy.yml'
 
 permissions:
