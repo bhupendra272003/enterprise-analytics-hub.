@@ -14,9 +14,9 @@ const hash=async(value:string)=>Array.from(new Uint8Array(await crypto.subtle.di
 const hashPassword=async(password:string)=>{
  const salt=crypto.getRandomValues(new Uint8Array(16));
  const key=await crypto.subtle.importKey("raw",new TextEncoder().encode(password),"PBKDF2",false,["deriveBits"]);
- const bits=new Uint8Array(await crypto.subtle.deriveBits({name:"PBKDF2",hash:"SHA-256",salt,iterations:310000},key,256));
+ const bits=new Uint8Array(await crypto.subtle.deriveBits({name:"PBKDF2",hash:"SHA-256",salt,iterations:100000},key,256));
  const hex=(v:Uint8Array)=>Array.from(v,b=>b.toString(16).padStart(2,"0")).join("");
- return `pbkdf2-sha256$310000${hex(salt)}${hex(bits)}`;
+ return `pbkdf2-sha256$100000${hex(salt)}${hex(bits)}`;
 };
 const validEmail=(v:unknown):v is string=>typeof v==="string"&&v.length<=254&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 async function sendInvite(env:Env,to:string,url:string){
