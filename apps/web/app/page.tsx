@@ -26,7 +26,7 @@ export default function Home() {
         body: JSON.stringify(mode === 'login' ? { email, password } : { fullName, email, password })
       });
       const result = await response.json();
-      setNotice(result.message || result.error || 'Something went wrong.');
+      setNotice([result.message || result.error || 'Something went wrong.', result.diagnostic ? `Diagnostic: ${result.diagnostic}` : ''].filter(Boolean).join(' '));
       setVerificationUrl(result.verificationUrl || '');
       if (response.ok && mode === 'login') window.location.href = '/workspace';
       if (response.ok && mode === 'register') {
