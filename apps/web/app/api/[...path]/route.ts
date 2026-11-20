@@ -20,8 +20,10 @@ async function proxy(request: Request, context: { params: Promise<{ path: string
 
   try {
     const { env } = getCloudflareContext();
-    const upstreamRequest = new Request(target, request);
-    return await env.API.fetch(upstreamRequest);
+    const api = (env as unknown as {
+      API: { fetch: (request: Request) => Promise<Response> };
+    }).API;
+    return await api.fetch(new Request(target, request));
   } catch {
     return Response.json({ error: "NEXUS API service binding is unavailable." }, { status: 502 });
   }
