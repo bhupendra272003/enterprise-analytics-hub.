@@ -261,20 +261,28 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     const origin = request.headers.get("Origin");
+    // Restrict browser access to the configured workspace origin and the
+    // canonical production workers.dev origin. Normalize trailing slashes.
+    const configuredOrigin = (env.APP_ORIGIN || "").replace(/\\/+$/, "");
+    const allowedOrigins = new Set([
+      configuredOrigin,
+      "https://nexus-analytics-web.bhupendrasinghdeora24.workers.dev"
+    ].filter(Boolean));
+    const allowedOrigin = origin && allowedOrigins.has(origin.replace(/\\/+$/, "")) ? origin : null;
     if (request.method === "OPTIONS") {
-      if (origin !== env.APP_ORIGIN) return new Response(null, { status: 403 });
+      if (!allowedOrigin) return new Response("CORS origin denied", { status: 403 });
       return new Response(null, { status: 204, headers: {
-        "access-control-allow-origin": env.APP_ORIGIN,
+        "access-control-allow-origin": allowedOrigin,
         "access-control-allow-credentials": "true",
         "access-control-allow-methods": "GET,POST,PATCH,OPTIONS",
-        "access-control-allow-headers": "Content-Type,X-Hub-Request",
+        "access-control-allow-headers": "Content-Type, X-Hub-Request",
         "access-control-max-age": "86400",
-        "vary": "Origin"
+        "vary": "Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
       }});
     }
     const headers: Record<string, string> = {};
-    if (origin === env.APP_ORIGIN) {
-      headers["access-control-allow-origin"] = env.APP_ORIGIN;
+    if (allowedOrigin) {
+      headers["access-control-allow-origin"] = allowedOrigin;
       headers["access-control-allow-credentials"] = "true";
       headers["vary"] = "Origin";
     }
