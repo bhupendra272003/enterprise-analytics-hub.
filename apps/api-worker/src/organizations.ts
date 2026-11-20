@@ -60,7 +60,7 @@ export async function handleOrganizations(request: Request, env: Env, path: stri
     const id=crypto.randomUUID();
     try {
       await env.DB.batch([
-        env.DB.prepare("undefined").bind(id,name,slug,user.id),
+        env.DB.prepare("INSERT INTO organizations (id,name,slug,created_by,industry) VALUES (?,?,?,?,?)").bind(id,name,slug,user.id,industry),
         env.DB.prepare("INSERT INTO memberships (id,organization_id,user_id,role,membership_status) VALUES (?,?,?,'OWNER','ACTIVE')").bind(crypto.randomUUID(),id,user.id),
         env.DB.prepare("INSERT INTO audit_logs (organization_id,actor_user_id,action,target_type,target_id) VALUES (?,?, 'ORGANIZATION_CREATED','ORGANIZATION',?)").bind(id,user.id,id)
       ]);
