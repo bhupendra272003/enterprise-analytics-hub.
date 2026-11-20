@@ -134,7 +134,8 @@ async function handleAuth(request: Request, env: Env, path: string): Promise<Res
     const { results: organizations } = await env.DB.prepare(
       "SELECT o.id AS organizationId,o.name AS organizationName,m.role FROM memberships m JOIN organizations o ON o.id=m.organization_id WHERE m.user_id=? AND m.membership_status='ACTIVE'"
     ).bind(user.id).all();
-    return json({ user: { id: user.id, fullName: user.full_name, email: user.email, status: user.account_status, emailVerified: !!user.email_verified_at }, organizations });
+    const platformAdmin = await env.DB.prepare("SELECT role FROM platform_admins WHERE user_id=? LIMIT 1").bind(user.id).first<{role:string}>();
+    return json({ user: { id: user.id, fullName: user.full_name, email: user.email, status: user.account_status, emailVerified: !!user.email_verified_at, platformRole: platformAdmin?.role ?? "USER" }, organizations });
   }
 
   if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
