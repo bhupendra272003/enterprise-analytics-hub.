@@ -2,6 +2,11 @@ name: Deploy NEXUS to Cloudflare Free
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/web/app/page.tsx'
+      - '.github/workflows/cloudflare-deploy.yml'
 
 permissions:
   contents: read
