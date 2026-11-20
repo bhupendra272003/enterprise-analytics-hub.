@@ -33,7 +33,7 @@ jobs:
           npm install
           npx opennextjs-cloudflare build
           npx wrangler deploy 2>&1 | tee deploy.log
-          url=$(grep -Eo 'https://[A-Za-z0-9.-]+\\.workers\\.dev' deploy.log | tail -n1)
+          url=$(grep -Eo 'https://[A-Za-z0-9.-]+[.]workers[.]dev' deploy.log | tail -n1)
           test -n "$url" || { echo "::error::Could not detect the frontend workers.dev URL"; exit 1; }
           echo "url=$url" >> "$GITHUB_OUTPUT"
       - name: Apply D1 migrations and deploy API Worker
@@ -48,7 +48,7 @@ jobs:
           npm install
           npx wrangler d1 migrations apply nexus-analytics --remote
           npx wrangler deploy --var "APP_ORIGIN:$FRONTEND_URL" 2>&1 | tee deploy.log
-          url=$(grep -Eo 'https://[A-Za-z0-9.-]+\\.workers\\.dev' deploy.log | tail -n1)
+          url=$(grep -Eo 'https://[A-Za-z0-9.-]+[.]workers[.]dev' deploy.log | tail -n1)
           test -n "$url" || { echo "::error::Could not detect the API workers.dev URL"; exit 1; }
           echo "url=$url" >> "$GITHUB_OUTPUT"
       - name: Publish deployment URLs
