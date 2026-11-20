@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - 'apps/web/app/page.tsx'
+      - 'apps/web/app/api/**'
       - 'apps/web/next.config.mjs'
       - 'apps/api-worker/src/index.ts'
       - '.github/workflows/cloudflare-deploy.yml'
