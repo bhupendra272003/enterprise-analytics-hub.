@@ -287,7 +287,7 @@ export default {
       headers["vary"] = "Origin";
     }
     if (request.method !== "GET" && request.method !== "HEAD") {
-      if (origin !== env.APP_ORIGIN || request.headers.get("X-Hub-Request") !== "1")
+      if (!allowedOrigin || request.headers.get("X-Hub-Request") !== "1")
         return json({ error: "Request origin validation failed." }, 403, headers);
     }
     if (url.pathname.startsWith("/api/reports/") || (url.pathname.startsWith("/api/organizations/") && url.pathname.endsWith("/reports"))) {
