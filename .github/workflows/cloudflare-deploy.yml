@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - 'apps/web/app/page.tsx'
+      - 'apps/api-worker/src/index.ts'
       - '.github/workflows/cloudflare-deploy.yml'
 
 permissions:
