@@ -263,12 +263,12 @@ export default {
     const origin = request.headers.get("Origin");
     // Restrict browser access to the configured workspace origin and the
     // canonical production workers.dev origin. Normalize trailing slashes.
-    const configuredOrigin = (env.APP_ORIGIN || "").replace(/\\/+$/, "");
+    const configuredOrigin = env.APP_ORIGIN || "";
     const allowedOrigins = new Set([
       configuredOrigin,
       "https://nexus-analytics-web.bhupendrasinghdeora24.workers.dev"
     ].filter(Boolean));
-    const allowedOrigin = origin && allowedOrigins.has(origin.replace(/\\/+$/, "")) ? origin : null;
+    const allowedOrigin = origin && allowedOrigins.has(origin) ? origin : null;
     if (request.method === "OPTIONS") {
       if (!allowedOrigin) return new Response("CORS origin denied", { status: 403 });
       return new Response(null, { status: 204, headers: {
