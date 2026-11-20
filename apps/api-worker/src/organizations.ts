@@ -46,7 +46,7 @@ export async function handleOrganizations(request: Request, env: Env, path: stri
   }
 
   if (path === "/api/organizations" && request.method === "GET") {
-    const {results} = await env.DB.prepare("SELECT o.id,o.name,o.slug,m.role FROM organizations o JOIN memberships m ON m.organization_id=o.id WHERE m.user_id=? AND m.membership_status='ACTIVE' ORDER BY o.name").bind(user.id).all();
+    const {results} = await env.DB.prepare("SELECT o.id,o.name,o.slug,o.industry,m.role FROM organizations o JOIN memberships m ON m.organization_id=o.id WHERE m.user_id=? AND m.membership_status='ACTIVE' ORDER BY o.name").bind(user.id).all();
     return reply({organizations:results});
   }
 
@@ -55,16 +55,17 @@ export async function handleOrganizations(request: Request, env: Env, path: stri
     let body: any; try { body=await request.json(); } catch { return reply({error:"Invalid JSON body."},400); }
     const name=typeof body.name==="string"?body.name.trim():"";
     const slug=typeof body.slug==="string"?body.slug.trim().toLowerCase():"";
-    if(name.length<2||name.length>160||!/^[a-z0-9-]{3,180}$/.test(slug)) return reply({error:"Enter a valid workspace name and URL slug."},400);
+    const industry=typeof body.industry==="string"?body.industry.trim().toUpperCase():"";
+    if(name.length<2||name.length>160||!/^[a-z0-9-]{3,180}$/.test(slug)||!["BFSI","ECOMMERCE","LOGISTICS","HOTELS"].includes(industry)) return reply({error:"Enter a valid workspace name, URL slug and industry."},400);
     const id=crypto.randomUUID();
     try {
       await env.DB.batch([
-        env.DB.prepare("INSERT INTO organizations (id,name,slug,created_by) VALUES (?,?,?,?)").bind(id,name,slug,user.id),
+        env.DB.prepare("undefined").bind(id,name,slug,user.id),
         env.DB.prepare("INSERT INTO memberships (id,organization_id,user_id,role,membership_status) VALUES (?,?,?,'OWNER','ACTIVE')").bind(crypto.randomUUID(),id,user.id),
         env.DB.prepare("INSERT INTO audit_logs (organization_id,actor_user_id,action,target_type,target_id) VALUES (?,?, 'ORGANIZATION_CREATED','ORGANIZATION',?)").bind(id,user.id,id)
       ]);
     } catch { return reply({error:"Workspace could not be created. The URL slug may already be in use."},409); }
-    return reply({organization:{id,name,slug,role:"OWNER"}},201);
+    return reply({organization:{id,name,slug,industry,role:"OWNER"}},201);
   }
 
   const memberMatch=path.match(/^\/api\/organizations\/([^/]+)\/members$/);
