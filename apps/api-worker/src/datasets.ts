@@ -22,6 +22,8 @@ const parseCsv=(buffer:ArrayBuffer)=>{
  return {records,columns,preview:records.slice(0,10).map((row:any)=>Object.fromEntries(columns.map(c=>[c,String(row[c]??"").slice(0,500)])))};
 };
 const allowed=(role:Role)=>["OWNER","ADMIN","MANAGER","ANALYST"].includes(role);
+const ownerOnly=(role:Role)=>role==="OWNER";
+const ownerRequired=()=>json({error:"Only the organization owner can change or replace original source data."},403);
 const isNum=(v:string)=>v.trim()!==""&&Number.isFinite(Number(v));
 const csvEncode=(rows:Record<string,string>[],columns:string[])=>[columns,...rows.map(r=>columns.map(k=>r[k]??""))].map(row=>row.map(v=>{const s=String(v);return /[",\r\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}).join(",")).join("\r\n")+"\r\n";
 const quality=(rows:Record<string,string>[],columns:string[])=>{
@@ -46,7 +48,8 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
   return json({datasets:results});
  }
  if(orgList&&req.method==="POST"){
-  const orgId=orgList[1],m=await membership(env,orgId,user.id);if(!m||!allowed(m.role))return json({error:"Insufficient organization permissions."},403);
+  const orgId=orgList[1],m=await membership(env,orgId,user.id);if(!m)return json({error:"Insufficient organization permissions."},403);
+  if(!ownerOnly(m.role))return ownerRequired();
   let form:FormData;try{form=await req.formData();}catch{return json({error:"Choose a CSV file to upload."},400);}
   const file=form.get("file"),name=typeof form.get("name")==="string"?(form.get("name") as string).trim():"";
   if(!(file instanceof File)||!file.size||!file.name.toLowerCase().endsWith(".csv"))return json({error:"Choose a valid CSV file."},400);
@@ -73,7 +76,7 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
  const m=await membership(env,dataset.organization_id,user.id);if(!m)return json({error:"Insufficient organization permissions."},403);
  if(["clean","profile","validate","anomalies","quality-dashboard","compare"].includes(sub)&&Number(dataset.file_size)>MAX_SYNC_CSV_BYTES)return syncLimitError();
  if(sub==="clean"&&req.method==="POST"){
-  if(!allowed(m.role))return json({error:"Your role cannot create cleaned dataset versions."},403);
+  if(!ownerOnly(m.role))return ownerRequired();
   let body:any={};try{body=await req.json();}catch{return json({error:"Invalid cleaning options."},400);}
   const trimWhitespace=body.trimWhitespace!==false,removeDuplicates=body.removeDuplicates!==false,fillMissing=body.fillMissing??"none";
   if(!["none","zero","mean","median","mode"].includes(fillMissing))return json({error:"Unsupported missing-value strategy."},400);
@@ -230,7 +233,7 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
   return json({comparison:{fromVersion:from,toVersion:to,fromRows:a.row_count,toRows:b.row_count,rowDelta:b.row_count-a.row_count,fromColumns:a.column_count,toColumns:b.column_count,addedColumns:newCols.filter((x:string)=>!oldCols.includes(x)),removedColumns:oldCols.filter((x:string)=>!newCols.includes(x)),unchangedColumns:oldCols.filter((x:string)=>newCols.includes(x))}});
  }
  if(sub==="versions"&&req.method==="POST"){
-  if(!allowed(m.role))return json({error:"You do not have permission to upload a dataset version."},403);
+  if(!ownerOnly(m.role))return ownerRequired();
   let form:FormData;try{form=await req.formData();}catch{return json({error:"Choose a CSV file for the new version."},400);}
   const file=form.get("file"),note=typeof form.get("changeNote")==="string"?(form.get("changeNote") as string).trim():"Source file updated";
   if(!(file instanceof File)||!file.size||!file.name.toLowerCase().endsWith(".csv"))return json({error:"Choose a valid CSV file."},400);
@@ -254,7 +257,7 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
   return json({error:"Use the version-specific restore endpoint after migration is complete."},501);
  }
  if(sub.startsWith("versions/")&&sub.endsWith("/restore")&&req.method==="POST"){
-  if(!allowed(m.role))return json({error:"You do not have permission to restore dataset versions."},403);
+  if(!ownerOnly(m.role))return ownerRequired();
   const version=Number(sub.split("/")[1]);if(!Number.isInteger(version)||version<1)return json({error:"Invalid version number."},400);
   const source=await env.DB.prepare("SELECT * FROM dataset_versions WHERE dataset_id=? AND version_number=?").bind(datasetId,version).first<any>();
   if(!source)return json({error:"Version not found."},404);
