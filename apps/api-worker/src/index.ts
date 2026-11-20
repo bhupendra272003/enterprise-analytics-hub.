@@ -54,7 +54,8 @@ const sessionCookie = (value: string, maxAge: number) =>
 const clearSessionCookie = () =>
   "hub.sid=; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=0";
 
-const PASSWORD_ITERATIONS = 310000;
+// Cloudflare Workers WebCrypto supports PBKDF2 iteration counts up to 100,000.
+const PASSWORD_ITERATIONS = 100000;
 const passwordHash = async (password: string) => {
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
@@ -66,7 +67,7 @@ const verifyPassword = async (password: string, encoded: string) => {
   const [scheme, rounds, saltHex, expectedHex] = encoded.split("$");
   if (scheme !== "pbkdf2-sha256" || !/^\d+$/.test(rounds || "") || !/^[a-f0-9]{32}$/.test(saltHex || "") || !/^[a-f0-9]{64}$/.test(expectedHex || "")) return false;
   const iterations = Number(rounds);
-  if (iterations < 100000 || iterations > 600000) return false;
+  if (iterations !== 100000) return false;
   const salt = new Uint8Array(saltHex.match(/.{2}/g)!.map(v => parseInt(v, 16)));
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
   const bits = new Uint8Array(await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations }, key, 256));
