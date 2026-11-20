@@ -76,7 +76,7 @@ export default function TeamPage() {
 
   return <main className="team-shell">
     <aside className="team-sidebar">
-      <a className="brand" href="/workspace"><span className="brand-mark">N</span><span>NEXUS<span className="brand-light"> ANALYTICS</span></span></a>
+      <a className="brand" href="/workspace"><span className="brand-mark">V</span><span>VYRON<span className="brand-light"> ANALYTICS</span></span></a>
       <div className="side-label">WORKSPACE</div>
       <a className="side-link" href="/workspace"><span>▦</span> Overview</a>
       <a className="side-link selected" href="/workspace/team"><span>♧</span> Team & access</a>
@@ -89,7 +89,7 @@ export default function TeamPage() {
     </aside>
 
     <section className="team-main">
-      <header className="team-header"><div><span className="breadcrumb">NEXUS / WORKSPACE /</span><b> TEAM & ACCESS</b></div><a href="/workspace" className="back-link">← Overview</a></header>
+      <header className="team-header"><div><span className="breadcrumb">VYRON / WORKSPACE /</span><b> TEAM & ACCESS</b></div><a href="/workspace" className="back-link">← Overview</a></header>
       <div className="team-content">
         <div className="team-heading"><div><div className="eyebrow"><span/> PEOPLE & PERMISSIONS</div><h1>Build your <em>team.</em></h1><p>Bring the right people into the right workspace, with access that makes sense.</p></div><button className="primary-action" onClick={() => setShowCreate(v => !v)}>＋ New organization</button></div>
 
@@ -111,7 +111,7 @@ export default function TeamPage() {
           </section>
 
           <section className="panel invite-panel"><div className="panel-title"><div><small>GROW YOUR TEAM</small><h2>Invite a member</h2></div><span className="invite-icon">↗</span></div>
-            {canInvite ? <form onSubmit={sendInvite}><label>MEMBER EMAIL<input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="colleague@company.com" required/></label><label>ASSIGN ROLE<select value={role} onChange={e => setRole(e.target.value)}><option value="MANAGER">Manager</option><option value="ANALYST">Analyst</option><option value="VIEWER">Viewer</option><option value="ADMIN">Admin</option></select></label><div className="role-hint"><b>{role}</b><span>{role === 'ADMIN' ? 'Can manage members and organization settings.' : role === 'MANAGER' ? 'Can coordinate projects and assignments.' : role === 'ANALYST' ? 'Can work with assigned data and analysis.' : 'Can view resources shared with them.'}</span></div><button className="primary-action full-action" disabled={busy}>{busy ? 'Creating invitation…' : 'Generate invitation ↗'}</button></form> : <div className="permission-state"><span>⌑</span><b>Manager access required</b><p>Only organization owners and admins can create member invitations. Select a workspace where you have the right permissions.</p></div>}
+            {canInvite ? <form onSubmit={sendInvite}><label>MEMBER EMAIL<input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="colleague@company.com" required/></label><label>ASSIGN ROLE<select value={role} onChange={e => setRole(e.target.value)}><option value="MANAGER">Team Leader</option><option value="ANALYST">Analyst</option><option value="VIEWER">Viewer</option><option value="ADMIN">Admin</option></select></label><div className="role-hint"><b>{role}</b><span>{role === 'ADMIN' ? 'Can manage members and organization settings.' : role === 'MANAGER' ? 'Can coordinate projects, assign tasks and guide analysts.' : role === 'ANALYST' ? 'Can work with assigned data and analysis.' : 'Can view resources shared with them.'}</span></div><button className="primary-action full-action" disabled={busy}>{busy ? 'Creating invitation…' : 'Generate invitation ↗'}</button></form> : <div className="permission-state"><span>⌑</span><b>Manager access required</b><p>Only organization owners and admins can create member invitations. Select a workspace where you have the right permissions.</p></div>}
             {inviteUrl && <div className="invite-result"><small>ONE-TIME INVITATION LINK</small><div className="invite-url">{inviteUrl}</div><button onClick={copyInvite}>Copy link</button><p>Expires in 7 days. Share privately with the invited email address.</p></div>}
           </section>
         </div>
@@ -119,7 +119,7 @@ export default function TeamPage() {
         {notice && <div className="team-notice" role="status"><span>✳</span>{notice}</div>}
         <div className="security-note"><span>⌑</span><div><b>Access is enforced server-side</b><small>Changing a visible role or URL does not grant permissions. Every organization action is checked by the API.</small></div></div>
       </div>
-      <footer className="team-footer"><span>© 2026 NEXUS ANALYTICS</span><span>PEOPLE • PERMISSIONS • PROGRESS</span></footer>
+      <footer className="team-footer"><span>© 2026 VYRON ANALYTICS</span><span>PEOPLE • PERMISSIONS • PROGRESS</span></footer>
     </section>
   </main>;
 }
