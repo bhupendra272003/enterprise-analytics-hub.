@@ -33,7 +33,8 @@ async function proxy(request: Request, context: { params: Promise<{ path: string
 
   try {
     return await api.fetch(new Request(target, request));
-  } catch {
-    return Response.json({ error: "NEXUS API service request failed." }, { status: 502 });
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    return Response.json({ error: "NEXUS API service request failed.", diagnostic: detail.slice(0, 240) }, { status: 502 });
   }
 }
