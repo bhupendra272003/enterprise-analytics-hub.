@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 const API = process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:4000');
 
 type Profile = {
-  user: { id: string; fullName: string; email: string; status: string };
+  user: { id: string; fullName: string; email: string; status: string; platformRole?: string };
   organizations: { organizationId: string; organizationName: string; role: string }[];
 };
 
@@ -56,11 +56,11 @@ export default function Workspace() {
     </header>
     {profile ? <section className="workspace-content">
       <div className="eyebrow"><span /> SECURE WORKSPACE</div>
-      <p className="welcome-label">YOUR ORGANIZATION</p>
+      <p className="welcome-label">{profile.user.platformRole === "SUPER_ADMIN" ? "FOUNDER · PLATFORM CONTROL" : "YOUR WORKSPACE"}</p>
       <h1>Welcome, <em>{profile.user.fullName.split(' ')[0]}.</em></h1>
       <p className="workspace-intro">Your NEXUS workspace is ready. Your access is governed by your organization role.</p>
       <div className="workspace-grid">
-        <article className="workspace-card"><small>ACCOUNT STATUS</small><strong>{profile.user.status}</strong><span>Identity verification state</span></article>
+        <article className="workspace-card"><small>PLATFORM ROLE</small><strong>{profile.user.platformRole === "SUPER_ADMIN" ? "SUPER ADMIN" : "MEMBER"}</strong><span>{profile.user.platformRole === "SUPER_ADMIN" ? "Founder-level platform access" : "Standard platform access"}</span></article>
         <article className="workspace-card"><small>ORGANIZATIONS</small><strong>{profile.organizations.length}</strong><span>Active organization memberships</span></article>
         <article className="workspace-card"><small>WORK EMAIL</small><strong className="email-value">{profile.user.email}</strong><span>Signed-in account</span></article>
       </div>
