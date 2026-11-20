@@ -32,8 +32,9 @@ export default function Home() {
         setMode('login');
         setPassword('');
       }
-    } catch {
-      setNotice('Unable to connect to NEXUS. Check the API URL and try again.');
+    } catch (error) {
+      const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+      setNotice(`Connection diagnostic: ${detail}. API: ${API || '(empty API URL)'}`);
     } finally {
       setBusy(false);
     }
