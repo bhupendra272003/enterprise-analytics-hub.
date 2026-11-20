@@ -47,19 +47,19 @@ export default function Home() {
     try {
       const r = await fetch(`${API}/api/auth/resend-verification`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', 'X-Hub-Request': '1' }, body: JSON.stringify({ email }) });
       const d = await r.json(); setNotice(d.message || d.error || 'Request completed.'); setVerificationUrl(d.verificationUrl || '');
-    } catch { setNotice('Unable to connect to NEXUS.'); } finally { setBusy(false); }
+    } catch { setNotice('Unable to connect to VYRON.'); } finally { setBusy(false); }
   }
 
   return (
     <main className="shell">
       <nav className="topbar">
-        <a className="brand" href="#"><span className="brand-mark">N</span><span>NEXUS<span className="brand-light"> ANALYTICS</span></span></a>
+        <a className="brand" href="#"><span className="brand-mark">V</span><span>VYRON<span className="brand-light"> ANALYTICS</span></span></a>
         <div className="top-meta"><span className="status-dot" /> SECURE WORKSPACE <span className="top-divider" /> V 0.1</div>
       </nav>
 
       <section className="hero">
         <div className="hero-copy">
-          <div className="eyebrow"><span /> THE ENTERPRISE ANALYTICS HUB</div>
+          <div className="eyebrow"><span /> THE ENTERPRISE INTELLIGENCE PLATFORM</div>
           <h1>Turn complex data<br />into <em>clear direction.</em></h1>
           <p className="intro">A connected workspace for teams to organize projects, prepare trusted data and turn analysis into decisions.</p>
           <div className="feature-list">
@@ -74,7 +74,7 @@ export default function Home() {
           <div className="auth-card">
             <div className="card-kicker">YOUR WORKSPACE AWAITS</div>
             <h2>{mode === 'login' ? 'Welcome back.' : 'Create your account.'}</h2>
-            <p className="card-sub">{mode === 'login' ? 'Sign in to continue to your organization.' : 'Join NEXUS. Your access will be reviewed.'}</p>
+            <p className="card-sub">{mode === 'login' ? 'Sign in to continue to your organization.' : 'Join VYRON. Your access will be reviewed.'}</p>
             <div className="tabs">
               <button className={mode === 'login' ? 'active' : ''} onClick={() => { setMode('login'); setNotice(''); }}>Sign in</button>
               <button className={mode === 'register' ? 'active' : ''} onClick={() => { setMode('register'); setNotice(''); }}>Create account</button>
@@ -83,7 +83,7 @@ export default function Home() {
               {mode === 'register' && <label>FULL NAME<input value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Your full name" minLength={2} maxLength={120} required /></label>}
               <label>WORK EMAIL<input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="name@company.com" autoComplete="email" required /></label>
               <label>PASSWORD<input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="At least 12 characters" minLength={12} maxLength={128} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} required /></label>
-              <button className="submit" type="submit" disabled={busy}>{busy ? 'Please wait…' : mode === 'login' ? 'Sign in to NEXUS' : 'Submit registration'} <span>↗</span></button>
+              <button className="submit" type="submit" disabled={busy}>{busy ? 'Please wait…' : mode === 'login' ? 'Sign in to VYRON' : 'Submit registration'} <span>↗</span></button>
             </form>
             {notice && <div className="notice" role="status">{notice}</div>}
             {verificationUrl && <a className="auth-action-link" href={verificationUrl}>Verify email ↗</a>}
@@ -93,7 +93,7 @@ export default function Home() {
           <div className="auth-bottom"><span>NEED AN INVITATION?</span><span>Ask your organization manager.</span></div>
         </div>
       </section>
-      <footer><span>© 2026 NEXUS ANALYTICS</span><span>DATA • PEOPLE • PROGRESS</span><span>DESIGNED FOR BETTER DECISIONS</span></footer>
+      <footer><span>© 2026 VYRON ANALYTICS</span><span>DATA • PEOPLE • PROGRESS</span><span>DESIGNED FOR BETTER DECISIONS</span></footer>
     </main>
   );
 }
