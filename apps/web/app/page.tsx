@@ -2,7 +2,8 @@
 
 import { FormEvent, useState } from 'react';
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:4000');
+// Production requests use the same-origin Next.js rewrite to avoid browser CORS.
+const API = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:4000';
 
 export default function Home() {
   const [mode, setMode] = useState<'login' | 'register'>('login');
