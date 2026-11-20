@@ -45,11 +45,21 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           FRONTEND_URL: ${{ steps.frontend.outputs.url }}
+          MAIL_API_KEY: ${{ secrets.MAIL_API_KEY }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
         run: |
           set -euo pipefail
           npm install
           npx wrangler d1 migrations apply nexus-analytics --remote
           npx wrangler deploy --var "APP_ORIGIN:$FRONTEND_URL" 2>&1 | tee deploy.log
+          # Provision email secrets on every deployment when repository secrets exist.
+          if [ -n "${MAIL_API_KEY:-}" ] && [ -n "${MAIL_FROM:-}" ]; then
+            printf %s "$MAIL_API_KEY" | npx wrangler secret put MAIL_API_KEY
+            printf %s "$MAIL_FROM" | npx wrangler secret put MAIL_FROM
+            echo "Email delivery secrets were provisioned."
+          else
+            echo "::warning::MAIL_API_KEY / MAIL_FROM GitHub repository secrets are missing; signup email delivery will remain disabled."
+          fi
           url=$(grep -Eo 'https://[A-Za-z0-9.-]+[.]workers[.]dev' deploy.log | tail -n1)
           test -n "$url" || { echo "::error::Could not detect the API workers.dev URL"; exit 1; }
           echo "url=$url" >> "$GITHUB_OUTPUT"
