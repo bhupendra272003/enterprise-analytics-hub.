@@ -14,6 +14,7 @@ export default function TeamPage() {
   const [slug, setSlug] = useState('');
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('ANALYST');
+  const [industry, setIndustry] = useState('BFSI');
   const [inviteUrl, setInviteUrl] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
@@ -46,7 +47,7 @@ export default function TeamPage() {
     event.preventDefault(); setBusy(true); setNotice('');
     try {
       const cleanSlug = (slug || name).toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-      const data = await request('/api/organizations', { method: 'POST', body: JSON.stringify({ name, slug: cleanSlug }) });
+      const data = await request('/api/organizations', { method: 'POST', body: JSON.stringify({ name, slug: cleanSlug, industry }) });
       setOrgs(current => [...current, data.organization]);
       setSelected(data.organization.id); setName(''); setSlug(''); setShowCreate(false);
       setNotice('Organization created. You are its owner.');
@@ -100,7 +101,7 @@ export default function TeamPage() {
 
         {showCreate && <form className="panel create-panel" onSubmit={createOrganization}>
           <div className="panel-title"><div><small>START A NEW WORKSPACE</small><h2>Create organization</h2></div><button type="button" className="close-button" onClick={() => setShowCreate(false)}>×</button></div>
-          <div className="form-grid"><label>ORGANIZATION NAME<input value={name} onChange={e => { setName(e.target.value); if (!slug) setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')); }} placeholder="e.g. Northstar Analytics" required minLength={2}/></label><label>WORKSPACE SLUG<input value={slug} onChange={e => setSlug(e.target.value)} placeholder="northstar-analytics" required pattern="[a-z0-9-]{3,180}"/></label></div>
+          <div className="form-grid"><label>INDUSTRY / BUSINESS DOMAIN<select value={industry} onChange={e => setIndustry(e.target.value)} required><option value="BFSI">BFSI · Banking, Finance & Insurance</option><option value="ECOMMERCE">E-commerce</option><option value="LOGISTICS">Logistics & Supply Chain</option><option value="HOTELS">Hotels & Hospitality</option></select></label><label>ORGANIZATION NAME<input value={name} onChange={e => { setName(e.target.value); if (!slug) setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')); }} placeholder="e.g. Northstar Analytics" required minLength={2}/></label><label>WORKSPACE SLUG<input value={slug} onChange={e => setSlug(e.target.value)} placeholder="northstar-analytics" required pattern="[a-z0-9-]{3,180}"/></label></div>
           <button className="primary-action" disabled={busy}>{busy ? 'Creating…' : 'Create workspace ↗'}</button>
         </form>}
 
