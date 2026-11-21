@@ -1,7 +1,7 @@
 -- Vyron governance foundation: four roles, teams, contribution events and Owner generator controls.
 -- Review legacy-role mapping before applying to a populated production database.
--- Legacy ADMIN maps to MANAGER (administrative power is removed); VIEWER maps to ANALYST
--- only after the organization Owner reviews the member's new access. Back up first.
+-- Legacy ADMIN and VIEWER both map to MANAGER, the least-privilege read-only role.
+-- The Owner can explicitly promote a reviewed member to LEADER or ANALYST later. Back up first.
 
 UPDATE memberships SET role='MANAGER' WHERE role='ADMIN';
 UPDATE memberships SET role='MANAGER' WHERE role='VIEWER';
