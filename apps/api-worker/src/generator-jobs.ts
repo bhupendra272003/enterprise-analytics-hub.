@@ -21,11 +21,13 @@ function makeRow(industry:string,index:number,seed:string){
  const booking=fmtDate(r,start,end),checkIn=fmtDate(r,new Date(booking+"T00:00:00Z").getTime(),end),nights=1+Math.floor(r()*12),checkOut=new Date(new Date(checkIn+"T00:00:00Z").getTime()+nights*86400000).toISOString().slice(0,10);
  return [id("BKG"),"GST-"+(10000+Math.floor(r()*90000)),booking,checkIn,checkOut,pick(r,["STANDARD","DELUXE","SUITE","FAMILY"]),nights,pick(r,["WEBSITE","OTA","WALK_IN","CORPORATE"]),(1500+Math.floor(r()*25000))*nights,pick(r,["CONFIRMED","CONFIRMED","CHECKED_IN","CANCELLED","CHECKED_OUT"])];
 }
-async function finalize(job:any,env:Env,schema:any){
+async function finalize(job:any,env:Env,schema:any,recovering=false){
  // Claim publication in D1 before writing the dataset. Cancellation is blocked
  // while this marker exists, so a cancelled job can never publish afterwards.
- const claim=await env.DB.prepare("UPDATE generation_jobs SET result_json='__VYRON_PUBLISHING__',updated_at=CURRENT_TIMESTAMP WHERE id=? AND status IN ('QUEUED','RUNNING') AND generated_rows>=requested_rows AND result_json IS NULL").bind(job.id).run();
- if(!claim.meta.changes)return;
+ if(!recovering){
+  const claim=await env.DB.prepare("UPDATE generation_jobs SET result_json='__VYRON_PUBLISHING__',updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='RUNNING' AND generated_rows>=requested_rows AND result_json IS NULL").bind(job.id).run();
+  if(!claim.meta.changes)return;
+ }
  const chunks=Math.ceil(job.requested_rows/BATCH_ROWS),parts:string[]=[];
  for(let i=0;i<chunks;i++){const part=await env.DATASETS.get("generation:"+job.id+":chunk:"+i,"text");if(part===null)throw new Error("GENERATION_CHUNK_MISSING");parts.push(part);}
  const header=schema.columns.map(csv).join(",");
@@ -46,8 +48,10 @@ async function finalize(job:any,env:Env,schema:any){
 }
 async function process(jobId:string,env:Env){
  const job=await env.DB.prepare("SELECT * FROM generation_jobs WHERE id=?").bind(jobId).first<any>();
- if(!job)return;if(job.status==="CANCELLED"){await clearChunks(env,job);return;}if(["COMPLETED","FAILED","PAUSED"].includes(job.status)||job.result_json==="__VYRON_PUBLISHING__")return;
+ if(!job)return;if(job.status==="CANCELLED"){await clearChunks(env,job);return;}if(["COMPLETED","FAILED","PAUSED"].includes(job.status))return;
  const schema=schemas[job.industry];if(!schema)throw new Error("UNSUPPORTED_INDUSTRY");
+ // Queue redelivery after an isolate crash must resume publication, not ack a permanently locked job.
+ if(job.result_json==="__VYRON_PUBLISHING__"){await finalize(job,env,schema,true);return;}
  const context=await env.DB.prepare("SELECT o.industry,EXISTS(SELECT 1 FROM projects p WHERE p.id=? AND p.organization_id=o.id AND p.status IN ('ACTIVE','PLANNING')) AS project_active,EXISTS(SELECT 1 FROM teams t WHERE t.id=? AND t.organization_id=o.id AND t.status='ACTIVE' AND EXISTS (SELECT 1 FROM memberships lm WHERE lm.organization_id=o.id AND lm.user_id=t.leader_user_id AND lm.role='LEADER' AND lm.membership_status='ACTIVE') AND EXISTS (SELECT 1 FROM team_members tm JOIN memberships am ON am.user_id=tm.user_id AND am.organization_id=o.id WHERE tm.team_id=t.id AND am.role='ANALYST' AND am.membership_status='ACTIVE')) AS team_active FROM organizations o WHERE o.id=?").bind(job.project_id,job.team_id,job.organization_id).first<any>();
  if(!context||context.industry!==job.industry||!context.project_active||!context.team_active){await env.DB.prepare("UPDATE generation_jobs SET status='FAILED',error_message='Generation stopped because its linked project or team no longer has an active Leader and Analyst.',completed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status NOT IN ('COMPLETED','CANCELLED')").bind(job.id).run();await clearChunks(env,job);return;}
  if(job.generated_rows>=job.requested_rows){await finalize(job,env,schema);return;}
