@@ -2,7 +2,7 @@
 import {useEffect,useMemo,useState} from 'react';
 const API=process.env.NEXT_PUBLIC_API_URL??(process.env.NODE_ENV==='production'?'':'http://localhost:4000');
 type Org={id:string;name:string;role:string};
-type Member={userId:string;fullName:string;role:string;assignedTasks:number;completedTasks:number;blockedTasks:number;overdueTasks:number;onTimeTasks:number};
+type Member={userId:string;fullName:string;role:string;assignedTasks:number;completedTasks:number;blockedTasks:number;overdueTasks:number;onTimeTasks:number;assignmentEvents:number;distinctTasksAssigned:number;tasks:{id:string;title:string;status:string;priority:string;dueDate:string|null;assignedByName:string|null}[]};
 type Team={id:string;name:string;leaderId:string|null;leaderName:string|null;memberCount:number;taskCount:number;completedTasks:number;overdueTasks:number;members:Member[];leaderWork:Record<string,number>;allocationSignals:string[]};
 async function call(path:string){const r=await fetch(API+path,{credentials:'include',headers:{'X-Hub-Request':'1'}});const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not load performance.');return d;}
 export default function PerformancePage(){
