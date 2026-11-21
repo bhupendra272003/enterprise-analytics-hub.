@@ -21,13 +21,15 @@ router.get('/organizations/:orgId/teams',async(req,res,next)=>{
     else if(!['OWNER','MANAGER'].includes(role))return res.status(403).json({error:'Insufficient permissions.'});
     sql+=' ORDER BY t.name';
     const [teams]=await pool.execute(sql,params);
-    const [roster]=await pool.execute(
-      `SELECT tm.team_id AS teamId,u.id AS userId,u.full_name AS fullName,m.role
+    let rosterSql=`SELECT tm.team_id AS teamId,u.id AS userId,u.full_name AS fullName,m.role
        FROM team_members tm JOIN teams t ON t.id=tm.team_id JOIN users u ON u.id=tm.user_id
        JOIN memberships m ON m.organization_id=t.organization_id AND m.user_id=u.id
-       WHERE t.organization_id=? AND m.membership_status='ACTIVE' ORDER BY u.full_name`,
-      [req.params.orgId]
-    );
+       WHERE t.organization_id=? AND m.membership_status='ACTIVE'`;
+    const rosterParams=[req.params.orgId];
+    if(role==='LEADER') {rosterSql+=' AND t.leader_user_id=?';rosterParams.push(req.user.id);}
+    if(role==='ANALYST') {rosterSql+=' AND tm.user_id=?';rosterParams.push(req.user.id);}
+    rosterSql+=' ORDER BY u.full_name';
+    const [roster]=await pool.execute(rosterSql,rosterParams);
     res.json({teams:teams.map(t=>({...t,members:roster.filter(m=>m.teamId===t.id)}))});
   }catch(e){next(e);}
 });
