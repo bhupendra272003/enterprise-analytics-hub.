@@ -47,7 +47,7 @@ export default function Home() {
     try {
       const r = await fetch(`${API}/api/auth/resend-verification`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', 'X-Hub-Request': '1' }, body: JSON.stringify({ email }) });
       const d = await r.json(); setNotice(d.message || d.error || 'Request completed.'); setVerificationUrl(d.verificationUrl || '');
-    } catch { setNotice('Unable to connect to BHUPENDRA'S VYRON.'); } finally { setBusy(false); }
+    } catch { setNotice("Unable to connect to BHUPENDRA'S VYRON."); } finally { setBusy(false); }
   }
 
   return (
