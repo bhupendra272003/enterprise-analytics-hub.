@@ -14,7 +14,7 @@ export async function handleDatasetJobs(req:Request,env:Env,path:string):Promise
   if(!ds)return json({error:"Dataset not found."},404);
   const m=await env.DB.prepare("SELECT role FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE'").bind(ds.organization_id,user.id).first<{role:Role}>();
   if(!m||!canRun(m.role))return json({error:"Insufficient organization permissions."},403);
-  if(ds.file_size>262144)return json({error:"Dataset exceeds the current 256 KB background-job safety limit."},413);
+  if(ds.file_size>10*1024*1024)return json({error:"Dataset exceeds the current 10 MiB background-job safety limit."},413);
   let body:any={};try{body=await req.json();}catch{return json({error:"Invalid job request."},400);}
   if(body.type!=="PROFILE")return json({error:"PROFILE is currently the only enabled background job type."},400);
   const id=crypto.randomUUID();
@@ -50,7 +50,7 @@ async function runProfile(msg:Msg,env:Env){
  const job=await env.DB.prepare("SELECT * FROM dataset_jobs WHERE id=?").bind(msg.jobId).first<any>();if(!job||["COMPLETED","FAILED","CANCELLED"].includes(job.status))return;
  const claim=await env.DB.prepare("UPDATE dataset_jobs SET status='RUNNING',stage='LOADING_SOURCE',progress=10,attempt_count=attempt_count+1,started_at=COALESCE(started_at,CURRENT_TIMESTAMP),updated_at=CURRENT_TIMESTAMP WHERE id=? AND status IN ('QUEUED','RETRYING')").bind(job.id).run();if(!claim.meta.changes)return;
  try{
-  const ds=await env.DB.prepare("SELECT name,storage_path,file_size FROM datasets WHERE id=? AND organization_id=?").bind(job.dataset_id,job.organization_id).first<any>();if(!ds)throw new Error("DATASET_NOT_FOUND");if(ds.file_size>262144)throw new Error("DATASET_TOO_LARGE");
+  const ds=await env.DB.prepare("SELECT name,storage_path,file_size FROM datasets WHERE id=? AND organization_id=?").bind(job.dataset_id,job.organization_id).first<any>();if(!ds)throw new Error("DATASET_NOT_FOUND");if(ds.file_size>10*1024*1024)throw new Error("DATASET_TOO_LARGE");
   const source=await env.DATASETS.get(ds.storage_path,"text");if(source===null)throw new Error("SOURCE_FILE_MISSING");
   const {parse}=await import("csv-parse/sync");const rows=parse(source,{columns:true,skip_empty_lines:true,bom:true,trim:true,relax_column_count:false});if(!rows.length)throw new Error("EMPTY_DATASET");
   const columns=Object.keys(rows[0]);if(!columns.length||columns.length>200)throw new Error("INVALID_HEADERS");
