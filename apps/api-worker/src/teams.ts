@@ -93,9 +93,9 @@ export async function handleTeams(req:Request,env:Env,path:string):Promise<Respo
   const task=await env.DB.prepare("SELECT t.id,t.team_id,t.assignee_id,t.status,t.title,p.organization_id FROM tasks t JOIN projects p ON p.id=t.project_id WHERE t.id=?").bind(taskMatch[1]).first<any>();if(!task||!task.team_id)return json({error:"Team task not found."},404);
   const m=await member(env,task.organization_id,user.id);if(!m)return json({error:"Organization membership required."},403);
   const team=await env.DB.prepare("SELECT leader_user_id FROM teams WHERE id=?").bind(task.team_id).first<{leader_user_id:string}>();
-  const canUpdate=(m.role==="OWNER")||(m.role==="LEADER"&&team?.leader_user_id===user.id)||(m.role==="ANALYST"&&task.assignee_id===user.id);
+  const canUpdate=(m.role==="LEADER"&&team?.leader_user_id===user.id&&task.assignee_id===user.id)||(m.role==="ANALYST"&&task.assignee_id===user.id);
   if(!canUpdate)return json({error:"You can update only your assigned work or work in your own team."},403);
-  if(m.role==="OWNER"||m.role==="LEADER"&&team?.leader_user_id===user.id){return json({error:"Owners and Leaders review team work; only the assigned contributor updates task progress."},403);}
+  if(!canUpdate)return json({error:"Only the assigned Analyst or a Leader working on their own task can update progress."},403);
   const completedAt=body.status==="DONE"?"CURRENT_TIMESTAMP":"NULL";
   await env.DB.prepare("UPDATE tasks SET status=?,completed_at="+completedAt+",updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(body.status,task.id).run();
   const eventType=body.status==="IN_PROGRESS"?"TASK_STARTED":body.status==="BLOCKED"?"TASK_BLOCKED":body.status==="DONE"?"TASK_SUBMITTED":"TASK_STATUS_CHANGED";
