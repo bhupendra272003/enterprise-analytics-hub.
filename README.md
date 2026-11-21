@@ -19,7 +19,8 @@ Vyron is a governed, multi-industry analytics workspace designed to connect data
 - `docs/TRAINER_PROPOSAL.md`: trainer-ready project explanation and approval questions
 - `docs/ROLE_GOVERNANCE.md`: organization roles, trainer access options and approval gates
 - `docs/INDUSTRY_DATA_CATALOG.md`: proposed industry datasets and business questions
-- `docs/DATA_GENERATION_SPEC.md`: safe, configurable synthetic-data generation specification
+- `docs/DATA_GENERATION_SPEC.md`: Owner-controlled synthetic-data generation specification
+- `docs/WORK_PERFORMANCE_SPEC.md`: contribution metrics, fairness and performance visibility
 - `docs/API-TESTING.md`: local API smoke-test sequence
 - `docs/DEPLOYMENT.md`: production hosting and environment guide
 
@@ -39,7 +40,7 @@ npm run dev
 The API listens on port 4000 by default. Check `http://localhost:4000/health`. Set `DATA_STORAGE_DIR` to a private, persistent disk path for CSV uploads; never place it inside the public web root. The default local path is `apps/api/storage/datasets` when starting from `apps/api`. Install Python 3 for the CSV cleaning engine; set `PYTHON_EXECUTABLE` if the executable is not available as `python` (Windows) or `python3` (Linux/macOS). The cleaning engine uses only Python's standard library.
 
 ### Database migrations
-For an existing database, apply migrations in numeric order from `database/migrations/`. Migrations 001–006 add organization access requests, projects/tasks, dataset metadata, Power BI report links, notifications and email/password tokens; migration 007 adds immutable dataset version history, migration 008 adds persisted validation history, and migration 009 adds persisted anomaly scan history.
+For an existing database, apply migrations in numeric order from `database/migrations/`. Migrations 001–009 add the existing identity, dataset, validation and anomaly foundations. Migration 010 proposes the four-role model, teams, performance events and Owner generator settings/jobs. Back up the database and review legacy role mapping before applying it.
 
 ### 3. Web app
 Copy `apps/web/.env.example` to `apps/web/.env.local`. Set `NEXT_PUBLIC_API_URL=http://localhost:4000`.
@@ -64,7 +65,7 @@ For local development, configure the API `APP_ORIGIN=http://localhost:3000` and 
 ## Team and invitation flow
 - Open `/workspace/team` after signing in.
 - Create an organization; its creator becomes OWNER.
-- OWNER/ADMIN users can generate 7-day invitation links for MANAGER, ANALYST, VIEWER or ADMIN roles.
+- The target role model is OWNER, MANAGER, LEADER and ANALYST only. The current invitation UI/API still needs migration and permission refactoring before the four-role policy is enforced.
 - Pending users can submit an organization-specific access request; OWNER/ADMIN/MANAGER users can view the queue, and OWNER/ADMIN users can approve or reject requests.
 - OWNER/ADMIN/MANAGER users can view the organization member directory.
 - Invitees can accept with an existing account or create an account from the invite link.
@@ -79,7 +80,7 @@ For local development, configure the API `APP_ORIGIN=http://localhost:3000` and 
 - `/workspace/access`: browse organizations and request membership
 - `/workspace/projects`: create projects, add tasks and update task status
 - `/workspace/data`: upload CSV files, inspect metadata, preview 10 rows, run column profiles, clean CSV data with Python, inspect before/after quality scores, define required/type/allowed-value/range/unique rules, validate immutable versions, review issue samples, quality trends, validation pass rates, recurring issue patterns, downloadable validation reports, version-to-version anomaly detection for numeric outliers, missingness spikes, category shifts, row-count changes and duplicate increases, with saved scan history and report replay, upload new versions, compare schema and row-level changes, and restore prior versions as a new version
-- `/workspace/audit`: review organization audit activity (OWNER/ADMIN)
+- `/workspace/audit`: review organization audit activity (legacy API currently OWNER/ADMIN; target access policy must be updated)
 - `/workspace/reports`: manage the organization's Power BI report-link catalog
 - `/workspace/notifications`: review and mark in-app notifications
 - `/verify-email?token=...`: verify an email address
@@ -119,8 +120,12 @@ No participants, teams, trainer accounts or fixed role assignments are pre-creat
 ## Industry and dataset plan
 The proposed starter catalog covers Banking & Finance, Hospital & Healthcare, Logistics & Supply Chain, and Retail & E-commerce. These are templates only; actual pilot industries are subject to approval. Use synthetic or formally approved de-identified data only.
 
-## Volume and scheduled generation
-The planning discussion included 50,000+ initial rows and 10,000+ daily additions. The scope (per industry or total across all industries) is not yet confirmed. No large-volume generator or daily schedule is enabled by this specification. Confirm the volume, storage, cost and load-test results before activation. See [Data Generation Specification](docs/DATA_GENERATION_SPEC.md).
+## Owner-controlled data generation
+There is no scheduled or automatic generation. The target workflow requires the Owner to select approved active industries, set per-dataset and total row caps, review an estimate, and click Generate. Unused industries stay idle. Migration 010 adds configuration/job metadata, but a production background worker, generator implementation, API authorization, UI, durable object storage and load testing are not yet complete. Do not start large jobs until those pieces are verified. See [Data Generation Specification](docs/DATA_GENERATION_SPEC.md).
 
 ## Architecture note
 The repository contains both an Express/MySQL application path and a Cloudflare Worker path using D1, KV and Queues. Verify the authoritative deployed routing and storage path before implementing large-scale generation, shared editing or production data connectors. Do not treat local-disk CSV storage or a Power BI link catalog as production object storage or secure embedded BI.
+
+
+## Target governance and performance model
+The required four roles are OWNER, MANAGER, LEADER and ANALYST. Owner controls sensitive permissions and data generation; Manager views reports and performance; Leader assigns tasks to Analysts in their team; Analyst completes assigned work. Contribution tracking must use transparent task, review and data-quality evidence—not login time or keystrokes. The role migration and event schema are foundations only; API/UI enforcement and reports remain pending. See [Role Governance](docs/ROLE_GOVERNANCE.md) and [Work Performance Specification](docs/WORK_PERFORMANCE_SPEC.md).
