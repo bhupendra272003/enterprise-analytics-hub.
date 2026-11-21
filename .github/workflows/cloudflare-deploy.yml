@@ -9,6 +9,7 @@ on:
       - 'apps/web/app/layout.tsx'
       - 'apps/web/app/globals.css'
       - 'apps/web/app/workspace/**'
+      - 'apps/web/app/**'
       - 'apps/web/app/api/**'
       - 'apps/web/next.config.mjs'
       - 'apps/api-worker/src/index.ts'
