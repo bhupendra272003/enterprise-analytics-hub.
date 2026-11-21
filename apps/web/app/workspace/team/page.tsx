@@ -76,7 +76,7 @@ export default function TeamPage() {
 
   return <main className="team-shell">
     <aside className="team-sidebar">
-      <a className="brand" href="/workspace"><span className="brand-mark">V</span><span>VYRON<span className="brand-light"> ANALYTICS</span></span></a>
+      <a className="brand" href="/workspace"><span className="brand-mark">V</span><span>BHUPENDRA'S VYRON</span></a>
       <div className="side-label">WORKSPACE</div>
       <a className="side-link" href="/workspace"><span>▦</span> Overview</a>
       <a className="side-link selected" href="/workspace/team"><span>♧</span> Team & access</a>
@@ -119,7 +119,7 @@ export default function TeamPage() {
         {notice && <div className="team-notice" role="status"><span>✳</span>{notice}</div>}
         <div className="security-note"><span>⌑</span><div><b>Access is enforced server-side</b><small>Changing a visible role or URL does not grant permissions. Every organization action is checked by the API.</small></div></div>
       </div>
-      <footer className="team-footer"><span>© 2026 VYRON ANALYTICS</span><span>PEOPLE • PERMISSIONS • PROGRESS</span></footer>
+      <footer className="team-footer"><span>© 2026 BHUPENDRA'S VYRON</span><span>PEOPLE • PERMISSIONS • PROGRESS</span></footer>
     </section>
   </main>;
 }
