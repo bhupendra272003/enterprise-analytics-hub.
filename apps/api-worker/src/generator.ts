@@ -65,8 +65,21 @@ export async function handleGenerator(req:Request,env:Env,path:string):Promise<R
     const preview=Array.from({length:Math.min(rows,5)},(_,i)=>rowFor(industry,i,typeof body.seed==="string"?body.seed:"vyron-preview")).map((r:any)=>Object.fromEntries(template.columns.map((k:string,i:number)=>[k,r[i]])));
     return json({industry,datasetKey:template.key,datasetName:template.label,requestedRows:rows,limits:{perDatasetRowCap:settings.per_dataset_row_cap,perJobRowCap:settings.per_job_row_cap,platformHardCap:100000},estimatedBytes:rows*150,estimatedSeconds:Math.max(2,Math.ceil(rows/5000)),preview,association:{projectId:context.project_id,projectName:context.project_name,teamId:context.team_id,teamName:context.team_name},manualConfirmationRequired:true});
    }
+   const idempotencyKey=typeof body.idempotencyKey==="string"?body.idempotencyKey:"";
+   if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(idempotencyKey))return json({error:"A valid idempotency key is required. Please prepare a fresh preview."},400);
+   const existing=await env.DB.prepare("SELECT id,industry,dataset_key AS datasetKey,requested_rows AS requestedRows,project_id AS projectId,team_id AS teamId,status FROM generation_jobs WHERE organization_id=? AND idempotency_key=?").bind(orgId,idempotencyKey).first<any>();
+   if(existing){
+    if(existing.industry!==industry||existing.datasetKey!==template.key||Number(existing.requestedRows)!==rows||existing.projectId!==context.project_id||existing.teamId!==context.team_id)return json({error:"This request key was already used for a different generation request. Prepare a new preview."},409);
+    return json({job:existing,message:"This generation request was already received; no duplicate job was created."},200);
+   }
    const id=crypto.randomUUID(),seed=typeof body.seed==="string"&&body.seed.length<=80?body.seed:crypto.randomUUID();
-   await env.DB.prepare("INSERT INTO generation_jobs (id,organization_id,requested_by,project_id,team_id,industry,dataset_key,requested_rows,seed,status) VALUES (?,?,?,?,?,?,?,?,?,'QUEUED')").bind(id,orgId,user.id,context.project_id,context.team_id,industry,template.key,rows,seed).run();
+   try{
+    await env.DB.prepare("INSERT INTO generation_jobs (id,organization_id,requested_by,project_id,team_id,industry,dataset_key,requested_rows,seed,status,idempotency_key) VALUES (?,?,?,?,?,?,?,?,?,'QUEUED',?)").bind(id,orgId,user.id,context.project_id,context.team_id,industry,template.key,rows,seed,idempotencyKey).run();
+   }catch(error){
+    const raced=await env.DB.prepare("SELECT id,industry,dataset_key AS datasetKey,requested_rows AS requestedRows,project_id AS projectId,team_id AS teamId,status FROM generation_jobs WHERE organization_id=? AND idempotency_key=?").bind(orgId,idempotencyKey).first<any>();
+    if(raced)return json({job:raced,message:"This generation request was already received; no duplicate job was created."},200);
+    throw error;
+   }
    try{await env.GENERATION_JOBS.send({jobId:id});}catch{await env.DB.prepare("UPDATE generation_jobs SET status='FAILED',error_message='The generation queue is unavailable.',completed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(id).run();return json({error:"Generation could not be queued. No data was generated."},503);}
    await env.DB.prepare("INSERT INTO audit_logs (organization_id,actor_user_id,action,target_type,target_id,metadata) VALUES (?,?,?,'GENERATION_JOB',?,?)").bind(orgId,user.id,"SYNTHETIC_GENERATION_STARTED",id,JSON.stringify({industry,datasetKey:template.key,rows})).run();
    return json({job:{id,industry,datasetKey:template.key,requestedRows:rows,status:"QUEUED"},message:"Generation queued after explicit Owner action."},202);
