@@ -43,5 +43,6 @@ Owner and Manager views must expand each team into member rows and each member i
 - Managers and Leaders may add review notes, but only the Owner can change role permissions.
 - Performance reports are internal project evidence, not a definitive measure of a person's ability.
 
-## Implementation status
-Migrations 010–011 add team, assignment-history and correction-request foundations. The current branch adds role-scoped team/performance API routes and Owner/Manager dashboard foundations. Full work-event capture for data cleaning, validation, dashboards and peer review, correction review UI, exhaustive API/UI tests and deployment remain required before production readiness.
+## Implementation status (Cloudflare D1/Worker branch)
+D1 migration 0007 adds teams, one-Leader constraints, task assignment history, work events and correction-request storage. The Worker API records task creation, assignment/reassignment and status changes. Owner/Manager performance endpoint and dashboard show every team, member task metrics, task-by-task details, assignment timelines, Leader assignment counts, unique recipients and Leader-owned/completed tasks. Review signals cover unassigned members, assignment concentration, narrow recipient patterns and Leaders with no recorded owned tasks.
+The fairness indicators are review prompts, not findings; current metrics are task-count based and do not yet model effort, skills, availability or leave. Work-event capture for cleaning, validation, dashboard/BI deliverables and peer review, accepted/revision review workflow, correction request UI, exhaustive integration tests, live D1 migration, deployment and security review remain outstanding.
