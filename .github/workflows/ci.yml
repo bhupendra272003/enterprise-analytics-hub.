@@ -41,6 +41,8 @@ jobs:
           assert not missing, f"Missing D1 tables: {sorted(missing)}"
           task_columns = {row[1] for row in db.execute("PRAGMA table_info(tasks)")}
           assert {"team_id", "assigned_by", "completed_at"} <= task_columns, "Missing team task evidence columns"
+          generation_columns = {row[1] for row in db.execute("PRAGMA table_info(generation_jobs)")}
+          assert {"project_id", "team_id", "requested_rows", "generated_rows"} <= generation_columns, "Generation jobs must retain project/team and row progress"
           membership_sql = db.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='memberships'").fetchone()[0]
           assert all(role in membership_sql for role in ("OWNER", "MANAGER", "LEADER", "ANALYST")), "Four-role membership constraint missing"
           assert not list(db.execute("PRAGMA foreign_key_check")), "D1 foreign key violations detected"
