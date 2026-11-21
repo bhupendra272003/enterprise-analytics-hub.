@@ -52,7 +52,7 @@ async function process(jobId:string,env:Env){
  await env.DATASETS.put("generation:"+job.id+":chunk:"+index,rows.join("\n"));
  const next=start+count;
  const update=await env.DB.prepare("UPDATE generation_jobs SET status='RUNNING',generated_rows=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND generated_rows=? AND status IN ('QUEUED','RUNNING')").bind(next,job.id,start).run();
- if(!update.meta.changes)return;
+ if(!update.meta.changes){const latest=await env.DB.prepare("SELECT status FROM generation_jobs WHERE id=?").bind(job.id).first<{status:string}>();if(latest?.status==="CANCELLED")await clearChunks(env,job);return;}
  if(next>=job.requested_rows){
   const latest=await env.DB.prepare("SELECT * FROM generation_jobs WHERE id=?").bind(job.id).first<any>();
   if(latest?.status!=="CANCELLED")await finalize(latest,env,schema);
