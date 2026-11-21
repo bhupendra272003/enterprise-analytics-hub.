@@ -41,8 +41,8 @@ router.post('/:orgId/request-access', requireAuth, async (req, res, next) => {
       await conn.commit();
     } catch (e) { await conn.rollback(); throw e; } finally { conn.release(); }
     await audit({ orgId: req.params.orgId, actorId: req.user.id, action: 'ACCESS_REQUEST_SUBMITTED', targetType: 'ACCESS_REQUEST', targetId: requestId, ip: req.ip });
-    await notifyOrganizationRoles({ organizationId: req.params.orgId, roles: ['OWNER', 'ADMIN'], type: 'ACCESS_REQUEST', title: 'New access request', message: 'A user requested to join your organization.', href: '/workspace/team' });
-    res.status(201).json({ message: 'Access request submitted. An organization administrator can now review it.' });
+    await notifyOrganizationRoles({ organizationId: req.params.orgId, roles: ['OWNER'], type: 'ACCESS_REQUEST', title: 'New access request', message: 'A user requested to join your organization.', href: '/workspace/team' });
+    res.status(201).json({ message: 'Access request submitted. The organization Owner can now review it.' });
   } catch (err) { next(err); }
 });
 
@@ -84,7 +84,7 @@ router.post('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.get('/:orgId/audit', requireRole('OWNER', 'ADMIN'), async (req, res, next) => {
+router.get('/:orgId/audit', requireRole('OWNER'), async (req, res, next) => {
   try {
     const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 100);
     const [rows] = await pool.execute(
@@ -95,7 +95,7 @@ router.get('/:orgId/audit', requireRole('OWNER', 'ADMIN'), async (req, res, next
   } catch (err) { next(err); }
 });
 
-router.get('/:orgId/members', requireRole('OWNER', 'ADMIN', 'MANAGER'), async (req, res, next) => {
+router.get('/:orgId/members', requireRole('OWNER', 'MANAGER'), async (req, res, next) => {
   try {
     const [rows] = await pool.execute(
       "SELECT u.id, u.full_name AS fullName, u.email, u.account_status AS accountStatus, m.role, m.membership_status AS membershipStatus, m.created_at AS joinedAt FROM memberships m JOIN users u ON u.id = m.user_id WHERE m.organization_id = ? ORDER BY m.created_at DESC",
@@ -110,7 +110,7 @@ router.patch('/:orgId/members/:userId', requireRole('OWNER', 'ADMIN'), async (re
   try {
     if (req.params.userId === req.user.id) return res.status(400).json({ error: 'You cannot change your own membership here.' });
     const input = z.object({
-      role: z.enum(['ADMIN', 'MANAGER', 'ANALYST', 'VIEWER']).optional(),
+      role: z.enum(['MANAGER', 'LEADER', 'ANALYST']).optional(),
       membershipStatus: z.enum(['ACTIVE', 'SUSPENDED']).optional()
     }).refine(v => Object.keys(v).length > 0).parse(req.body);
     const [rows] = await pool.execute(
@@ -119,7 +119,7 @@ router.patch('/:orgId/members/:userId', requireRole('OWNER', 'ADMIN'), async (re
     );
     if (!rows.length) return res.status(404).json({ error: 'Organization member not found.' });
     if (rows[0].role === 'OWNER') return res.status(403).json({ error: 'The organization owner cannot be modified here.' });
-    if (req.membership.role === 'ADMIN' && (rows[0].role === 'ADMIN' || input.role === 'ADMIN')) return res.status(403).json({ error: 'Only the owner can manage administrator roles.' });
+    
     await pool.execute(
       'UPDATE memberships SET role = COALESCE(?, role), membership_status = COALESCE(?, membership_status) WHERE organization_id = ? AND user_id = ?',
       [input.role || null, input.membershipStatus || null, req.params.orgId, req.params.userId]
@@ -142,7 +142,7 @@ router.get('/:orgId/requests', requireRole('OWNER', 'ADMIN', 'MANAGER'), async (
 
 router.patch('/:orgId/requests/:requestId', requireRole('OWNER', 'ADMIN'), async (req, res, next) => {
   try {
-    const input = z.object({ decision: z.enum(['APPROVE', 'REJECT']), role: z.enum(['MANAGER', 'ANALYST', 'VIEWER']).optional() }).parse(req.body);
+    const input = z.object({ decision: z.enum(['APPROVE', 'REJECT']), role: z.enum(['MANAGER', 'LEADER', 'ANALYST']).optional() }).parse(req.body);
     if (input.decision === 'APPROVE' && !input.role) return res.status(400).json({ error: 'Choose a role before approving this request.' });
     const conn = await pool.getConnection();
     let request;
