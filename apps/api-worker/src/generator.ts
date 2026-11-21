@@ -106,7 +106,8 @@ export async function handleGenerator(req:Request,env:Env,path:string):Promise<R
   const job=await env.DB.prepare("SELECT organization_id,status FROM generation_jobs WHERE id=?").bind(jobMatch[1]).first<{organization_id:string;status:string}>();if(!job)return json({error:"Generation job not found."},404);
   const ctx=await ownerContext(req,env,job.organization_id);if(ctx.error)return ctx.error;
   if(["COMPLETED","FAILED","CANCELLED"].includes(job.status))return json({error:"This generation job can no longer be cancelled."},409);
-  await env.DB.prepare("UPDATE generation_jobs SET status='CANCELLED',updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(jobMatch[1]).run();
+  const cancelled=await env.DB.prepare("UPDATE generation_jobs SET status='CANCELLED',updated_at=CURRENT_TIMESTAMP WHERE id=? AND status IN ('PENDING','QUEUED','RUNNING','PAUSED') AND result_json IS NULL").bind(jobMatch[1]).run();
+  if(!cancelled.meta.changes)return json({error:"This job has already entered the publishing stage and can no longer be cancelled. Wait for publication to finish."},409);
   await env.DB.prepare("INSERT INTO audit_logs (organization_id,actor_user_id,action,target_type,target_id) VALUES (?,?,?,'GENERATION_JOB',?)").bind(job.organization_id,ctx.user!.id,"SYNTHETIC_GENERATION_CANCELLED",jobMatch[1]).run();
   return json({message:"Generation cancellation requested."});
  }
