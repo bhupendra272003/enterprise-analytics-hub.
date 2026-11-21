@@ -60,6 +60,8 @@ router.post('/teams/:teamId/members',async(req,res,next)=>{
     if(!owner.length||owner[0].role!=='OWNER')return res.status(403).json({error:'Only the Owner can add or move team members.'});
     const [analyst]=await pool.execute("SELECT id FROM memberships WHERE organization_id=? AND user_id=? AND role='ANALYST' AND membership_status='ACTIVE' LIMIT 1",[team.organization_id,input.userId]);
     if(!analyst.length)return res.status(400).json({error:'Only an active ANALYST can be added to a team.'});
+    const [existing]=await pool.execute('SELECT tm.team_id FROM team_members tm JOIN teams t ON t.id=tm.team_id WHERE t.organization_id=? AND tm.user_id=? LIMIT 1',[team.organization_id,input.userId]);
+    if(existing.length)return res.status(409).json({error:'This Analyst already belongs to a team. Remove them from the current team before moving them.'});
     await pool.execute('INSERT INTO team_members (team_id,user_id,added_by) VALUES (?,?,?)',[team.id,input.userId,req.user.id]);
     await audit({orgId:team.organization_id,actorId:req.user.id,action:'TEAM_MEMBER_ADDED',targetType:'TEAM',targetId:team.id,metadata:{userId:input.userId},ip:req.ip});
     res.status(201).json({message:'Analyst added to team.'});
