@@ -15,6 +15,7 @@ export async function handlePerformance(req:Request,env:Env,path:string):Promise
  const {results:history}=await env.DB.prepare("SELECT h.id,h.team_id AS teamId,h.task_id AS taskId,h.assigned_by AS assignedBy,by_user.full_name AS assignedByName,h.previous_assignee_id AS previousAssigneeId,prev.full_name AS previousAssigneeName,h.new_assignee_id AS newAssigneeId,next.full_name AS newAssigneeName,h.reason,h.created_at AS createdAt FROM task_assignment_history h JOIN teams t ON t.id=h.team_id LEFT JOIN users by_user ON by_user.id=h.assigned_by LEFT JOIN users prev ON prev.id=h.previous_assignee_id JOIN users next ON next.id=h.new_assignee_id WHERE h.organization_id=? ORDER BY h.created_at DESC LIMIT 5000").bind(orgId).all<any>();
  const {results:events}=await env.DB.prepare("SELECT e.id,e.team_id AS teamId,e.task_id AS taskId,e.actor_user_id AS actorId,u.full_name AS actorName,e.event_type AS eventType,e.metadata,e.created_at AS createdAt FROM work_events e JOIN users u ON u.id=e.actor_user_id WHERE e.organization_id=? ORDER BY e.created_at DESC LIMIT 5000").bind(orgId).all<any>();
  const now=Date.now(),due=(v:string|null)=>!!v&&new Date(v+"T23:59:59").getTime()<now;
+ const onTime=(task:any)=>{if(!task.dueDate||!task.completedAt)return false;const completed=Date.parse(task.completedAt.includes("T")?task.completedAt:task.completedAt.replace(" ","T")+"Z");const deadline=Date.parse(task.dueDate+"T23:59:59Z");return Number.isFinite(completed)&&Number.isFinite(deadline)&&completed<=deadline;};
  const byTeam=teams.map(team=>{
   const teamMembers=members.filter(m=>m.teamId===team.id);
   const teamTasks=tasks.filter(t=>t.teamId===team.id);
@@ -23,7 +24,7 @@ export async function handlePerformance(req:Request,env:Env,path:string):Promise
   const memberStats=teamMembers.map(m=>{
    const mine=teamTasks.filter(t=>t.assigneeId===m.userId), completed=mine.filter(t=>t.status==="DONE"), overdue=mine.filter(t=>t.status!=="DONE"&&due(t.dueDate));
    const received=teamHistory.filter(h=>h.newAssigneeId===m.userId);
-   return {...m,assignedTasks:mine.length,completedTasks:completed.length,blockedTasks:mine.filter(t=>t.status==="BLOCKED").length,overdueTasks:overdue.length,onTimeTasks:completed.filter(t=>!due(t.dueDate)).length,assignmentEvents:received.length,distinctTasksAssigned:new Set(received.map(h=>h.taskId)).size,tasks:mine.map(task=>({...task,assignmentHistory:teamHistory.filter(h=>h.taskId===task.id)}))};
+   return {...m,assignedTasks:mine.length,completedTasks:completed.length,blockedTasks:mine.filter(t=>t.status==="BLOCKED").length,overdueTasks:overdue.length,onTimeTasks:completed.filter(onTime).length,assignmentEvents:received.length,distinctTasksAssigned:new Set(received.map(h=>h.taskId)).size,tasks:mine.map(task=>({...task,assignmentHistory:teamHistory.filter(h=>h.taskId===task.id)}))};
   });
   const leaderAssignments=teamHistory.filter(h=>h.assignedBy===team.leaderId);
   const leaderOwnTasks=teamTasks.filter(t=>t.assigneeId===team.leaderId);
