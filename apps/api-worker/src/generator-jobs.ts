@@ -1,6 +1,6 @@
 type Msg={jobId:string};
 type Env={DB:D1Database;DATASETS:KVNamespace;GENERATION_JOBS:Queue<Msg>};
-const BATCH_ROWS=1000,MAX_FILE_BYTES=20*1024*1024;
+const BATCH_ROWS=1000,MAX_FILE_BYTES=10*1024*1024;
 const schemas:any={
  BFSI:{name:"Synthetic Banking Transactions",filename:"synthetic_transactions.csv",columns:["transaction_id","account_id","transaction_date","amount","transaction_type","channel","status","branch_id","city"]},
  ECOMMERCE:{name:"Synthetic E-commerce Orders",filename:"synthetic_orders.csv",columns:["order_id","customer_id","order_date","product_id","quantity","unit_price","discount_pct","payment_method","status","city"]},
@@ -26,7 +26,7 @@ async function finalize(job:any,env:Env,schema:any){
  const header=schema.columns.map(csv).join(",");
  const content=header+"\n"+parts.join("\n");
  const bytes=new TextEncoder().encode(content).byteLength;
- if(bytes>MAX_FILE_BYTES){await env.DB.prepare("UPDATE generation_jobs SET status='FAILED',error_message='Generated CSV exceeded the 20 MiB safe file limit. Reduce the requested row count and try again.',completed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(job.id).run();return;}
+ if(bytes>MAX_FILE_BYTES){await env.DB.prepare("UPDATE generation_jobs SET status='FAILED',error_message='Generated CSV exceeded the 10 MiB safe file limit. Reduce the requested row count and try again.',completed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(job.id).run();return;}
  const datasetId=job.id,storagePath="datasets/"+job.organization_id+"/"+datasetId+"/v1.csv";
  await env.DATASETS.put(storagePath,content,{metadata:{organizationId:job.organization_id,datasetId,rowCount:job.requested_rows,synthetic:true}});
  const preview=Array.from({length:Math.min(5,job.requested_rows)},(_,i)=>Object.fromEntries(schema.columns.map((key:string,j:number)=>[key,makeRow(job.industry,i,job.seed)[j]])));
