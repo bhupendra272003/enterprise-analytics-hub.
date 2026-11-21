@@ -74,6 +74,17 @@ router.get('/organizations/:orgId/performance', async (req, res, next) => {
        FROM task_assignment_history WHERE organization_id=? GROUP BY team_id,assigned_by`,
       [req.params.orgId]
     );
+    const [teamTasks] = await pool.execute(
+      `SELECT tk.id,tk.team_id AS teamId,tk.title,tk.status,tk.priority,tk.due_date AS dueDate,
+        tk.assignee_id AS assigneeId,assignee.full_name AS assigneeName,
+        tk.assigned_by AS assignedBy,assigner.full_name AS assignedByName,tk.created_at AS createdAt
+       FROM tasks tk JOIN projects p ON p.id=tk.project_id
+       LEFT JOIN users assignee ON assignee.id=tk.assignee_id
+       LEFT JOIN users assigner ON assigner.id=tk.assigned_by
+       WHERE p.organization_id=? AND tk.team_id IS NOT NULL
+       ORDER BY tk.due_date IS NULL,tk.due_date,tk.created_at DESC`,
+      [req.params.orgId]
+    );
     const teamReports = teams.map(team => {
       const roster = members.filter(member => member.teamId === team.id).map(member => ({...member,...(allocationHistory.find(row=>row.teamId===team.id&&row.userId===member.userId)||{assignmentEvents:0,distinctTasksAssigned:0,distinctAssigners:0,lastAssignedAt:null})}));
       const counts = roster.map(member => Number(member.assignedTasks));
@@ -87,7 +98,7 @@ router.get('/organizations/:orgId/performance', async (req, res, next) => {
       if (roster.length > 1 && historyCounts.some(value=>value===0) && Math.max(...historyCounts)>0) signals.push('POSSIBLE_ASSIGNMENT_EXCLUSION');
       if (roster.length > 1 && Math.min(...historyCounts)>0 && Math.max(...historyCounts)>=Math.min(...historyCounts)*2 && Math.max(...historyCounts)-Math.min(...historyCounts)>=2) signals.push('ASSIGNMENT_HISTORY_IMBALANCE');
       if (Number(leader.tasksAssignedByLeader || 0) > 0 && Number(leader.tasksPersonallyOwnedByLeader || 0) === 0) signals.push('LEADER_HAS_NO_PERSONAL_TASK_OWNERSHIP');
-      return { ...team, members: roster, leaderWork: leader, allocationSignals: signals };
+      return { ...team, members: roster.map(member=>({...member,tasks:teamTasks.filter(task=>task.teamId===team.id&&task.assigneeId===member.userId)})), unassignedTasks:teamTasks.filter(task=>task.teamId===team.id&&!task.assigneeId), leaderWork: leader, allocationSignals: signals };
     });
     res.json({ teams: teamReports, methodology: {
       note: 'Signals are prompts for human review, not proof of favoritism or misconduct. Compare task complexity, availability, leave, skills and agreed workload before drawing conclusions.',
