@@ -106,7 +106,7 @@ router.get('/:orgId/members', requireRole('OWNER', 'MANAGER'), async (req, res, 
 });
 
 
-router.patch('/:orgId/members/:userId', requireRole('OWNER', 'ADMIN'), async (req, res, next) => {
+router.patch('/:orgId/members/:userId', requireRole('OWNER'), async (req, res, next) => {
   try {
     if (req.params.userId === req.user.id) return res.status(400).json({ error: 'You cannot change your own membership here.' });
     const input = z.object({
@@ -130,7 +130,7 @@ router.patch('/:orgId/members/:userId', requireRole('OWNER', 'ADMIN'), async (re
   } catch (err) { next(err); }
 });
 
-router.get('/:orgId/requests', requireRole('OWNER', 'ADMIN', 'MANAGER'), async (req, res, next) => {
+router.get('/:orgId/requests', requireRole('OWNER'), async (req, res, next) => {
   try {
     const [rows] = await pool.execute(
       "SELECT r.id, r.status, r.created_at AS requestedAt, u.id AS userId, u.full_name AS fullName, u.email FROM organization_access_requests r JOIN users u ON u.id = r.user_id WHERE r.organization_id = ? AND r.status = 'PENDING' ORDER BY r.created_at ASC",
@@ -140,7 +140,7 @@ router.get('/:orgId/requests', requireRole('OWNER', 'ADMIN', 'MANAGER'), async (
   } catch (err) { next(err); }
 });
 
-router.patch('/:orgId/requests/:requestId', requireRole('OWNER', 'ADMIN'), async (req, res, next) => {
+router.patch('/:orgId/requests/:requestId', requireRole('OWNER'), async (req, res, next) => {
   try {
     const input = z.object({ decision: z.enum(['APPROVE', 'REJECT']), role: z.enum(['MANAGER', 'LEADER', 'ANALYST']).optional() }).parse(req.body);
     if (input.decision === 'APPROVE' && !input.role) return res.status(400).json({ error: 'Choose a role before approving this request.' });
