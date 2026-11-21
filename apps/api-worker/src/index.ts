@@ -389,6 +389,8 @@ export default {
     return json({ error: "Not found." }, 404, headers);
   },
   async queue(batch: MessageBatch<{ jobId: string }>, env: Env) {
-    await datasetJobs.queue(batch, env);
+    const queueName = (batch as MessageBatch<{ jobId: string }> & { queue?: string }).queue;
+    if (queueName === "vyron-generation-jobs") await generationJobs.queue(batch, env);
+    else await datasetJobs.queue(batch, env);
   }
 };
