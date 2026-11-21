@@ -1,75 +1,61 @@
-# Vyron — Roles, Permissions & Approval Governance
+# Vyron — Four-Role Governance & Permissions
 
-## Principles
-1. Keep platform administration separate from organization and project responsibilities.
-2. Grant the minimum access required for a task.
-3. A title such as Trainer, Mentor or Team Lead does not automatically grant technical permissions.
-4. All privileged changes must be attributable and auditable.
-5. Team creation and onboarding remain disabled until the project scope is approved.
+## The only organization roles
+Vyron uses exactly four organization roles:
 
-## Role layers
-
-### Platform role
-Controls platform-wide operations (for example, platform owner/operator). This role is not a normal organization membership role and must be assigned only to a trusted operator.
-
-### Organization role
-The current application supports:
-- **OWNER:** accountable organization owner; approves scope, administrators and sensitive access.
-- **ADMIN:** manages organization settings and members within owner-defined limits.
-- **MANAGER:** coordinates projects, tasks, workload and review queues.
-- **ANALYST:** works on authorized datasets, analysis and assigned tasks.
-- **VIEWER:** read-only access to permitted organization resources.
-
-The existing application enforces these organization roles in API routes. Do not assume this automatically provides column-level or project-level isolation.
-
-### Project responsibility (target design)
-These are responsibilities, not organization roles:
-- Project Lead: plans milestones, coordinates delivery and reports progress.
-- Data Engineer / Data Steward: ingestion, schema, provenance and data quality.
-- Data Cleaner: cleaning rules and transformation notes.
-- Analyst: SQL/Python exploration and business questions.
-- BI Developer: data model, measures, dashboards and narrative.
-- QA / Reviewer: checks reproducibility, data quality and reconciliation.
-- Trainer / Mentor: reviews learning outcomes and deliverables if invited.
-
-One person may hold multiple responsibilities in a small cohort. Responsibilities can rotate between sprints.
-
-## Trainer participation options
-The owner should ask the trainer which involvement model they prefer.
-
-| Option | Intended access | When appropriate |
+| Role | Main responsibility | Allowed actions |
 |---|---|---|
-| External reviewer / mentor | Read-only project overview, approved datasets and deliverables; comments/review if supported | Trainer supervises but does not operate the workspace |
-| Project manager | Project milestones, task coordination and review queue; no platform-wide settings by default | Trainer agrees to coordinate daily work |
-| Organization admin | Member invitations and organization settings within the defined scope | Only if trainer explicitly accepts administrative responsibility |
-| Platform admin | Cross-organization technical controls | Not recommended for a trainer by default |
+| **OWNER** | Workspace owner and final approver | Full workspace control; configure industries and generation limits; manually start, pause and cancel synthetic-data jobs; grant/revoke elevated permissions; manage members, teams, roles and settings; view all reports, audit and performance |
+| **MANAGER** | Program/workspace oversight | View organization reports, team performance, workload and progress; review delivery health; request an Owner approval for restricted actions. No generator controls, role escalation, sensitive settings or member administration unless explicitly authorized by Owner |
+| **LEADER** | Team/project delivery lead | Create and assign project tasks to Analysts in their team; set priorities and due dates; track task progress; review submissions and report team progress. Cannot generate data or grant access |
+| **ANALYST** | Individual contributor | Work on assigned datasets/tasks; update own task status; document analysis, cleaning, validation and dashboard deliverables; submit work for review |
 
-**Recommendation:** Start with reviewer/mentor access. Promote to Manager only if the trainer wants to manage delivery. Grant Admin only after explicit approval and a clear responsibility agreement. Keep the OWNER role with the project owner unless formal ownership changes.
+No ADMIN or VIEWER role exists in the target role model. Trainer/Mentor is not a fifth role: a trainer can be invited as MANAGER or LEADER only if the Owner and trainer agree on the scope. Default recommendation is MANAGER with reporting/review visibility, not elevated settings access.
+
+## Permission boundaries
+- Only OWNER can change organization-wide settings, choose enabled industries, set generation caps, start/stop generation, manage role assignments and approve restricted actions.
+- MANAGER has read-only access to reports, team performance and progress. If another action is needed, the UI must show “Request Owner approval”; the API must reject the action until the Owner approves it.
+- LEADER can assign tasks only to active ANALYST members belonging to that Leader's own team/project scope. A Leader cannot assign to another Leader or Manager.
+- ANALYST can update only their own assigned task status and submit deliverables; they cannot reassign work.
+- Every privileged action is checked server-side. Hiding a button is not authorization.
+- The Owner can explicitly grant a narrow, time-bound permission for a specific action. Such grants must be auditable and must not silently change the member's base role.
+
+## Team structure
+An organization can contain multiple teams. Each team has one designated LEADER and one or more ANALYSTS. A person cannot be assigned to a team until the Owner confirms the participant list and trainer/institution approval. Team sizes are determined from actual approved participants; do not assume a fixed cohort size.
+
+## Owner-controlled synthetic data generation
+- Generator is OFF by default and has no cron or automatic daily run.
+- Only an authenticated OWNER can change generator settings or click **Generate data**.
+- Owner selects one or more approved industries, datasets, target row counts, batch size and optional seed.
+- The requested count is a hard maximum, not a target that the system may exceed.
+- An industry with no active approved project/team is skipped and cannot be generated by default.
+- The Owner sees a cost/volume estimate and must confirm before a job is queued.
+- Jobs run in the background with bounded batches, progress, cancel/pause controls, idempotency and an audit trail.
+- MANAGER, LEADER and ANALYST may view job status only if the Owner permits it; they cannot trigger or edit a job.
+- A failed job must not overwrite a previous successful dataset snapshot.
+
+## Performance and contribution tracking
+Performance is measured from verifiable work events, not online time or arbitrary activity counts. Track:
+- Tasks assigned, completed, overdue, blocked and reopened.
+- On-time completion rate and median cycle time.
+- Review outcomes, revision count and accepted deliverables.
+- Dataset quality work: validation issues resolved, reproducible cleaning steps and documented quality deltas.
+- Analysis/BI deliverables accepted against a checklist.
+- Peer-review participation and handoff quality.
+- Workload distribution and estimated time only when users record it transparently.
+
+Show each person a transparent contribution timeline and allow corrections/disputes. Do not rank people solely by task count, keystrokes, login duration or raw hours. Managers see team-level reports and individual contribution evidence; Leaders see their own team; Analysts see their own metrics. Owner can see all. Sensitive comments and private personal information are excluded from performance scoring.
+
+## Audit requirements
+Record actor, timestamp, organization, team/project, action, target and safe metadata for role changes, approvals, task assignments/reassignments, status changes, review decisions, generator configuration and each generation job. Never log passwords, raw invitation tokens, session identifiers or sensitive data values.
 
 ## Approval gates
-- Gate 0 — Proposal: scope, objectives, industries, tools, participant model and risks documented.
-- Gate 1 — Trainer/institution approval: approval, conditions and supervisor recorded.
-- Gate 2 — Data approval: synthetic/de-identified policy and dataset boundaries confirmed.
-- Gate 3 — Participant onboarding: actual participants and consent confirmed; invitations issued.
-- Gate 4 — Team/project setup: team count, leads, roles, task schedule and access reviewed.
-- Gate 5 — Operational launch: storage, backups, access tests and workload tests passed.
+1. Trainer/institution approves the project scope and operating conditions.
+2. Data policy and synthetic-data-only rules are confirmed.
+3. Actual participant count and consent are confirmed.
+4. Owner configures teams, one Leader per team and Analyst assignments.
+5. Storage, backup, access isolation, generator throughput and recovery are tested.
+6. Owner manually enables and starts generation for selected approved industries.
 
-## Access request lifecycle
-Requested → Pending review → Approved or Rejected → Active membership (if approved) → Suspended or Revoked (if required).
-
-An email verification proves control of an email address; it does not itself grant organization access. Membership approval and project/dataset permissions remain separate decisions.
-
-## Required audit events
-Record actor, timestamp, target, action and safe metadata for:
-- Invitations created, accepted, expired or revoked.
-- Access requests approved or rejected.
-- Role changes and membership suspension.
-- Project/task assignment and completion.
-- Dataset upload, new version, cleaning, validation, export and restore.
-- Review and approval decisions.
-- Scheduled generation runs, failures, retries and cancellations.
-
-Never log passwords, raw invitation tokens, session identifiers or sensitive dataset values.
-
-## Current implementation gap
-The current schema has organization-level membership roles and task assignees. Project-scoped roles, dataset-level ACLs, column masking and trainer-specific reviewer permissions are target capabilities and must be implemented and tested before promising them as available.
+## Implementation status
+This document defines the required target model. The repository's current API and database still contain legacy ADMIN/VIEWER/manager permission branches and do not yet enforce the complete four-role model, team-scoped Leader assignment, Owner-only generator controls or performance reporting. Apply the migration and API/UI implementation and test all role boundaries before calling this live.
