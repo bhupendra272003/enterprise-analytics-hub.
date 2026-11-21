@@ -40,6 +40,8 @@ router.post('/organizations/:orgId/teams',async(req,res,next)=>{
     const input=z.object({name:z.string().trim().min(2).max(120),description:z.string().trim().max(500).optional().default(''),leaderUserId:z.string().uuid()}).parse(req.body);
     const [leader]=await conn.execute("SELECT id FROM memberships WHERE organization_id=? AND user_id=? AND role='LEADER' AND membership_status='ACTIVE' LIMIT 1",[req.params.orgId,input.leaderUserId]);
     if(!leader.length)return res.status(400).json({error:'The designated Leader must be an active LEADER in this organization.'});
+    const [existingLeader]=await conn.execute('SELECT id FROM teams WHERE organization_id=? AND leader_user_id=? LIMIT 1',[req.params.orgId,input.leaderUserId]);
+    if(existingLeader.length)return res.status(409).json({error:'This Leader already leads a team. Each Leader can be assigned to one team.'});
     const id=randomUUID();
     await conn.beginTransaction();
     await conn.execute("INSERT INTO teams (id,organization_id,name,description,leader_user_id,created_by) VALUES (?,?,?,?,?,?)",[id,req.params.orgId,input.name,input.description,input.leaderUserId,req.user.id]);
