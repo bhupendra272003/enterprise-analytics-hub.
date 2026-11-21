@@ -43,6 +43,8 @@ async function process(jobId:string,env:Env){
  const job=await env.DB.prepare("SELECT * FROM generation_jobs WHERE id=?").bind(jobId).first<any>();
  if(!job||["COMPLETED","FAILED","CANCELLED"].includes(job.status))return;
  const schema=schemas[job.industry];if(!schema)throw new Error("UNSUPPORTED_INDUSTRY");
+ const context=await env.DB.prepare("SELECT o.industry,(SELECT COUNT(*) FROM projects p WHERE p.organization_id=o.id AND p.status IN ('ACTIVE','PLANNING')) AS projects,(SELECT COUNT(*) FROM teams t JOIN team_members tm ON tm.team_id=t.id JOIN memberships m ON m.organization_id=o.id AND m.user_id=tm.user_id WHERE t.organization_id=o.id AND t.status='ACTIVE' AND m.role='ANALYST' AND m.membership_status='ACTIVE') AS active_analysts FROM organizations o WHERE o.id=?").bind(job.organization_id).first<any>();
+ if(!context||context.industry!==job.industry||!context.projects||!context.active_analysts){await env.DB.prepare("UPDATE generation_jobs SET status='FAILED',error_message='Generation stopped because the organization no longer has an active project, active team or active Analyst for this industry.',completed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status NOT IN ('COMPLETED','CANCELLED')").bind(job.id).run();return;}
  if(job.generated_rows>=job.requested_rows){await finalize(job,env,schema);return;}
  const start=Number(job.generated_rows),count=Math.min(BATCH_ROWS,Number(job.requested_rows)-start),index=Math.floor(start/BATCH_ROWS);
  const rows=Array.from({length:count},(_,i)=>makeRow(job.industry,start+i,job.seed).map(csv).join(","));
