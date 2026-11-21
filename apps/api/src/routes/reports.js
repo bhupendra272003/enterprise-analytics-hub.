@@ -15,6 +15,15 @@ router.post('/organizations/:orgId/reports',requireRole('OWNER'),async(req,res,n
  try{const input=reportInput.parse(req.body);const id=randomUUID();await pool.execute("INSERT INTO reports (id,organization_id,title,description,report_url,created_by) VALUES (?,?,?,?,?,?)",[id,req.params.orgId,input.title,input.description,input.reportUrl,req.user.id]);await audit({orgId:req.params.orgId,actorId:req.user.id,action:'REPORT_REGISTERED',targetType:'REPORT',targetId:id,metadata:{title:input.title},ip:req.ip});await notifyOrganizationRoles({organizationId:req.params.orgId,roles:['OWNER','MANAGER','LEADER','ANALYST'],excludeUserId:req.user.id,type:'REPORT_ADDED',title:'New Power BI report',message:'A new report was added to your organization workspace.',href:'/workspace/reports'});res.status(201).json({report:{id,...input}});}catch(e){next(e);}
 });
 router.patch('/reports/:reportId/archive',async(req,res,next)=>{
- try{const [rows]=await pool.execute('SELECT organization_id FROM reports WHERE id=? AND status=? LIMIT 1',[req.params.reportId,'ACTIVE']);if(!rows.length)return res.status(404).json({error:'Report not found.'});const orgId=rows[0].organization_id;const [membership]=await pool.execute("SELECT role FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE'",[orgId,req.user.id]);if(!membership.length||!membership[0].role==='OWNER')return res.status(403).json({error:'Insufficient organization permissions.'});await pool.execute("UPDATE reports SET status='ARCHIVED' WHERE id=?",[req.params.reportId]);await audit({orgId,actorId:req.user.id,action:'REPORT_ARCHIVED',targetType:'REPORT',targetId:req.params.reportId,ip:req.ip});res.json({message:'Report archived.'});}catch(e){next(e);}
+ try{
+  const [rows]=await pool.execute("SELECT organization_id FROM reports WHERE id=? AND status='ACTIVE' LIMIT 1",[req.params.reportId]);
+  if(!rows.length)return res.status(404).json({error:'Report not found.'});
+  const orgId=rows[0].organization_id;
+  const [membership]=await pool.execute("SELECT role FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE' LIMIT 1",[orgId,req.user.id]);
+  if(!membership.length||membership[0].role!=='OWNER')return res.status(403).json({error:'Only the Owner can archive reports.'});
+  await pool.execute("UPDATE reports SET status='ARCHIVED' WHERE id=?",[req.params.reportId]);
+  await audit({orgId,actorId:req.user.id,action:'REPORT_ARCHIVED',targetType:'REPORT',targetId:req.params.reportId,ip:req.ip});
+  res.json({message:'Report archived.'});
+ }catch(e){next(e);}
 });
 export default router;
