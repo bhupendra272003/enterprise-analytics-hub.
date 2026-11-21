@@ -1,6 +1,6 @@
-# NEXUS ANALYTICS — Enterprise Analytics Hub
+# Bhupendra's Vyron — Multi-Industry Analytics & Collaboration Platform
 
-A multi-tenant analytics and team collaboration platform. The repository includes identity, organization access, team management, projects and task-tracking foundations with a responsive web application.
+Vyron is a governed, multi-industry analytics workspace designed to connect data preparation, analysis, dashboarding, review and delivery. The project is approval-gated: participant onboarding, teams, role assignments and scheduled data generation are not activated until the trainer/institution approves the scope.
 
 ## Stack
 - Web: Next.js 15, React 19, TypeScript
@@ -14,7 +14,12 @@ A multi-tenant analytics and team collaboration platform. The repository include
 - `apps/web`: Next.js web application (sign-in, registration and authenticated workspace)
 - `apps/api`: Express API
 - `database/schema.sql`: MySQL schema
-- `docs/ARCHITECTURE.md`: architecture and roadmap
+- `docs/ARCHITECTURE.md`: current architecture, security boundaries and roadmap
+- `docs/PLATFORM_BLUEPRINT.md`: end-to-end platform design and delivery phases
+- `docs/TRAINER_PROPOSAL.md`: trainer-ready project explanation and approval questions
+- `docs/ROLE_GOVERNANCE.md`: organization roles, trainer access options and approval gates
+- `docs/INDUSTRY_DATA_CATALOG.md`: proposed industry datasets and business questions
+- `docs/DATA_GENERATION_SPEC.md`: safe, configurable synthetic-data generation specification
 - `docs/API-TESTING.md`: local API smoke-test sequence
 - `docs/DEPLOYMENT.md`: production hosting and environment guide
 
@@ -69,6 +74,7 @@ For local development, configure the API `APP_ORIGIN=http://localhost:3000` and 
 ## Frontend routes
 - `/`: sign in and open registration
 - `/workspace`: authenticated profile and organization overview
+- `/workspace/blueprint`: project briefing, industry templates, analytics lifecycle and governance overview
 - `/workspace/team`: organization creation, invitations, member directory, member role changes, suspension and access approval queue
 - `/workspace/access`: browse organizations and request membership
 - `/workspace/projects`: create projects, add tasks and update task status
@@ -105,3 +111,16 @@ This is a development foundation, not production-certified software. Before publ
 10. Governed SQL/Python analyst workspace and cleaning pipeline
 11. Power BI secure embedding and dashboard integration
 12. MFA, alerts, backups and security hardening
+
+
+## Approval-first operating model
+No participants, teams, trainer accounts or fixed role assignments are pre-created. The trainer/institution first approves the scope, industries, permitted tools, workload, data policy and participant count. Only then should the owner invite members and configure teams. See [Trainer Proposal](docs/TRAINER_PROPOSAL.md) and [Role Governance](docs/ROLE_GOVERNANCE.md).
+
+## Industry and dataset plan
+The proposed starter catalog covers Banking & Finance, Hospital & Healthcare, Logistics & Supply Chain, and Retail & E-commerce. These are templates only; actual pilot industries are subject to approval. Use synthetic or formally approved de-identified data only.
+
+## Volume and scheduled generation
+The planning discussion included 50,000+ initial rows and 10,000+ daily additions. The scope (per industry or total across all industries) is not yet confirmed. No large-volume generator or daily schedule is enabled by this specification. Confirm the volume, storage, cost and load-test results before activation. See [Data Generation Specification](docs/DATA_GENERATION_SPEC.md).
+
+## Architecture note
+The repository contains both an Express/MySQL application path and a Cloudflare Worker path using D1, KV and Queues. Verify the authoritative deployed routing and storage path before implementing large-scale generation, shared editing or production data connectors. Do not treat local-disk CSV storage or a Power BI link catalog as production object storage or secure embedded BI.
