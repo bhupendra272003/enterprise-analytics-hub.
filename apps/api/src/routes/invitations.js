@@ -31,9 +31,9 @@ router.post('/accept', requireAuth, async (req, res, next) => {
     res.json({ message: 'Invitation accepted.' });
   } catch (err) { next(err); }
 });
-router.post('/organizations/:orgId/invitations', requireAuth, requireActiveUser, requireRole('OWNER','ADMIN'), async (req, res, next) => {
+router.post('/organizations/:orgId/invitations', requireAuth, requireActiveUser, requireRole('OWNER'), async (req, res, next) => {
   try {
-    const input = z.object({ email: z.string().email().transform(v => v.toLowerCase()), role: z.enum(['ADMIN','MANAGER','ANALYST','VIEWER']) }).parse(req.body);
+    const input = z.object({ email: z.string().email().transform(v => v.toLowerCase()), role: z.enum(['MANAGER','LEADER','ANALYST']) }).parse(req.body);
     const token = randomBytes(32).toString('hex'), id = randomUUID();
     await pool.execute('INSERT INTO invitations (id, organization_id, email, role, token_hash, invited_by, expires_at) VALUES (?, ?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 7 DAY))', [id, req.params.orgId, input.email, input.role, createHash('sha256').update(token).digest('hex'), req.user.id]);
     await audit({ orgId: req.params.orgId, actorId: req.user.id, action: 'INVITATION_CREATED', targetType: 'INVITATION', targetId: id, metadata: { email: input.email, role: input.role }, ip: req.ip });
