@@ -19,17 +19,20 @@ Every event records actor, organization, optional team/project/task, event type,
 - Quality: validation pass rate and documented issue reduction on approved datasets.
 - Delivery: accepted analysis/dashboard deliverables against a project checklist.
 - Collaboration: peer reviews and documented handoffs.
-- Workload: open tasks, current assigned tasks, historical assignment events, distinct tasks, assignment concentration and estimated hours only when transparently entered by the member.\n- Leader accountability: tasks assigned by the Leader, distinct recipients, tasks personally owned by the Leader, and the Leader's own completion/on-time outcomes. A Leader is expected to contribute work as well as coordinate it.
+- Workload: open tasks, current assigned tasks, historical assignment events, distinct tasks, assignment concentration and estimated hours only when transparently entered by the member.
+- Leader accountability: tasks assigned by the Leader, distinct recipients, tasks personally owned by the Leader, and the Leader's own completion/on-time outcomes. A Leader is expected to contribute work as well as coordinate it.
 
 ## Visibility
-- OWNER: organization-wide and team-level reports, all members, generator audit and approvals.
-- MANAGER: read-only organization reports, workload, team performance and contribution evidence. No access to change roles or generation settings.
+- OWNER: organization-wide and team-level reports, all members, assignment history, Leader accountability, generator audit and approvals.
+- MANAGER: read-only organization reports, every team's workload, team performance, Leader accountability and individual contribution evidence. No access to change roles or generation settings.
 - LEADER: own team's delivery and Analyst-level contribution evidence.
 - ANALYST: own tasks, own performance and own contribution timeline.
 
 ## Fairness and safeguards
 - Never score people by login duration, online status, keystrokes, mouse activity or raw task count alone.
-- Compare only similar task types and agreed expectations.\n- Flag possible workload imbalance, repeated concentration of assignments, members receiving no assignments, and Leaders who assign work but have no personally owned tasks. These are review signals only, never automated findings of favoritism or misconduct.\n- Consider task complexity, skills, availability, leave, estimated effort and member-approved workload before judging equality.
+- Compare only similar task types and agreed expectations.
+- Flag possible workload imbalance, repeated concentration of assignments, members receiving no assignments, and Leaders who assign work but have no personally owned tasks. These are review signals only, never automated findings of favoritism or misconduct.
+- Consider task complexity, skills, availability, leave, estimated effort and member-approved workload before judging equality.
 - Show the underlying events behind each metric.
 - Let members add context and request corrections.
 - Separate work quantity from quality and complexity.
