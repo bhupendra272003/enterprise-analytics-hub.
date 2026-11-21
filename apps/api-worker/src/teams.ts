@@ -91,16 +91,37 @@ export async function handleTeams(req:Request,env:Env,path:string):Promise<Respo
   const task=await env.DB.prepare("SELECT t.id,t.team_id,t.assignee_id,t.status,t.title,p.organization_id FROM tasks t JOIN projects p ON p.id=t.project_id WHERE t.id=?").bind(taskMatch[1]).first<any>();
   if(!task||!task.team_id)return null;
   let body:any;try{body=await req.json();}catch{return json({error:"Invalid task update."},400);}
-  if(!body||typeof body!=="object"||Array.isArray(body)||Object.keys(body).some(k=>k!=="status"&&k!=="note")||!["TODO","IN_PROGRESS","BLOCKED","DONE"].includes(body.status))return json({error:"Only task status and an optional work note can be updated."},400);
+  const allowedKeys=["status","note","assigneeId","reason"];
+  if(!body||typeof body!=="object"||Array.isArray(body)||Object.keys(body).some(k=>!allowedKeys.includes(k))||(!("status" in body)&&!("assigneeId" in body)))return json({error:"Provide task progress or a new assignee."},400);
+  if(body.status!==undefined&&!["TODO","IN_PROGRESS","BLOCKED","DONE"].includes(body.status))return json({error:"Invalid task status."},400);
+  if(body.assigneeId!==undefined&&(typeof body.assigneeId!=="string"||!body.assigneeId))return json({error:"Choose a valid new assignee."},400);
   const m=await member(env,task.organization_id,user.id);if(!m)return json({error:"Organization membership required."},403);
   const team=await env.DB.prepare("SELECT leader_user_id FROM teams WHERE id=?").bind(task.team_id).first<{leader_user_id:string}>();
-  const canUpdate=(m.role==="LEADER"&&team?.leader_user_id===user.id&&task.assignee_id===user.id)||(m.role==="ANALYST"&&task.assignee_id===user.id);
-  if(!canUpdate)return json({error:"You can update only your assigned work or work in your own team."},403);
-  await env.DB.prepare("UPDATE tasks SET status=?,completed_at="+completedAt+",updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(body.status,task.id).run();
-  const eventType=body.status==="IN_PROGRESS"?"TASK_STARTED":body.status==="BLOCKED"?"TASK_BLOCKED":body.status==="DONE"?"TASK_SUBMITTED":"TASK_STATUS_CHANGED";
-  await event(env,task.organization_id,task.team_id,task.id,user.id,eventType,{from:task.status,to:body.status,note:typeof body.note==="string"?body.note.slice(0,1000):""});
-  await audit(env,task.organization_id,user.id,"TASK_STATUS_UPDATED","TASK",task.id,{from:task.status,to:body.status});
-  return json({message:"Task progress updated."});
+  if(body.assigneeId!==undefined){
+   const canAssign=m.role==="OWNER"||(m.role==="LEADER"&&team?.leader_user_id===user.id);
+   if(!canAssign)return json({error:"Only the Owner or this team's Leader can reassign team tasks."},403);
+   const selfLeader=body.assigneeId===team?.leader_user_id;
+   const analyst=!!await env.DB.prepare("SELECT 1 FROM team_members tm JOIN memberships m ON m.user_id=tm.user_id JOIN teams t ON t.id=tm.team_id WHERE tm.team_id=? AND tm.user_id=? AND m.organization_id=t.organization_id AND m.role='ANALYST' AND m.membership_status='ACTIVE'").bind(task.team_id,body.assigneeId).first();
+   if(!selfLeader&&!analyst)return json({error:"A team task can be assigned only to an Analyst in this team or its Leader."},400);
+   if(body.assigneeId!==task.assignee_id){
+    await env.DB.batch([
+     env.DB.prepare("UPDATE tasks SET assignee_id=?,assigned_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(body.assigneeId,user.id,task.id),
+     env.DB.prepare("INSERT INTO task_assignment_history (id,organization_id,team_id,task_id,assigned_by,previous_assignee_id,new_assignee_id,reason) VALUES (?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(),task.organization_id,task.team_id,task.id,user.id,task.assignee_id,body.assigneeId,typeof body.reason==="string"?body.reason.slice(0,500):null),
+     env.DB.prepare("INSERT INTO work_events (id,organization_id,team_id,task_id,actor_user_id,event_type,metadata) VALUES (?,?,?,?,?,'TASK_ASSIGNED',?)").bind(crypto.randomUUID(),task.organization_id,task.team_id,task.id,user.id,JSON.stringify({previousAssigneeId:task.assignee_id,newAssigneeId:body.assigneeId,reason:typeof body.reason==="string"?body.reason.slice(0,500):null}))
+    ]);
+    await env.DB.prepare("INSERT INTO notifications (id,user_id,organization_id,type,title,message,href) VALUES (?,?,?,'TASK_ASSIGNED','A team task was assigned',?,'/workspace/projects')").bind(crypto.randomUUID(),body.assigneeId,task.organization_id,"You have been assigned: "+task.title).run();
+    await audit(env,task.organization_id,user.id,"TEAM_TASK_REASSIGNED","TASK",task.id,{teamId:task.team_id,previousAssigneeId:task.assignee_id,newAssigneeId:body.assigneeId});
+   }
+  }
+  if(body.status!==undefined){
+   const canUpdate=(m.role==="LEADER"&&team?.leader_user_id===user.id&&task.assignee_id===user.id)||(m.role==="ANALYST"&&task.assignee_id===user.id);
+   if(!canUpdate)return json({error:"Only the assigned Analyst or a Leader working on their own task can update progress."},403);
+   await env.DB.prepare("UPDATE tasks SET status=?,completed_at=CASE WHEN ?='DONE' THEN CURRENT_TIMESTAMP ELSE NULL END,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(body.status,body.status,task.id).run();
+   const eventType=body.status==="IN_PROGRESS"?"TASK_STARTED":body.status==="BLOCKED"?"TASK_BLOCKED":body.status==="DONE"?"TASK_SUBMITTED":"TASK_STATUS_CHANGED";
+   await event(env,task.organization_id,task.team_id,task.id,user.id,eventType,{from:task.status,to:body.status,note:typeof body.note==="string"?body.note.slice(0,1000):""});
+   await audit(env,task.organization_id,user.id,"TASK_STATUS_UPDATED","TASK",task.id,{from:task.status,to:body.status});
+  }
+  return json({message:body.status!==undefined?"Task progress updated.":"Task reassigned and history recorded."});
  }
  return null;
 }
