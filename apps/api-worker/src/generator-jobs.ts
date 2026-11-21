@@ -1,6 +1,7 @@
 type Msg={jobId:string};
 type Env={DB:D1Database;DATASETS:KVNamespace;GENERATION_JOBS:Queue<Msg>};
 const BATCH_ROWS=1000,MAX_FILE_BYTES=10*1024*1024;
+async function clearChunks(env:Env,job:any){const count=Math.ceil(Number(job.requested_rows)/BATCH_ROWS);for(let i=0;i<count;i++)await env.DATASETS.delete("generation:"+job.id+":chunk:"+i);}
 const schemas:any={
  BFSI:{name:"Synthetic Banking Transactions",filename:"synthetic_transactions.csv",columns:["transaction_id","account_id","transaction_date","amount","transaction_type","channel","status","branch_id","city"]},
  ECOMMERCE:{name:"Synthetic E-commerce Orders",filename:"synthetic_orders.csv",columns:["order_id","customer_id","order_date","product_id","quantity","unit_price","discount_pct","payment_method","status","city"]},
@@ -26,7 +27,7 @@ async function finalize(job:any,env:Env,schema:any){
  const header=schema.columns.map(csv).join(",");
  const content=header+"\n"+parts.join("\n");
  const bytes=new TextEncoder().encode(content).byteLength;
- if(bytes>MAX_FILE_BYTES){await env.DB.prepare("UPDATE generation_jobs SET status='FAILED',error_message='Generated CSV exceeded the 10 MiB safe file limit. Reduce the requested row count and try again.',completed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(job.id).run();return;}
+ if(bytes>MAX_FILE_BYTES){await env.DB.prepare("UPDATE generation_jobs SET status='FAILED',error_message='Generated CSV exceeded the 10 MiB safe file limit. Reduce the requested row count and try again.',completed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(job.id).run();await clearChunks(env,job);return;}
  const datasetId=job.id,storagePath="datasets/"+job.organization_id+"/"+datasetId+"/v1.csv";
  await env.DATASETS.put(storagePath,content,{metadata:{organizationId:job.organization_id,datasetId,rowCount:job.requested_rows,synthetic:true}});
  const preview=Array.from({length:Math.min(5,job.requested_rows)},(_,i)=>Object.fromEntries(schema.columns.map((key:string,j:number)=>[key,makeRow(job.industry,i,job.seed)[j]])));
@@ -41,10 +42,10 @@ async function finalize(job:any,env:Env,schema:any){
 }
 async function process(jobId:string,env:Env){
  const job=await env.DB.prepare("SELECT * FROM generation_jobs WHERE id=?").bind(jobId).first<any>();
- if(!job||["COMPLETED","FAILED","CANCELLED"].includes(job.status))return;
+ if(!job)return;if(job.status==="CANCELLED"){await clearChunks(env,job);return;}if(["COMPLETED","FAILED"].includes(job.status))return;
  const schema=schemas[job.industry];if(!schema)throw new Error("UNSUPPORTED_INDUSTRY");
  const context=await env.DB.prepare("SELECT o.industry,(SELECT COUNT(*) FROM projects p WHERE p.organization_id=o.id AND p.status IN ('ACTIVE','PLANNING')) AS projects,(SELECT COUNT(*) FROM teams t JOIN team_members tm ON tm.team_id=t.id JOIN memberships m ON m.organization_id=o.id AND m.user_id=tm.user_id WHERE t.organization_id=o.id AND t.status='ACTIVE' AND m.role='ANALYST' AND m.membership_status='ACTIVE' AND EXISTS (SELECT 1 FROM memberships lm WHERE lm.organization_id=o.id AND lm.user_id=t.leader_user_id AND lm.role='LEADER' AND lm.membership_status='ACTIVE')) AS active_analysts FROM organizations o WHERE o.id=?").bind(job.organization_id).first<any>();
- if(!context||context.industry!==job.industry||!context.projects||!context.active_analysts){await env.DB.prepare("UPDATE generation_jobs SET status='FAILED',error_message='Generation stopped because the organization no longer has an active project, active team or active Analyst for this industry.',completed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status NOT IN ('COMPLETED','CANCELLED')").bind(job.id).run();return;}
+ if(!context||context.industry!==job.industry||!context.projects||!context.active_analysts){await env.DB.prepare("UPDATE generation_jobs SET status='FAILED',error_message='Generation stopped because the organization no longer has an active project, active team or active Analyst for this industry.',completed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status NOT IN ('COMPLETED','CANCELLED')").bind(job.id).run();await clearChunks(env,job);return;}
  if(job.generated_rows>=job.requested_rows){await finalize(job,env,schema);return;}
  const start=Number(job.generated_rows),count=Math.min(BATCH_ROWS,Number(job.requested_rows)-start),index=Math.floor(start/BATCH_ROWS);
  const rows=Array.from({length:count},(_,i)=>makeRow(job.industry,start+i,job.seed).map(csv).join(","));
@@ -57,4 +58,4 @@ async function process(jobId:string,env:Env){
   if(latest?.status!=="CANCELLED")await finalize(latest,env,schema);
  }else await env.GENERATION_JOBS.send({jobId:job.id});
 }
-export default {async queue(batch:MessageBatch<Msg>,env:Env){for(const msg of batch.messages){try{await process(msg.body.jobId,env);msg.ack();}catch(e){if(msg.attempts>=3){await env.DB.prepare("UPDATE generation_jobs SET status='FAILED',error_message='The generation worker exhausted its retry attempts.',completed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status NOT IN ('COMPLETED','CANCELLED')").bind(msg.body.jobId).run();msg.ack();}else msg.retry({delaySeconds:30});}}}};
+export default {async queue(batch:MessageBatch<Msg>,env:Env){for(const msg of batch.messages){try{await process(msg.body.jobId,env);msg.ack();}catch(e){if(msg.attempts>=3){const job=await env.DB.prepare("SELECT * FROM generation_jobs WHERE id=?").bind(msg.body.jobId).first<any>();await env.DB.prepare("UPDATE generation_jobs SET status='FAILED',error_message='The generation worker exhausted its retry attempts.',completed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status NOT IN ('COMPLETED','CANCELLED')").bind(msg.body.jobId).run();if(job)await clearChunks(env,job);msg.ack();}else msg.retry({delaySeconds:30});}}}};
