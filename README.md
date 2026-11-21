@@ -60,14 +60,15 @@ For local development, configure the API `APP_ORIGIN=http://localhost:3000` and 
 - Organization administrators review requests before membership is activated.
 - The authenticated workspace reads the signed-in profile and organization memberships.
 - Organization-specific access is enforced by the API, not by hiding frontend links.
+- The Cloudflare D1/Worker runtime now enforces exactly OWNER, MANAGER, LEADER and ANALYST organization roles; legacy ADMIN/VIEWER memberships are mapped to read-only MANAGER during D1 migration.
 
 
 ## Team and invitation flow
 - Open `/workspace/team` after signing in.
 - Create an organization; its creator becomes OWNER.
-- The target role model is OWNER, MANAGER, LEADER and ANALYST only. The current invitation UI/API still needs migration and permission refactoring before the four-role policy is enforced.
-- Pending users can submit an organization-specific access request; OWNER/ADMIN/MANAGER users can view the queue, and OWNER/ADMIN users can approve or reject requests.
-- OWNER/ADMIN/MANAGER users can view the organization member directory.
+- The enforced Cloudflare organization roles are OWNER, MANAGER, LEADER and ANALYST only. OWNER manages invitations and role changes; MANAGER has read-only organization reporting; LEADER owns one team; ANALYST works on assigned tasks.
+- Pending users can submit an organization-specific access request; OWNER and MANAGER can view the queue, and only OWNER can approve or reject requests.
+- OWNER and MANAGER can view the organization member directory; only OWNER can change roles or membership status.
 - Invitees can accept with an existing account or create an account from the invite link.
 - Invite links are one-time tokens; only a matching invited email can accept with an existing account.
 - When SMTP is configured, invitations are emailed automatically; without SMTP, the API returns a one-time URL for private manual delivery. Never expose invitation tokens in logs.
@@ -76,7 +77,8 @@ For local development, configure the API `APP_ORIGIN=http://localhost:3000` and 
 - `/`: sign in and open registration
 - `/workspace`: authenticated profile and organization overview
 - `/workspace/blueprint`: project briefing, industry templates, analytics lifecycle and governance overview
-- `/workspace/team`: organization creation, Owner-managed invitations, member directory, four-role changes, suspension and access approval queue\n- `/workspace/teams`: Owner-managed team creation, one designated Leader per team and Analyst assignment\n- `/workspace/performance`: Owner/Manager organization-wide team, member, allocation and Leader contribution reporting
+- `/workspace/team`: organization creation, Owner-managed invitations, member directory, four-role changes, suspension and access approval queue\n- `/workspace/teams`: Owner-managed team creation, one designated Leader per team and Analyst assignment\n- `/workspace/performance`: Owner/Manager organization-wide team, member, allocation, task-level evidence and Leader contribution reporting
+- `/workspace/generator`: Owner-controlled synthetic data limits, preview, manual generation and job history; Manager can view job status
 - `/workspace/access`: browse organizations and request membership
 - `/workspace/projects`: create projects, add tasks and update task status
 - `/workspace/data`: upload CSV files, inspect metadata, preview 10 rows, run column profiles, clean CSV data with Python, inspect before/after quality scores, define required/type/allowed-value/range/unique rules, validate immutable versions, review issue samples, quality trends, validation pass rates, recurring issue patterns, downloadable validation reports, version-to-version anomaly detection for numeric outliers, missingness spikes, category shifts, row-count changes and duplicate increases, with saved scan history and report replay, upload new versions, compare schema and row-level changes, and restore prior versions as a new version
@@ -121,11 +123,11 @@ No participants, teams, trainer accounts or fixed role assignments are pre-creat
 The proposed starter catalog covers Banking & Finance, Hospital & Healthcare, Logistics & Supply Chain, and Retail & E-commerce. These are templates only; actual pilot industries are subject to approval. Use synthetic or formally approved de-identified data only.
 
 ## Owner-controlled data generation
-There is no scheduled or automatic generation. The target workflow requires the Owner to select approved active industries, set per-dataset and total row caps, review an estimate, and click Generate. Unused industries stay idle. Migration 010 adds configuration/job metadata, but a production background worker, generator implementation, API authorization, UI, durable object storage and load testing are not yet complete. Do not start large jobs until those pieces are verified. See [Data Generation Specification](docs/DATA_GENERATION_SPEC.md).
+There is no scheduled or automatic generation. The Cloudflare Worker branch now provides Owner-only generator settings, per-dataset/per-job row caps, preview, a confirmation-gated Generate action, a dedicated queue worker, progress, retry and cancellation. It refuses to run unless the organization has an active project, active team and active Analyst for its selected industry. The first templates generate synthetic Banking transactions, E-commerce orders, Logistics shipments or Hotel bookings. Current hard limits are 100,000 rows and 10 MiB per dataset; files are stored in the Worker KV namespace and can be background-profiled up to 10 MiB. R2 storage, pause/resume, multi-table relational generation, validation-before-publish and load testing remain outstanding. No job is scheduled or started automatically. See [Data Generation Specification](docs/DATA_GENERATION_SPEC.md).
 
 ## Architecture note
 The repository contains both an Express/MySQL application path and a Cloudflare Worker path using D1, KV and Queues. Verify the authoritative deployed routing and storage path before implementing large-scale generation, shared editing or production data connectors. Do not treat local-disk CSV storage or a Power BI link catalog as production object storage or secure embedded BI.
 
 
 ## Target governance and performance model
-The required four roles are OWNER, MANAGER, LEADER and ANALYST. Owner controls sensitive permissions and data generation; Manager views reports and performance; Leader assigns tasks to Analysts in their team; Analyst completes assigned work. Contribution tracking must use transparent task, review and data-quality evidence—not login time or keystrokes. The role migration and event schema are foundations only; API/UI enforcement and reports remain pending. See [Role Governance](docs/ROLE_GOVERNANCE.md) and [Work Performance Specification](docs/WORK_PERFORMANCE_SPEC.md).
+The required four roles are OWNER, MANAGER, LEADER and ANALYST. Owner controls sensitive permissions and data generation; Manager views reports and performance; Leader assigns tasks to Analysts in their team; Analyst completes assigned work. Contribution tracking must use transparent task, review and data-quality evidence—not login time or keystrokes. The Cloudflare D1/Worker path now enforces the four roles and exposes team, task assignment history and Owner/Manager performance reports. The MySQL/Express path remains a legacy/local path and must not be assumed to have identical behavior. See [Role Governance](docs/ROLE_GOVERNANCE.md) and [Work Performance Specification](docs/WORK_PERFORMANCE_SPEC.md).
