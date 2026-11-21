@@ -27,11 +27,11 @@ export async function handlePerformance(req:Request,env:Env,path:string):Promise
   });
   const leaderAssignments=teamHistory.filter(h=>h.assignedBy===team.leaderId);
   const leaderOwnTasks=teamTasks.filter(t=>t.assigneeId===team.leaderId);
-  const counts=memberStats.map(m=>m.metrics.assigned);
+  const counts=memberStats.map(m=>m.assignedTasks);
   const positive=counts.filter(n=>n>0),avg=counts.length?counts.reduce((a,b)=>a+b,0)/counts.length:0;
   const max=counts.length?Math.max(...counts):0,min=counts.length?Math.min(...counts):0;
   const signals:any[]=[];
-  if(teamTasks.length&&memberStats.some(m=>m.role==="ANALYST"&&m.metrics.assigned===0)&&positive.length)signals.push({type:"MEMBER_WITHOUT_ASSIGNMENTS",severity:"REVIEW",message:"One or more active Analysts have no assigned team tasks. Check availability, skills and whether work was distributed outside the system."});
+  if(teamTasks.length&&memberStats.some(m=>m.role==="ANALYST"&&m.assignedTasks===0)&&positive.length)signals.push({type:"MEMBER_WITHOUT_ASSIGNMENTS",severity:"REVIEW",message:"One or more active Analysts have no assigned team tasks. Check availability, skills and whether work was distributed outside the system."});
   if(positive.length>=2&&max>Math.max(3,avg*2.5))signals.push({type:"ASSIGNMENT_CONCENTRATION",severity:"REVIEW",message:"Task counts are concentrated among a small number of members. Compare task effort, complexity and capacity before drawing conclusions."});
   if(leaderAssignments.length>0&&leaderOwnTasks.length===0)signals.push({type:"LEADER_NO_OWN_TASKS",severity:"REVIEW",message:"The Leader has assigned work but has no tasks assigned to themself in this team. Review their non-task contributions and workload expectations."});
   if(leaderAssignments.length>0&&new Set(leaderAssignments.map(h=>h.newAssigneeId)).size<Math.min(2,teamMembers.filter(m=>m.role==="ANALYST").length)&&teamMembers.filter(m=>m.role==="ANALYST").length>1)signals.push({type:"NARROW_RECIPIENT_PATTERN",severity:"REVIEW",message:"Recent recorded assignments went to a narrow set of recipients. Check skill fit, availability and assignment reasons."});
