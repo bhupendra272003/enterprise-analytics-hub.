@@ -1,6 +1,6 @@
 # Cloudflare D1 database
 
-The initial Cloudflare D1 schema lives in `0001_initial.sql`.
+The initial Cloudflare D1 schema lives in `0001_initial.sql`. Governance and team accountability are added in `0007_vyron_governance.sql`.
 
 ## Scope
 
@@ -12,6 +12,9 @@ The migration creates the application's relational tables for:
 - Power BI report links and in-app notifications
 - Email verification / password reset tokens
 - A D1-native session table
+- Four membership roles (OWNER, MANAGER, LEADER, ANALYST), team roster ownership and one Leader per team
+- Task assignment history, work events and Owner/Manager performance evidence
+- Performance correction records and Owner-controlled synthetic generator settings/job metadata (generator execution is not yet enabled)
 
 ## MySQL-to-SQLite decisions
 
