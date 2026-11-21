@@ -324,3 +324,20 @@ body{background-image:radial-gradient(ellipse at 78% 4%,rgba(164,137,91,.13),tra
  .generator-shell section{padding:17px!important}
  .generator-shell table{min-width:650px}
 }
+
+
+/* Royal treatment for the Teams & Leaders route, including legacy inline-styled controls */
+.vyron-teams-page{background:radial-gradient(ellipse at 78% 4%,rgba(164,137,91,.13),transparent 34%),linear-gradient(135deg,#080d17,#101b2a 58%,#090f19)!important;color:#f4f0e7!important}
+.vyron-teams-page header{border-bottom-color:var(--line)!important}
+.vyron-teams-page a{color:#e0cda6!important}
+.vyron-teams-page section[style],.vyron-teams-page article[style]{background:linear-gradient(145deg,rgba(23,32,47,.97),rgba(13,21,34,.98))!important;border-color:rgba(207,185,139,.22)!important;box-shadow:0 16px 48px rgba(0,0,0,.2)!important;border-radius:16px!important}
+.vyron-teams-page h1,.vyron-teams-page h2,.vyron-teams-page b,.vyron-teams-page span{color:#f4f0e7}
+.vyron-teams-page h1 span,.vyron-teams-page small{color:#d6c49c!important}
+.vyron-teams-page p{color:#b8b4a9!important}
+.vyron-teams-page input,.vyron-teams-page select{background:#0c1522!important;color:#f4f0e7!important;border:1px solid rgba(185,170,139,.3)!important;border-radius:10px!important;min-height:44px;padding:10px 12px}
+.vyron-teams-page input::placeholder{color:#8993a1!important}
+.vyron-teams-page option{background:#0c1522!important;color:#f4f0e7!important}
+.vyron-teams-page button{background:linear-gradient(135deg,#dfcca5,#b99b69)!important;color:#151923!important;border:1px solid rgba(242,224,184,.55)!important;border-radius:10px!important;font-weight:750!important;cursor:pointer;min-height:44px}
+.vyron-teams-page button:disabled{opacity:.55!important;cursor:not-allowed}
+.vyron-teams-page button:focus-visible,.vyron-teams-page a:focus-visible,.vyron-teams-page input:focus-visible,.vyron-teams-page select:focus-visible{outline:2px solid #e0cca2!important;outline-offset:3px}
+@media(max-width:640px){.vyron-teams-page{padding:18px 14px!important}.vyron-teams-page h1{font-size:clamp(30px,9vw,42px)!important}.vyron-teams-page header{gap:12px;align-items:center}.vyron-teams-page header a:first-child{font-size:11px;letter-spacing:.08em}.vyron-teams-page section[style]{padding:16px!important}.vyron-teams-page form{grid-template-columns:minmax(0,1fr)!important}.vyron-teams-page select{max-width:100%;min-width:0}}
