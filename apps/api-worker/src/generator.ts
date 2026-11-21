@@ -27,7 +27,7 @@ const activeContext=async(env:Env,orgId:string)=>env.DB.prepare("SELECT o.indust
 async function ownerContext(req:Request,env:Env,orgId:string){const user=await userFor(req,env);if(!user)return {error:json({error:"Authentication required."},401)};if(user.account_status==="SUSPENDED")return {error:json({error:"This account has been suspended."},403)};const m=await env.DB.prepare("SELECT role FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE'").bind(orgId,user.id).first<{role:Role}>();if(!m||m.role!=="OWNER")return {error:json({error:"Only the Owner can configure or start synthetic data generation."},403)};return {user};}
 export async function handleGenerator(req:Request,env:Env,path:string):Promise<Response|null>{
  const orgMatch=path.match(/^\/api\/organizations\/([^/]+)\/generator(?:\/(settings|preview|jobs))?$/);
- const jobMatch=path.match(/^\/api\/generator\/jobs\/([^/]+)(?:\/(cancel))?$/);
+ const jobMatch=path.match(/^\/api\/generator\/jobs\/([^/]+)(?:\/(pause|resume|cancel))?$/);
  if(!orgMatch&&!jobMatch)return null;
  if(orgMatch){
   const orgId=orgMatch[1],action=orgMatch[2]||"overview";
@@ -72,6 +72,22 @@ export async function handleGenerator(req:Request,env:Env,path:string):Promise<R
    return json({job:{id,industry,datasetKey:template.key,requestedRows:rows,status:"QUEUED"},message:"Generation queued after explicit Owner action."},202);
   }
   return json({error:"Method not allowed."},405);
+ }
+ if(jobMatch&&req.method==="POST"&&["pause","resume"].includes(jobMatch[2]||"")){
+  const job=await env.DB.prepare("SELECT organization_id,status FROM generation_jobs WHERE id=?").bind(jobMatch[1]).first<{organization_id:string;status:string}>();if(!job)return json({error:"Generation job not found."},404);
+  const ctx=await ownerContext(req,env,job.organization_id);if(ctx.error)return ctx.error;
+  if(jobMatch[2]==="pause"){
+   const changed=await env.DB.prepare("UPDATE generation_jobs SET status='PAUSED',updated_at=CURRENT_TIMESTAMP WHERE id=? AND status IN ('QUEUED','RUNNING')").bind(jobMatch[1]).run();
+   if(!changed.meta.changes)return json({error:"Only queued or running jobs can be paused."},409);
+   await env.DB.prepare("INSERT INTO audit_logs (organization_id,actor_user_id,action,target_type,target_id) VALUES (?,?,?,'GENERATION_JOB',?)").bind(job.organization_id,ctx.user!.id,"SYNTHETIC_GENERATION_PAUSED",jobMatch[1]).run();
+   return json({message:"Generation paused. Progress is preserved; resume will continue from the last committed batch."});
+  }
+  const changed=await env.DB.prepare("UPDATE generation_jobs SET status='QUEUED',updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='PAUSED'").bind(jobMatch[1]).run();
+  if(!changed.meta.changes)return json({error:"This generation job is not paused."},409);
+  try{await env.GENERATION_JOBS.send({jobId:jobMatch[1]});}
+  catch{await env.DB.prepare("UPDATE generation_jobs SET status='PAUSED',updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='QUEUED'").bind(jobMatch[1]).run();return json({error:"The queue is unavailable. The job remains paused."},503);}
+  await env.DB.prepare("INSERT INTO audit_logs (organization_id,actor_user_id,action,target_type,target_id) VALUES (?,?,?,'GENERATION_JOB',?)").bind(job.organization_id,ctx.user!.id,"SYNTHETIC_GENERATION_RESUMED",jobMatch[1]).run();
+  return json({message:"Generation resumed from the last committed batch."});
  }
  if(jobMatch&&req.method==="POST"&&jobMatch[2]==="cancel"){
   const job=await env.DB.prepare("SELECT organization_id,status FROM generation_jobs WHERE id=?").bind(jobMatch[1]).first<{organization_id:string;status:string}>();if(!job)return json({error:"Generation job not found."},404);
