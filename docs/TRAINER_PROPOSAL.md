@@ -35,9 +35,9 @@ Use synthetic or formally approved de-identified data only. Never introduce real
 A maximum of two hours per participant per day may be used as a planning proposal, subject to trainer approval. The trainer may set a different schedule and workload.
 
 ## 9. Current implementation status
-The codebase has an initial identity and organization system, access requests/invitations, projects/tasks, CSV upload, Python cleaning/profiling, dataset versioning/validation, audit history and a Power BI link catalog.
+The repository now contains a Cloudflare D1/Worker implementation of the four organization roles, team-scoped task assignment and reassignment history, Owner/Manager organization-wide performance reporting, and an Owner-click-only synthetic generator with row caps and a queued batch worker. The web UI includes team, performance and generator pages. CI has validated the D1 schema and Worker type-check on recent commits; the latest full build and production deployment still require final verification.
 
-The four-role model, team-scoped Leader permissions, Owner-only generation controls, background generator, performance dashboards and complete role-specific UI are requirements for the next implementation phase; they are not yet production-ready. Granular project/dataset permissions, secure Power BI embedding, live connectors, durable object storage, backups and independent security review also remain engineering work.
+The generator currently supports one synthetic CSV template per organization's selected industry, up to 100,000 rows and 10 MiB per dataset, stored in the Worker KV namespace. It requires an active project, active team and active Analyst. It has no schedule or automatic trigger. Pause/resume, multi-table relational data, validation-before-publish, R2 storage, large-scale load tests, granular project/dataset permissions, secure Power BI embedding, live connectors, backups and independent security review remain engineering work.
 
 ## 10. Decisions requested from the trainer
 1. Is a supervised synthetic-data-based pilot approved?
