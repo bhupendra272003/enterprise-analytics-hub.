@@ -1,4 +1,4 @@
-name: NEXUS CI
+name: VYRON CI
 
 on:
   push:
