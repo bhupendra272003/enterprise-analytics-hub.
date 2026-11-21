@@ -159,7 +159,7 @@ async function handleAuth(request: Request, env: Env, path: string): Promise<Res
     const token = await createToken(env, id, "EMAIL_VERIFY");
     const url = env.APP_ORIGIN + "/verify-email?token=" + encodeURIComponent(token);
     let sent = false;
-    try { sent = await sendMail(env, email, "Verify your NEXUS Analytics email", `Hello ${fullName},\n\nVerify your email: ${url}\n\nThis link expires in 24 hours.`); }
+    try { sent = await sendMail(env, email, "Verify your Bhupendra's Vyron email", `Hello ${fullName},\n\nVerify your email: ${url}\n\nThis link expires in 24 hours.`); }
     catch { await env.DB.prepare("DELETE FROM auth_tokens WHERE user_id=? AND purpose='EMAIL_VERIFY' AND used_at IS NULL").bind(id).run(); await env.DB.prepare("DELETE FROM users WHERE id=?").bind(id).run(); return json({ error: "Email delivery failed. Please try again later." }, 503); }
     if (!sent) return json({ error: "Email delivery is not configured yet. Registration is temporarily unavailable." }, 503);
     await createAudit(env, id, "USER_REGISTERED", ip);
@@ -217,7 +217,7 @@ async function handleAuth(request: Request, env: Env, path: string): Promise<Res
     const token = await createToken(env, user.id, "EMAIL_VERIFY");
     const url = env.APP_ORIGIN + "/verify-email?token=" + encodeURIComponent(token);
     try {
-      const sent = await sendMail(env, email, "Your NEXUS verification link", `Verify your email: ${url}\n\nThis link expires in 24 hours.`);
+      const sent = await sendMail(env, email, "Your Bhupendra's Vyron verification link", `Verify your email: ${url}\n\nThis link expires in 24 hours.`);
       if (!sent) return json({ error: "Email delivery is not configured yet." }, 503);
     } catch { return json({ error: "Email delivery failed. Please try again later." }, 503); }
     return json({ message: "If the account needs verification, a new link has been sent." });
@@ -232,7 +232,7 @@ async function handleAuth(request: Request, env: Env, path: string): Promise<Res
     const token = await createToken(env, user.id, "PASSWORD_RESET");
     const url = env.APP_ORIGIN + "/reset-password?token=" + encodeURIComponent(token);
     try {
-      const sent = await sendMail(env, email, "Reset your NEXUS Analytics password", `Reset your password: ${url}\n\nThis link expires in 1 hour. If you did not request this, ignore this email.`);
+      const sent = await sendMail(env, email, "Reset your Bhupendra's Vyron password", `Reset your password: ${url}\n\nThis link expires in 1 hour. If you did not request this, ignore this email.`);
       if (!sent) return json({ error: "Password recovery email is not configured yet." }, 503);
     } catch { return json({ error: "Email delivery failed. Please try again later." }, 503); }
     return json({ message: "If an account exists for that email, a reset link has been sent." });
@@ -356,7 +356,7 @@ export default {
       for (const [key, value] of Object.entries(headers)) merged.set(key, value);
       return new Response(response.body, { status: response.status, headers: merged });
     }
-    if (url.pathname === "/health") return json({ status: "ok", service: "nexus-analytics-cloudflare-api" }, 200, headers);
+    if (url.pathname === "/health") return json({ status: "ok", service: "bhupendras-vyron-cloudflare-api" }, 200, headers);
     return json({ error: "Not found." }, 404, headers);
   },
   async queue(batch: MessageBatch<{ jobId: string }>, env: Env) {
