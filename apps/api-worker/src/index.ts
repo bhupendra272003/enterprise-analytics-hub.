@@ -335,7 +335,7 @@ export default {
         return new Response(response.body, { status: response.status, headers: merged });
       }
     }
-    if (url.pathname.startsWith("/api/teams/") || (url.pathname.startsWith("/api/organizations/") && url.pathname.endsWith("/teams")) || /^\\/api\\/tasks\\/[^/]+$/.test(url.pathname)) {
+    if (url.pathname.startsWith("/api/teams/") || (url.pathname.startsWith("/api/organizations/") && url.pathname.endsWith("/teams")) || url.pathname.startsWith("/api/tasks/")) {
       const response = await handleTeams(request, env, url.pathname);
       if (response) {
         const merged = new Headers(response.headers);
@@ -343,7 +343,7 @@ export default {
         return new Response(response.body, { status: response.status, headers: merged });
       }
     }
-    if (/^\\/api\\/organizations\\/[^/]+\\/performance$/.test(url.pathname)) {
+    if (url.pathname.startsWith("/api/organizations/") && url.pathname.endsWith("/performance")) {
       const response = await handlePerformance(request, env, url.pathname);
       if (response) {
         const merged = new Headers(response.headers);
