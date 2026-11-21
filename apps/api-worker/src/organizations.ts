@@ -105,7 +105,7 @@ export async function handleOrganizations(request: Request, env: Env, path: stri
   const accessMatch=path.match(/^\/api\/organizations\/([^/]+)\/requests$/);
   if(accessMatch && request.method==="GET") {
     const orgId=accessMatch[1], m=await membership(env,orgId,user.id);
-    if(!m||!["OWNER","ADMIN","MANAGER"].includes(m.role)) return reply({error:"Insufficient organization permissions."},403);
+    if(!m||!["OWNER","MANAGER"].includes(m.role)) return reply({error:"Insufficient organization permissions."},403);
     const {results}=await env.DB.prepare("SELECT r.id,r.status,r.created_at AS requestedAt,u.id AS userId,u.full_name AS fullName,u.email FROM organization_access_requests r JOIN users u ON u.id=r.user_id WHERE r.organization_id=? AND r.status='PENDING' ORDER BY r.created_at").bind(orgId).all();
     return reply({requests:results});
   }
@@ -113,7 +113,7 @@ export async function handleOrganizations(request: Request, env: Env, path: stri
   const decideMatch=path.match(/^\/api\/organizations\/([^/]+)\/requests\/([^/]+)$/);
   if(decideMatch && request.method==="PATCH") {
     const [,orgId,requestId]=decideMatch, m=await membership(env,orgId,user.id);
-    if(!m||!["OWNER","ADMIN"].includes(m.role)) return reply({error:"Insufficient organization permissions."},403);
+    if(!m||m.role!=="OWNER") return reply({error:"Insufficient organization permissions."},403);
     let body:any; try { body=await request.json(); } catch { return reply({error:"Invalid JSON body."},400); }
     if(!["APPROVE","REJECT"].includes(body.decision)|| (body.decision==="APPROVE"&&!["MANAGER","LEADER","ANALYST"].includes(body.role))) return reply({error:"Choose a valid decision and role."},400);
     const access=await env.DB.prepare("SELECT id,user_id,status FROM organization_access_requests WHERE id=? AND organization_id=?").bind(requestId,orgId).first<{id:string;user_id:string;status:string}>();
