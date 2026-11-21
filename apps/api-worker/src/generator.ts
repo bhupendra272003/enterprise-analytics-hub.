@@ -54,22 +54,22 @@ export async function handleGenerator(req:Request,env:Env,path:string):Promise<R
   if((action==="preview"||action==="jobs")&&req.method==="POST"){
    let body:any={};try{body=await req.json();}catch{return json({error:"Invalid generation request."},400);}
    const settings=await env.DB.prepare("SELECT enabled,per_dataset_row_cap,per_job_row_cap FROM generator_settings WHERE organization_id=?").bind(orgId).first<any>();
-   const context=await activeContext(env,orgId);if(!context?.industry||!templates[context.industry])return json({error:"Choose a supported industry for this organization before generating data."},409);
+   const context=await activeContext(env,orgId);const industry=context?.industry;if(!industry||!templates[industry])return json({error:"Choose a supported industry for this organization before generating data."},409);
    if(!context.projects||!context.active_analysts)return json({error:"Generation is unavailable until this industry has an active project, an active team and at least one active Analyst. No unused-industry data will be generated."},409);
    const rows=Number(body.rows);
    if(!Number.isInteger(rows)||rows<1)return json({error:"Enter a positive whole-number row count."},400);
    if(!settings||!settings.enabled||!settings.per_dataset_row_cap||!settings.per_job_row_cap)return json({error:"The Owner must enable the generator and configure row caps first."},409);
    if(rows>settings.per_job_row_cap||rows>settings.per_dataset_row_cap)return json({error:"Requested rows exceed the Owner-configured per-job or per-dataset limit."},400);
-   const template=templates[context.industry];
+   const template=templates[industry];
    if(action==="preview"){
-    const preview=Array.from({length:Math.min(rows,5)},(_,i)=>rowFor(context.industry,i,typeof body.seed==="string"?body.seed:"vyron-preview")).map((r:any)=>Object.fromEntries(template.columns.map((k:string,i:number)=>[k,r[i]])));
-    return json({industry:context.industry,datasetKey:template.key,datasetName:template.label,requestedRows:rows,limits:{perDatasetRowCap:settings.per_dataset_row_cap,perJobRowCap:settings.per_job_row_cap,platformHardCap:100000},estimatedBytes:rows*150,estimatedSeconds:Math.max(2,Math.ceil(rows/5000)),preview,manualConfirmationRequired:true});
+    const preview=Array.from({length:Math.min(rows,5)},(_,i)=>rowFor(industry,i,typeof body.seed==="string"?body.seed:"vyron-preview")).map((r:any)=>Object.fromEntries(template.columns.map((k:string,i:number)=>[k,r[i]])));
+    return json({industry,datasetKey:template.key,datasetName:template.label,requestedRows:rows,limits:{perDatasetRowCap:settings.per_dataset_row_cap,perJobRowCap:settings.per_job_row_cap,platformHardCap:100000},estimatedBytes:rows*150,estimatedSeconds:Math.max(2,Math.ceil(rows/5000)),preview,manualConfirmationRequired:true});
    }
    const id=crypto.randomUUID(),seed=typeof body.seed==="string"&&body.seed.length<=80?body.seed:crypto.randomUUID();
    await env.DB.prepare("INSERT INTO generation_jobs (id,organization_id,requested_by,industry,dataset_key,requested_rows,seed,status) VALUES (?,?,?,?,?,?,?,'QUEUED')").bind(id,orgId,user.id,context.industry,template.key,rows,seed).run();
    try{await env.GENERATION_JOBS.send({jobId:id});}catch{await env.DB.prepare("UPDATE generation_jobs SET status='FAILED',error_message='The generation queue is unavailable.',completed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(id).run();return json({error:"Generation could not be queued. No data was generated."},503);}
-   await env.DB.prepare("INSERT INTO audit_logs (organization_id,actor_user_id,action,target_type,target_id,metadata) VALUES (?,?,?,'GENERATION_JOB',?,?)").bind(orgId,user.id,"SYNTHETIC_GENERATION_STARTED",id,JSON.stringify({industry:context.industry,datasetKey:template.key,rows})).run();
-   return json({job:{id,industry:context.industry,datasetKey:template.key,requestedRows:rows,status:"QUEUED"},message:"Generation queued after explicit Owner action."},202);
+   await env.DB.prepare("INSERT INTO audit_logs (organization_id,actor_user_id,action,target_type,target_id,metadata) VALUES (?,?,?,'GENERATION_JOB',?,?)").bind(orgId,user.id,"SYNTHETIC_GENERATION_STARTED",id,JSON.stringify({industry,datasetKey:template.key,rows})).run();
+   return json({job:{id,industry,datasetKey:template.key,requestedRows:rows,status:"QUEUED"},message:"Generation queued after explicit Owner action."},202);
   }
   return json({error:"Method not allowed."},405);
  }
