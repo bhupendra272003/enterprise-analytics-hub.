@@ -42,7 +42,7 @@ async function finalize(job:any,env:Env,schema:any){
 }
 async function process(jobId:string,env:Env){
  const job=await env.DB.prepare("SELECT * FROM generation_jobs WHERE id=?").bind(jobId).first<any>();
- if(!job)return;if(job.status==="CANCELLED"){await clearChunks(env,job);return;}if(["COMPLETED","FAILED"].includes(job.status))return;
+ if(!job)return;if(job.status==="CANCELLED"){await clearChunks(env,job);return;}if(["COMPLETED","FAILED","PAUSED"].includes(job.status))return;
  const schema=schemas[job.industry];if(!schema)throw new Error("UNSUPPORTED_INDUSTRY");
  const context=await env.DB.prepare("SELECT o.industry,EXISTS(SELECT 1 FROM projects p WHERE p.id=? AND p.organization_id=o.id AND p.status IN ('ACTIVE','PLANNING')) AS project_active,EXISTS(SELECT 1 FROM teams t WHERE t.id=? AND t.organization_id=o.id AND t.status='ACTIVE' AND EXISTS (SELECT 1 FROM memberships lm WHERE lm.organization_id=o.id AND lm.user_id=t.leader_user_id AND lm.role='LEADER' AND lm.membership_status='ACTIVE') AND EXISTS (SELECT 1 FROM team_members tm JOIN memberships am ON am.user_id=tm.user_id AND am.organization_id=o.id WHERE tm.team_id=t.id AND am.role='ANALYST' AND am.membership_status='ACTIVE')) AS team_active FROM organizations o WHERE o.id=?").bind(job.project_id,job.team_id,job.organization_id).first<any>();
  if(!context||context.industry!==job.industry||!context.project_active||!context.team_active){await env.DB.prepare("UPDATE generation_jobs SET status='FAILED',error_message='Generation stopped because its linked project or team no longer has an active Leader and Analyst.',completed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status NOT IN ('COMPLETED','CANCELLED')").bind(job.id).run();await clearChunks(env,job);return;}
@@ -55,7 +55,7 @@ async function process(jobId:string,env:Env){
  if(!update.meta.changes){const latest=await env.DB.prepare("SELECT status FROM generation_jobs WHERE id=?").bind(job.id).first<{status:string}>();if(latest?.status==="CANCELLED")await clearChunks(env,job);return;}
  if(next>=job.requested_rows){
   const latest=await env.DB.prepare("SELECT * FROM generation_jobs WHERE id=?").bind(job.id).first<any>();
-  if(latest?.status!=="CANCELLED")await finalize(latest,env,schema);
+  if(latest&&["QUEUED","RUNNING"].includes(latest.status))await finalize(latest,env,schema);
  }else await env.GENERATION_JOBS.send({jobId:job.id});
 }
 export default {async queue(batch:MessageBatch<Msg>,env:Env){for(const msg of batch.messages){try{await process(msg.body.jobId,env);msg.ack();}catch(e){if(msg.attempts>=3){const job=await env.DB.prepare("SELECT * FROM generation_jobs WHERE id=?").bind(msg.body.jobId).first<any>();await env.DB.prepare("UPDATE generation_jobs SET status='FAILED',error_message='The generation worker exhausted its retry attempts.',completed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status NOT IN ('COMPLETED','CANCELLED')").bind(msg.body.jobId).run();if(job)await clearChunks(env,job);msg.ack();}else msg.retry({delaySeconds:30});}}}};
