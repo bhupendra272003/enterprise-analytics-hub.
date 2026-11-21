@@ -18,9 +18,9 @@ const upload=multer({storage:multer.memoryStorage(),limits:{fileSize:15*1024*102
   if(path.extname(file.originalname).toLowerCase()!=='.csv')return cb(new Error('Only CSV files are supported.'));
   cb(null,true);
 }});
-const datasetRole=requireRole('OWNER','ADMIN','MANAGER','ANALYST');
+const datasetRole=requireRole('OWNER','LEADER','ANALYST');
 
-router.get('/organizations/:orgId/datasets',requireRole('OWNER','ADMIN','MANAGER','ANALYST','VIEWER'),async(req,res,next)=>{
+router.get('/organizations/:orgId/datasets',requireRole('OWNER','MANAGER','LEADER','ANALYST'),async(req,res,next)=>{
   try{
     const [rows]=await pool.execute('SELECT id,name,original_filename AS originalFilename,file_size AS fileSize,row_count AS rowCount,column_count AS columnCount,created_at AS createdAt,u.full_name AS uploadedBy FROM datasets d JOIN users u ON u.id=d.uploaded_by WHERE d.organization_id=? ORDER BY d.created_at DESC',[req.params.orgId]);
     res.json({datasets:rows});
@@ -68,7 +68,7 @@ router.post('/datasets/:datasetId/versions',upload.single('file'),async(req,res,
     const [rows]=await connection.execute('SELECT id,organization_id FROM datasets WHERE id=? FOR UPDATE',[req.params.datasetId]);
     if(!rows.length){await connection.rollback();return res.status(404).json({error:'Dataset not found.'});}
     const [members]=await connection.execute("SELECT role FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE' LIMIT 1",[rows[0].organization_id,req.user.id]);
-    if(!members.length||!['OWNER','ADMIN','MANAGER','ANALYST'].includes(members[0].role)){await connection.rollback();return res.status(403).json({error:'You do not have permission to upload a dataset version.'});}
+    if(!members.length||!['OWNER','LEADER','ANALYST'].includes(members[0].role)){await connection.rollback();return res.status(403).json({error:'You do not have permission to upload a dataset version.'});}
     const [latest]=await connection.execute('SELECT COALESCE(MAX(version_number),0) AS currentVersion FROM dataset_versions WHERE dataset_id=?',[req.params.datasetId]);
     const versionNumber=Number(latest[0].currentVersion)+1;
     const root=path.resolve(config.dataStorageDir);
@@ -109,7 +109,7 @@ router.get('/datasets/:datasetId/versions/compare',async(req,res,next)=>{
     const [rows]=await pool.execute('SELECT d.organization_id,a.row_count AS fromRows,a.column_count AS fromColumns,a.columns_json AS fromSchema,b.row_count AS toRows,b.column_count AS toColumns,b.columns_json AS toSchema FROM datasets d JOIN dataset_versions a ON a.dataset_id=d.id AND a.version_number=? JOIN dataset_versions b ON b.dataset_id=d.id AND b.version_number=? WHERE d.id=? LIMIT 1',[from,to,req.params.datasetId]);
     if(!rows.length)return res.status(404).json({error:'Dataset or selected version not found.'});
     const [members]=await pool.execute("SELECT role FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE' LIMIT 1",[rows[0].organization_id,req.user.id]);
-    if(!members.length||!['OWNER','ADMIN','MANAGER','ANALYST'].includes(members[0].role))return res.status(403).json({error:'Insufficient organization permissions.'});
+    if(!members.length||!['OWNER','LEADER','ANALYST'].includes(members[0].role))return res.status(403).json({error:'Insufficient organization permissions.'});
     const parseSchema=value=>typeof value==='string'?JSON.parse(value):value;
     const oldColumns=parseSchema(rows[0].fromSchema)||[],newColumns=parseSchema(rows[0].toSchema)||[];
     res.json({comparison:{fromVersion:from,toVersion:to,fromRows:Number(rows[0].fromRows),toRows:Number(rows[0].toRows),rowDelta:Number(rows[0].toRows)-Number(rows[0].fromRows),fromColumns:Number(rows[0].fromColumns),toColumns:Number(rows[0].toColumns),addedColumns:newColumns.filter(x=>!oldColumns.includes(x)),removedColumns:oldColumns.filter(x=>!newColumns.includes(x)),unchangedColumns:oldColumns.filter(x=>newColumns.includes(x))}});
@@ -184,7 +184,7 @@ router.post('/datasets/:datasetId/versions/:versionNumber/restore',async(req,res
     const [datasets]=await connection.execute('SELECT id,organization_id FROM datasets WHERE id=? FOR UPDATE',[req.params.datasetId]);
     if(!datasets.length){await connection.rollback();return res.status(404).json({error:'Dataset not found.'});}
     const [members]=await connection.execute("SELECT role FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE' LIMIT 1",[datasets[0].organization_id,req.user.id]);
-    if(!members.length||!['OWNER','ADMIN','MANAGER','ANALYST'].includes(members[0].role)){await connection.rollback();return res.status(403).json({error:'You do not have permission to restore dataset versions.'});}
+    if(!members.length||!['OWNER','LEADER','ANALYST'].includes(members[0].role)){await connection.rollback();return res.status(403).json({error:'You do not have permission to restore dataset versions.'});}
     const [source]=await connection.execute('SELECT * FROM dataset_versions WHERE dataset_id=? AND version_number=? LIMIT 1',[req.params.datasetId,versionNumber]);
     if(!source.length){await connection.rollback();return res.status(404).json({error:'Version not found.'});}
     const [latest]=await connection.execute('SELECT COALESCE(MAX(version_number),0) AS currentVersion FROM dataset_versions WHERE dataset_id=?',[req.params.datasetId]);
@@ -234,7 +234,7 @@ router.post('/datasets/:datasetId/clean',async(req,res,next)=>{
     if(!datasets.length)return res.status(404).json({error:'Dataset not found.'});
     const [members]=await pool.execute("SELECT role FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE' LIMIT 1",[datasets[0].organization_id,req.user.id]);
     if(!members.length)return res.status(403).json({error:'Insufficient organization permissions.'});
-    if(!['OWNER','ADMIN','MANAGER','ANALYST'].includes(members[0].role))return res.status(403).json({error:'Your role cannot create cleaned dataset versions.'});
+    if(!['OWNER','LEADER','ANALYST'].includes(members[0].role))return res.status(403).json({error:'Your role cannot create cleaned dataset versions.'});
     const root=path.resolve(config.dataStorageDir);
     await mkdir(root,{recursive:true});
     cleanedPath=path.join(root,randomUUID()+'.csv');
@@ -259,7 +259,7 @@ router.post('/datasets/:datasetId/clean',async(req,res,next)=>{
     const [locked]=await connection.execute('SELECT id,organization_id FROM datasets WHERE id=? FOR UPDATE',[req.params.datasetId]);
     if(!locked.length){await connection.rollback();return res.status(404).json({error:'Dataset not found.'});}
     const [currentMembership]=await connection.execute("SELECT role FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE' LIMIT 1",[locked[0].organization_id,req.user.id]);
-    if(!currentMembership.length||!['OWNER','ADMIN','MANAGER','ANALYST'].includes(currentMembership[0].role)){await connection.rollback();return res.status(403).json({error:'Dataset access changed while cleaning was running.'});}
+    if(!currentMembership.length||!['OWNER','LEADER','ANALYST'].includes(currentMembership[0].role)){await connection.rollback();return res.status(403).json({error:'Dataset access changed while cleaning was running.'});}
     const [latest]=await connection.execute('SELECT COALESCE(MAX(version_number),0) AS currentVersion FROM dataset_versions WHERE dataset_id=?',[req.params.datasetId]);
     const versionNumber=Number(latest[0].currentVersion)+1;
     await connection.execute('INSERT INTO dataset_versions (id,dataset_id,version_number,storage_path,file_size,row_count,column_count,columns_json,preview_json,uploaded_by,change_note) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
@@ -296,7 +296,7 @@ router.post('/datasets/:datasetId/validate',async(req,res,next)=>{
     if(!datasets.length)return res.status(404).json({error:'Dataset not found.'});
     const [members]=await pool.execute("SELECT role FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE' LIMIT 1",[datasets[0].organization_id,req.user.id]);
     if(!members.length)return res.status(403).json({error:'Insufficient organization permissions.'});
-    if(!['OWNER','ADMIN','MANAGER','ANALYST'].includes(members[0].role))return res.status(403).json({error:'Your role cannot run dataset validation.'});
+    if(!['OWNER','LEADER','ANALYST'].includes(members[0].role))return res.status(403).json({error:'Your role cannot run dataset validation.'});
     const [versions]=await pool.execute('SELECT version_number AS versionNumber,storage_path AS storagePath,columns_json AS columnsJson FROM dataset_versions WHERE dataset_id=? AND version_number=COALESCE(?,(SELECT MAX(version_number) FROM dataset_versions WHERE dataset_id=?)) LIMIT 1',[req.params.datasetId,schema.versionNumber??null,req.params.datasetId]);
     if(!versions.length)return res.status(404).json({error:'Dataset version not found.'});
     const columns=typeof versions[0].columnsJson==='string'?JSON.parse(versions[0].columnsJson):versions[0].columnsJson;
@@ -404,7 +404,7 @@ router.post('/datasets/:datasetId/anomalies',async(req,res,next)=>{
     const [rows]=await pool.execute('SELECT d.organization_id,a.storage_path AS fromPath,a.columns_json AS fromSchema,b.storage_path AS toPath,b.columns_json AS toSchema FROM datasets d JOIN dataset_versions a ON a.dataset_id=d.id AND a.version_number=? JOIN dataset_versions b ON b.dataset_id=d.id AND b.version_number=? WHERE d.id=? LIMIT 1',[from,to,req.params.datasetId]);
     if(!rows.length)return res.status(404).json({error:'Dataset or selected version not found.'});
     const [members]=await pool.execute("SELECT role FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE' LIMIT 1",[rows[0].organization_id,req.user.id]);
-    if(!members.length||!['OWNER','ADMIN','MANAGER','ANALYST'].includes(members[0].role))return res.status(403).json({error:'Insufficient organization permissions.'});
+    if(!members.length||!['OWNER','LEADER','ANALYST'].includes(members[0].role))return res.status(403).json({error:'Insufficient organization permissions.'});
     const parseSchema=value=>typeof value==='string'?JSON.parse(value):value;
     const oldColumns=parseSchema(rows[0].fromSchema)||[],newColumns=parseSchema(rows[0].toSchema)||[];
     const options={columns:true,skip_empty_lines:true,bom:true,trim:false,relax_column_count:false};
