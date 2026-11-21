@@ -24,7 +24,7 @@ async function finalize(job:any,env:Env,schema:any){
  const chunks=Math.ceil(job.requested_rows/BATCH_ROWS),parts:string[]=[];
  for(let i=0;i<chunks;i++){const part=await env.DATASETS.get("generation:"+job.id+":chunk:"+i,"text");if(part===null)throw new Error("GENERATION_CHUNK_MISSING");parts.push(part);}
  const header=schema.columns.map(csv).join(",");
- const content=header+"\n"+parts.join("");
+ const content=header+"\n"+parts.join("\n");
  const bytes=new TextEncoder().encode(content).byteLength;
  if(bytes>MAX_FILE_BYTES){await env.DB.prepare("UPDATE generation_jobs SET status='FAILED',error_message='Generated CSV exceeded the 20 MiB safe file limit. Reduce the requested row count and try again.',completed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(job.id).run();return;}
  const datasetId=job.id,storagePath="datasets/"+job.organization_id+"/"+datasetId+"/v1.csv";
