@@ -22,7 +22,7 @@ Every event records actor, organization, optional team/project/task, event type,
 - Workload: open tasks, current assigned tasks, historical assignment events, distinct tasks, assignment concentration and estimated hours only when transparently entered by the member.
 - Leader accountability: tasks assigned by the Leader, distinct recipients, tasks personally owned by the Leader, and the Leader's own completion/on-time outcomes. A Leader is expected to contribute work as well as coordinate it.
 
-## Visibility
+## Task-level reporting\nOwner and Manager views must expand each team into member rows and each member into the tasks assigned to them, including title, status, priority, due date and assigning person. The Leader view is limited to their own team; Analyst view is limited to their own contribution. Assignment history must preserve reassignment counts and recipients so repeated concentration can be reviewed.\n\n## Visibility
 - OWNER: organization-wide and team-level reports, all members, assignment history, Leader accountability, generator audit and approvals.
 - MANAGER: read-only organization reports, every team's workload, team performance, Leader accountability and individual contribution evidence. No access to change roles or generation settings.
 - LEADER: own team's delivery and Analyst-level contribution evidence.
