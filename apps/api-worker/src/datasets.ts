@@ -4,7 +4,7 @@ const readStored=async(env:Env,key:string):Promise<{arrayBuffer:()=>Promise<Arra
 const MAX_SYNC_CSV_BYTES=256*1024;
 const syncLimitError=()=>json({error:"This CSV is larger than the current synchronous processing limit (256 KB). Background CSV jobs are being prepared; please use a smaller CSV for now."},413);
 type User={id:string;account_status:string};
-type Role="OWNER"|"ADMIN"|"MANAGER"|"ANALYST"|"VIEWER";
+type Role="OWNER"|"MANAGER"|"LEADER"|"ANALYST";
 const json=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store"}});
 const getUser=async(req:Request,env:Env):Promise<User|null>=>{
  const raw=req.headers.get("Cookie")||"",sid=raw.split(";").map(v=>v.trim()).find(v=>v.startsWith("hub.sid="))?.slice(8);
@@ -21,7 +21,7 @@ const parseCsv=(buffer:ArrayBuffer)=>{
  if(!columns.length||columns.length>200||columns.some(c=>!c.trim()))throw new Error("HEADERS");
  return {records,columns,preview:records.slice(0,10).map((row:any)=>Object.fromEntries(columns.map(c=>[c,String(row[c]??"").slice(0,500)])))};
 };
-const allowed=(role:Role)=>["OWNER","ADMIN","MANAGER","ANALYST"].includes(role);
+const allowed=(role:Role)=>["OWNER","LEADER","ANALYST"].includes(role);
 const ownerOnly=(role:Role)=>role==="OWNER";
 const ownerRequired=()=>json({error:"Only the organization owner can change or replace original source data."},403);
 const isNum=(v:string)=>v.trim()!==""&&Number.isFinite(Number(v));
