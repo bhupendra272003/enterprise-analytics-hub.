@@ -63,6 +63,9 @@ jobs:
           set -euo pipefail
           npm install
           npx wrangler d1 migrations apply nexus-analytics --remote
+          if ! npx wrangler queues list | grep -Fq "vyron-generation-jobs"; then
+            npx wrangler queues create vyron-generation-jobs
+          fi
           npx wrangler deploy --var "APP_ORIGIN:$FRONTEND_URL" 2>&1 | tee deploy.log
           # Provision email secrets on every deployment when repository secrets exist.
           if [ -n "${MAIL_API_KEY:-}" ] && [ -n "${MAIL_FROM:-}" ]; then
