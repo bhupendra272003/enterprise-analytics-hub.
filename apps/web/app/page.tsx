@@ -47,13 +47,13 @@ export default function Home() {
     try {
       const r = await fetch(`${API}/api/auth/resend-verification`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', 'X-Hub-Request': '1' }, body: JSON.stringify({ email }) });
       const d = await r.json(); setNotice(d.message || d.error || 'Request completed.'); setVerificationUrl(d.verificationUrl || '');
-    } catch { setNotice('Unable to connect to VYRON.'); } finally { setBusy(false); }
+    } catch { setNotice('Unable to connect to BHUPENDRA'S VYRON.'); } finally { setBusy(false); }
   }
 
   return (
     <main className="shell">
       <nav className="topbar">
-        <a className="brand" href="#"><span className="brand-mark">V</span><span>VYRON<span className="brand-light"> ANALYTICS</span></span></a>
+        <a className="brand" href="#"><span className="brand-mark">V</span><span>BHUPENDRA'S VYRON</span></a>
         <div className="top-meta"><span className="status-dot" /> SECURE WORKSPACE <span className="top-divider" /> V 0.1</div>
       </nav>
 
@@ -74,7 +74,7 @@ export default function Home() {
           <div className="auth-card">
             <div className="card-kicker">YOUR WORKSPACE AWAITS</div>
             <h2>{mode === 'login' ? 'Welcome back.' : 'Create your account.'}</h2>
-            <p className="card-sub">{mode === 'login' ? 'Sign in to continue to your organization.' : 'Join VYRON. Your access will be reviewed.'}</p>
+            <p className="card-sub">{mode === 'login' ? 'Sign in to continue to your organization.' : 'Join BHUPENDRA'S VYRON. Your access will be reviewed.'}</p>
             <div className="tabs">
               <button className={mode === 'login' ? 'active' : ''} onClick={() => { setMode('login'); setNotice(''); }}>Sign in</button>
               <button className={mode === 'register' ? 'active' : ''} onClick={() => { setMode('register'); setNotice(''); }}>Create account</button>
@@ -93,7 +93,7 @@ export default function Home() {
           <div className="auth-bottom"><span>NEED AN INVITATION?</span><span>Ask your organization manager.</span></div>
         </div>
       </section>
-      <footer><span>© 2026 VYRON ANALYTICS</span><span>DATA • PEOPLE • PROGRESS</span><span>DESIGNED FOR BETTER DECISIONS</span></footer>
+      <footer><span>© 2026 BHUPENDRA'S VYRON</span><span>DATA • PEOPLE • PROGRESS</span><span>DESIGNED FOR BETTER DECISIONS</span></footer>
     </main>
   );
 }
