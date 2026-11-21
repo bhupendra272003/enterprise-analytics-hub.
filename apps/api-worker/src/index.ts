@@ -5,6 +5,8 @@ import { handleNotifications } from "./notifications";
 import { handleDatasets } from "./datasets";
 import datasetJobs, { handleDatasetJobs } from "./dataset-jobs";
 import { handleReports } from "./reports";
+import { handleTeams } from "./teams";
+import { handlePerformance } from "./performance";
 
 interface Env {
   DB: D1Database;
@@ -330,6 +332,22 @@ export default {
         const merged = new Headers(response.headers);
         for (const [key, value] of Object.entries(headers)) merged.set(key, value);
         if (response.headers.has("set-cookie")) merged.set("set-cookie", response.headers.get("set-cookie")!);
+        return new Response(response.body, { status: response.status, headers: merged });
+      }
+    }
+    if (url.pathname.startsWith("/api/teams/") || (url.pathname.startsWith("/api/organizations/") && url.pathname.endsWith("/teams")) || /^\\/api\\/tasks\\/[^/]+$/.test(url.pathname)) {
+      const response = await handleTeams(request, env, url.pathname);
+      if (response) {
+        const merged = new Headers(response.headers);
+        for (const [key, value] of Object.entries(headers)) merged.set(key, value);
+        return new Response(response.body, { status: response.status, headers: merged });
+      }
+    }
+    if (/^\\/api\\/organizations\\/[^/]+\\/performance$/.test(url.pathname)) {
+      const response = await handlePerformance(request, env, url.pathname);
+      if (response) {
+        const merged = new Headers(response.headers);
+        for (const [key, value] of Object.entries(headers)) merged.set(key, value);
         return new Response(response.body, { status: response.status, headers: merged });
       }
     }
