@@ -50,6 +50,16 @@ router.use(requireAuth, requireActiveUser);
 
 router.get('/', async (req, res, next) => {
   try {
+    // Rename only the signed-in user's own legacy "Vyron" workspace.
+    // Preserve its ID and slug to avoid breaking memberships or saved links.
+    const [legacyOwned] = await pool.execute(
+      "SELECT o.id FROM organizations o JOIN memberships m ON m.organization_id = o.id WHERE m.user_id = ? AND m.role = 'OWNER' AND m.membership_status = 'ACTIVE' AND LOWER(o.name) = 'vyron'",
+      [req.user.id]
+    );
+    for (const org of legacyOwned) {
+      await pool.execute("UPDATE organizations SET name = ? WHERE id = ? AND LOWER(name) = 'vyron'", ["Bhupendra's Vyron", org.id]);
+      await audit({ orgId: org.id, actorId: req.user.id, action: 'ORGANIZATION_RENAMED', targetType: 'ORGANIZATION', targetId: org.id, metadata: { from: 'Vyron', to: "Bhupendra's Vyron" }, ip: req.ip });
+    }
     const [rows] = await pool.execute(
       "SELECT o.id, o.name, o.slug, m.role FROM organizations o JOIN memberships m ON m.organization_id = o.id WHERE m.user_id = ? AND m.membership_status = 'ACTIVE'",
       [req.user.id]
