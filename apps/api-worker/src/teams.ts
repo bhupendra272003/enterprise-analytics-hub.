@@ -88,9 +88,10 @@ export async function handleTeams(req:Request,env:Env,path:string):Promise<Respo
  }
  const taskMatch=path.match(/^\/api\/tasks\/([^/]+)$/);
  if(taskMatch&&req.method==="PATCH"){
+  const task=await env.DB.prepare("SELECT t.id,t.team_id,t.assignee_id,t.status,t.title,p.organization_id FROM tasks t JOIN projects p ON p.id=t.project_id WHERE t.id=?").bind(taskMatch[1]).first<any>();
+  if(!task||!task.team_id)return null;
   let body:any;try{body=await req.json();}catch{return json({error:"Invalid task update."},400);}
   if(!body||typeof body!=="object"||Array.isArray(body)||Object.keys(body).some(k=>k!=="status"&&k!=="note")||!["TODO","IN_PROGRESS","BLOCKED","DONE"].includes(body.status))return json({error:"Only task status and an optional work note can be updated."},400);
-  const task=await env.DB.prepare("SELECT t.id,t.team_id,t.assignee_id,t.status,t.title,p.organization_id FROM tasks t JOIN projects p ON p.id=t.project_id WHERE t.id=?").bind(taskMatch[1]).first<any>();if(!task||!task.team_id)return json({error:"Team task not found."},404);
   const m=await member(env,task.organization_id,user.id);if(!m)return json({error:"Organization membership required."},403);
   const team=await env.DB.prepare("SELECT leader_user_id FROM teams WHERE id=?").bind(task.team_id).first<{leader_user_id:string}>();
   const canUpdate=(m.role==="LEADER"&&team?.leader_user_id===user.id&&task.assignee_id===user.id)||(m.role==="ANALYST"&&task.assignee_id===user.id);
