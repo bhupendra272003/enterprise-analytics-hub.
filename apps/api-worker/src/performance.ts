@@ -23,7 +23,7 @@ export async function handlePerformance(req:Request,env:Env,path:string):Promise
   const memberStats=teamMembers.map(m=>{
    const mine=teamTasks.filter(t=>t.assigneeId===m.userId), completed=mine.filter(t=>t.status==="DONE"), overdue=mine.filter(t=>t.status!=="DONE"&&due(t.dueDate));
    const received=teamHistory.filter(h=>h.newAssigneeId===m.userId);
-   return {...m,assignedTasks:mine.length,completedTasks:completed.length,blockedTasks:mine.filter(t=>t.status==="BLOCKED").length,overdueTasks:overdue.length,onTimeTasks:completed.filter(t=>!due(t.dueDate)).length,assignmentEvents:received.length,distinctTasksAssigned:new Set(received.map(h=>h.taskId)).size,tasks:mine};
+   return {...m,assignedTasks:mine.length,completedTasks:completed.length,blockedTasks:mine.filter(t=>t.status==="BLOCKED").length,overdueTasks:overdue.length,onTimeTasks:completed.filter(t=>!due(t.dueDate)).length,assignmentEvents:received.length,distinctTasksAssigned:new Set(received.map(h=>h.taskId)).size,tasks:mine.map(task=>({...task,assignmentHistory:teamHistory.filter(h=>h.taskId===task.id)}))};
   });
   const leaderAssignments=teamHistory.filter(h=>h.assignedBy===team.leaderId);
   const leaderOwnTasks=teamTasks.filter(t=>t.assigneeId===team.leaderId);
