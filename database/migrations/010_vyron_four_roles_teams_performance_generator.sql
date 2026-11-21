@@ -4,9 +4,9 @@
 -- only after the organization Owner reviews the member's new access. Back up first.
 
 UPDATE memberships SET role='MANAGER' WHERE role='ADMIN';
-UPDATE memberships SET role='ANALYST' WHERE role='VIEWER';
+UPDATE memberships SET role='MANAGER' WHERE role='VIEWER';
 UPDATE invitations SET role='MANAGER' WHERE role='ADMIN';
-UPDATE invitations SET role='ANALYST' WHERE role='VIEWER';
+UPDATE invitations SET role='MANAGER' WHERE role='VIEWER';
 
 ALTER TABLE memberships
   MODIFY role ENUM('OWNER','MANAGER','LEADER','ANALYST') NOT NULL;
