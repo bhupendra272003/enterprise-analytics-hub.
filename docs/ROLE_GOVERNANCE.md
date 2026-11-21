@@ -57,5 +57,7 @@ Record actor, timestamp, organization, team/project, action, target and safe met
 5. Storage, backup, access isolation, generator throughput and recovery are tested.
 6. Owner manually enables and starts generation for selected approved industries.
 
-## Implementation status
-This document defines the required target model. The repository's current API and database still contain legacy ADMIN/VIEWER/manager permission branches and do not yet enforce the complete four-role model, team-scoped Leader assignment, Owner-only generator controls or performance reporting. Apply the migration and API/UI implementation and test all role boundaries before calling this live.
+## Implementation status (Cloudflare D1/Worker branch)
+The Cloudflare D1 migration and Worker API now enforce exactly OWNER, MANAGER, LEADER and ANALYST organization roles. Legacy ADMIN and VIEWER memberships are mapped to read-only MANAGER during migration. Team APIs enforce one designated Leader per team, one Analyst team per organization, Owner-managed roster changes, Leader-scoped task assignment/reassignment and Analyst-only assigned-task progress updates. Owner and Manager have organization-wide performance visibility; Leader and Analyst views are scoped.
+The Owner-only generator settings, preview, confirmation endpoint and queued batch worker are implemented with active project/team/participant checks, row caps, cancellation and audit history. The current generator is limited to one synthetic CSV template per organization's industry, 100,000 rows and 10 MiB per file; no schedule or automatic run exists.
+This branch has passed recent D1 migration validation and Worker type-check. Full production deployment, live D1 migration, queue provisioning verification, end-to-end authorization tests, load tests and security review are still pending. The Express/MySQL application path remains legacy and must not be assumed to enforce the same policy.
