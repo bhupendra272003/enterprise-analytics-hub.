@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { pool } from '../db.js';
 import { audit } from '../audit.js';
-import { requireAuth, requireActiveUser, requireRole } from '../middleware.js';
+import { requireAuth, requireActiveUser } from '../middleware.js';
 
 const router = Router();
 router.use(requireAuth, requireActiveUser);
