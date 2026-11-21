@@ -163,4 +163,31 @@ router.post('/organizations/:orgId/performance/corrections', async (req, res, ne
   } catch (err) { next(err); }
 });
 
+
+router.get('/organizations/:orgId/performance/corrections', async (req,res,next)=>{
+  try{
+    const [membership]=await pool.execute("SELECT role FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE' LIMIT 1",[req.params.orgId,req.user.id]);
+    if(!membership.length||membership[0].role!=='OWNER')return res.status(403).json({error:'Only the Owner can review performance correction requests.'});
+    const [rows]=await pool.execute(
+      `SELECT c.id,c.subject_user_id AS subjectUserId,s.full_name AS subjectName,c.requested_by AS requestedBy,r.full_name AS requesterName,c.task_id AS taskId,c.reason,c.status,c.reviewer_note AS reviewerNote,c.created_at AS createdAt,c.reviewed_at AS reviewedAt
+       FROM performance_corrections c JOIN users s ON s.id=c.subject_user_id JOIN users r ON r.id=c.requested_by
+       WHERE c.organization_id=? ORDER BY c.created_at DESC LIMIT 100`,
+      [req.params.orgId]
+    );
+    res.json({corrections:rows});
+  }catch(err){next(err);}
+});
+
+router.patch('/organizations/:orgId/performance/corrections/:correctionId', async (req,res,next)=>{
+  try{
+    const input=z.object({status:z.enum(['ACCEPTED','DECLINED']),reviewerNote:z.string().trim().max(1000).optional().default('')}).parse(req.body);
+    const [membership]=await pool.execute("SELECT role FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE' LIMIT 1",[req.params.orgId,req.user.id]);
+    if(!membership.length||membership[0].role!=='OWNER')return res.status(403).json({error:'Only the Owner can decide correction requests.'});
+    const [result]=await pool.execute("UPDATE performance_corrections SET status=?,reviewed_by=?,reviewer_note=?,reviewed_at=NOW() WHERE id=? AND organization_id=? AND status='OPEN'",[input.status,req.user.id,input.reviewerNote,req.params.correctionId,req.params.orgId]);
+    if(!result.affectedRows)return res.status(404).json({error:'Open correction request not found.'});
+    await audit({orgId:req.params.orgId,actorId:req.user.id,action:'PERFORMANCE_CORRECTION_REVIEWED',targetType:'PERFORMANCE_CORRECTION',targetId:req.params.correctionId,metadata:{status:input.status},ip:req.ip});
+    res.json({message:'Performance correction request reviewed.',status:input.status});
+  }catch(err){next(err);}
+});
+
 export default router;
