@@ -25,14 +25,16 @@ export default function PeoplePanel({ organizationId, role }: { organizationId:s
     setRefreshing(true);
     try {
       const headers={'X-Hub-Request':'1'};
-      const [m,r]=await Promise.all([
-        fetch(`${API}/api/organizations/${organizationId}/members`,{credentials:'include',headers}),
-        fetch(`${API}/api/organizations/${organizationId}/requests`,{credentials:'include',headers})
-      ]);
-      const md=await m.json(); const rd=await r.json();
+      const m=await fetch(`${API}/api/organizations/${organizationId}/members`,{credentials:'include',headers});
+      const md=await m.json();
       if(!m.ok) throw new Error(md.error||'Could not load members.');
-      if(!r.ok) throw new Error(rd.error||'Could not load access requests.');
-      setMembers(md.members||[]); setRequests(rd.requests||[]);
+      setMembers(md.members||[]);
+      if(canReview){
+        const r=await fetch(`${API}/api/organizations/${organizationId}/requests`,{credentials:'include',headers});
+        const rd=await r.json();
+        if(!r.ok) throw new Error(rd.error||'Could not load access requests.');
+        setRequests(rd.requests||[]);
+      } else setRequests([]);
     } catch(e) { setNotice(e instanceof Error?e.message:'Could not load people.'); }
     finally { setRefreshing(false); }
   },[organizationId,canView,canReview]);
