@@ -83,7 +83,9 @@ router.get('/organizations/:orgId/performance', async (req, res, next) => {
       const leader = {...(leaderWork.find(row => row.teamId === team.id) || {}),...(leaderAssignmentHistory.find(row=>row.teamId===team.id&&row.leaderId===team.leaderId)||{assignmentEvents:0,distinctRecipients:0,distinctTasksTouched:0})};
       const signals = [];
       if (roster.length > 1 && Number(team.taskCount) > 0 && roster.some(member => Number(member.assignedTasks) === 0)) signals.push('MEMBER_WITH_NO_ASSIGNED_TASKS');
-      if (roster.length > 1 && min > 0 && max >= min * 2 && max - min >= 2) signals.push('POSSIBLE_WORKLOAD_IMBALANCE');\n      if (roster.length > 1 && historyCounts.some(value=>value===0) && Math.max(...historyCounts)>0) signals.push('POSSIBLE_ASSIGNMENT_EXCLUSION');\n      if (roster.length > 1 && Math.min(...historyCounts)>0 && Math.max(...historyCounts)>=Math.min(...historyCounts)*2 && Math.max(...historyCounts)-Math.min(...historyCounts)>=2) signals.push('ASSIGNMENT_HISTORY_IMBALANCE');
+      if (roster.length > 1 && min > 0 && max >= min * 2 && max - min >= 2) signals.push('POSSIBLE_WORKLOAD_IMBALANCE');
+      if (roster.length > 1 && historyCounts.some(value=>value===0) && Math.max(...historyCounts)>0) signals.push('POSSIBLE_ASSIGNMENT_EXCLUSION');
+      if (roster.length > 1 && Math.min(...historyCounts)>0 && Math.max(...historyCounts)>=Math.min(...historyCounts)*2 && Math.max(...historyCounts)-Math.min(...historyCounts)>=2) signals.push('ASSIGNMENT_HISTORY_IMBALANCE');
       if (Number(leader.tasksAssignedByLeader || 0) > 0 && Number(leader.tasksPersonallyOwnedByLeader || 0) === 0) signals.push('LEADER_HAS_NO_PERSONAL_TASK_OWNERSHIP');
       return { ...team, members: roster, leaderWork: leader, allocationSignals: signals };
     });
