@@ -14,6 +14,7 @@ import projectRoutes from './routes/projects.js';
 import datasetRoutes from './routes/datasets.js';
 import reportRoutes from './routes/reports.js';
 import notificationRoutes from './routes/notifications.js';
+import performanceRoutes from './routes/performance.js';
 const app = express();
 const MySQLStore = MySQLStoreFactory(session);
 const sessionStore = new MySQLStore({ createDatabaseTable: true }, pool);
@@ -36,6 +37,7 @@ app.use('/api', projectRoutes);
 app.use('/api', datasetRoutes);
 app.use('/api', reportRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api', performanceRoutes);
 app.use((err, req, res, next) => {
   if (err?.name === 'MulterError') return res.status(err.code === 'LIMIT_FILE_SIZE' ? 413 : 400).json({ error: err.code === 'LIMIT_FILE_SIZE' ? 'CSV file exceeds the 15 MB limit.' : 'File upload could not be processed.' });
   if (err?.name === 'ZodError') return res.status(400).json({ error: 'Validation failed.', details: err.issues });
