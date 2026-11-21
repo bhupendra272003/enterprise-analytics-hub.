@@ -12,7 +12,9 @@ on:
       - 'apps/web/app/**'
       - 'apps/web/app/api/**'
       - 'apps/web/next.config.mjs'
-      - 'apps/api-worker/src/index.ts'
+      - 'apps/api-worker/src/**'
+      - 'apps/api-worker/wrangler.jsonc'
+      - 'apps/web/wrangler.jsonc'
       - 'database/d1/**'
       - '.github/workflows/cloudflare-deploy.yml'
 
@@ -40,8 +42,6 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          # Proxy browser API requests through the frontend origin to avoid CORS.
-          API_PROXY_TARGET: https://nexus-analytics-api.bhupendrasinghdeora24.workers.dev
         run: |
           set -euo pipefail
           npm install
@@ -84,7 +84,7 @@ jobs:
           API_URL: ${{ steps.api.outputs.url }}
         run: |
           {
-            echo "## NEXUS Cloudflare deployment"
+            echo "## Bhupendra's Vyron Cloudflare deployment"
             echo "- Frontend: $FRONTEND_URL"
             echo "- API Worker: $API_URL"
             echo "- Health check: $API_URL/health"
