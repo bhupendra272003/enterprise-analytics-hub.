@@ -1,4 +1,4 @@
-name: Deploy NEXUS to Cloudflare Free
+name: Deploy Bhupendra's Vyron to Cloudflare Free
 
 on:
   workflow_dispatch:
