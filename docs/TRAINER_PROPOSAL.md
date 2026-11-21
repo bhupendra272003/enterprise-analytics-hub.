@@ -1,68 +1,62 @@
 # Trainer Proposal — Bhupendra's Vyron
 
 ## 1. Project introduction
-Bhupendra's Vyron is a proposed multi-industry analytics and team-collaboration workspace. It is designed to simulate a professional analytics delivery environment where participants work with structured datasets, clean and validate data, analyze business questions, build dashboards and present evidence-backed insights.
+Bhupendra's Vyron is a governed multi-industry analytics and collaboration workspace. It is designed to simulate a professional analytics delivery environment where participants work with structured datasets, clean and validate data, analyze business questions, build dashboards and present evidence-backed insights.
 
-## 2. Why this project
-Individual analytics exercises often stop at a single dashboard. Vyron aims to connect the full lifecycle:
+## 2. Learning lifecycle
 Requirements → Data discovery → Ingestion → Profiling → Cleaning → Validation → SQL/Python analysis → Dashboarding → QA/reconciliation → Insights → Review → Delivery.
 
-The purpose is practical learning, collaboration, documentation and accountable handoffs.
-
-## 3. Proposed industries
+## 3. Proposed industry templates
 - Banking & Financial Services
 - Hospital & Healthcare
 - Logistics & Supply Chain
 - Retail & E-commerce
 
-The trainer may approve fewer, different or additional industries. No industry is compulsory.
+The trainer may approve fewer, different or additional industries. An unused industry remains idle; it does not receive generated data.
 
-## 4. What participants may learn
-- Data cleaning and quality assessment.
-- Excel/CSV handling, SQL and Python analysis.
-- Data modeling, KPI design and Power BI dashboards.
-- Version control, documentation and reproducibility.
-- Team collaboration, review, task planning and presentation.
-- Responsible handling of sensitive information.
+## 4. Four-role operating model
+- **Owner:** controls workspace, approves access, selects active industries, sets data-generation limits and manually starts generation.
+- **Manager:** views reports, workload, team progress and performance; requests Owner approval for any restricted action.
+- **Leader:** leads one team, assigns work to Analysts, monitors delivery and submits team progress.
+- **Analyst:** completes assigned cleaning, SQL/Python analysis, validation and dashboard tasks.
 
-## 5. Proposed operating model
-- Workload target: maximum two hours per participant per day, subject to trainer approval.
-- Data refresh: at most one planned synthetic-data batch per day after performance testing.
-- First work session: common dataset orientation, profiling and cleaning practice.
-- Later sessions: validation, analysis, dashboarding, QA and presentation.
-- Team count and member roles will be decided only after the number of approved participants is known.
+There are exactly four organization roles. A team consists of one Leader and its Analysts. Team count and size depend on the actual approved participant count.
 
-## 6. Data and privacy safeguards
-The training environment will use synthetic or formally approved de-identified data. No real patient identifiers, bank account numbers, card details, passwords or private customer records will be introduced without formal approval and safeguards. Dataset exports will be controlled and documented.
+## 5. Owner-controlled data generation
+There is no automatic daily generation. The Owner selects approved industries, datasets and row limits, reviews the volume summary, and clicks Generate. Industries without an active approved team/project are skipped. The configured row limit is a hard cap. Large jobs must run in a background worker with progress, pause/cancel, idempotent retries and audit history.
 
-## 7. Governance
-The project owner remains accountable for the workspace. The trainer may choose to participate as a reviewer/mentor, project manager or administrator. Reviewer access is the recommended starting point. Administrative privileges will be granted only with explicit consent and a clearly defined responsibility.
+## 6. Performance and contribution transparency
+Vyron is intended to track assigned/completed/overdue/blocked tasks, on-time delivery, review outcomes, accepted deliverables, data-quality improvements, documentation and peer review. Managers can view reports and team performance. Leaders see their team's work; Analysts see their own contribution history; Owner has full oversight. Metrics are evidence-based and transparent, not based on login time or keystrokes.
 
-No invitations, teams or scheduled generation will be activated before approval.
+## 7. Data and privacy safeguards
+Use synthetic or formally approved de-identified data only. Never introduce real patient identifiers, bank account/card details, passwords or private customer records without formal approval, legal basis and safeguards. Label generated data as synthetic and preserve source/version history.
 
-## 8. Current status and honest scope
-The existing codebase already has an initial identity and organization system, access requests and invitations, projects/tasks, CSV upload, Python cleaning/profiling, dataset versioning/validation, audit history and a Power BI link catalog.
+## 8. Proposed workload
+A maximum of two hours per participant per day may be used as a planning proposal, subject to trainer approval. The trainer may set a different schedule and workload.
 
-The following require further implementation or production validation: granular project/dataset permissions, secure Power BI embedding, live database/API connectors, true concurrent editing, durable object storage for large datasets, scheduled high-volume generation, backups and independent security review.
+## 9. Current implementation status
+The codebase has an initial identity and organization system, access requests/invitations, projects/tasks, CSV upload, Python cleaning/profiling, dataset versioning/validation, audit history and a Power BI link catalog.
 
-## 9. Decisions requested from the trainer
-1. Is the project approved for a supervised pilot?
-2. Which industries and datasets are suitable?
-3. How many participants may join?
-4. What daily time limit and schedule should apply?
-5. Should the trainer be a reviewer, project manager or administrator?
+The four-role model, team-scoped Leader permissions, Owner-only generation controls, background generator, performance dashboards and complete role-specific UI are requirements for the next implementation phase; they are not yet production-ready. Granular project/dataset permissions, secure Power BI embedding, live connectors, durable object storage, backups and independent security review also remain engineering work.
+
+## 10. Decisions requested from the trainer
+1. Is a supervised synthetic-data-based pilot approved?
+2. Which industries and datasets should be active?
+3. How many participants may join, and what team sizes are suitable?
+4. Who may act as Manager and Leaders?
+5. What daily workload and schedule should apply?
 6. Which tools are permitted (Vyron, Excel, SQL, Python, Power BI)?
 7. What data/privacy and submission rules must be followed?
 8. What deliverables and evaluation criteria are expected?
 
-## 10. Expected deliverables
+## 11. Expected deliverables
 - Documented datasets and data dictionaries.
 - Cleaning and validation evidence.
-- SQL/Python analysis notebooks or scripts.
+- SQL/Python analysis scripts or notebooks.
 - Power BI dashboards and KPI definitions.
 - QA/reconciliation checklist.
 - Final insights report and presentation.
 - Individual/team contribution and learning summary.
 
-## 11. Proposed approval statement
-"Approval is requested to conduct a supervised, synthetic-data-based analytics collaboration project using Bhupendra's Vyron. Participant onboarding, team creation, data-generation schedules and operational roles will begin only after the trainer confirms the scope and conditions."
+## 12. Approval statement
+"Approval is requested to conduct a supervised, synthetic-data-based analytics collaboration project using Bhupendra's Vyron. Participant onboarding, team creation, active industries and data generation will begin only after the trainer confirms the scope and conditions."
