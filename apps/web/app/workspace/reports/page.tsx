@@ -4,7 +4,7 @@ const API=process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === 'producti
 type Org={id:string;name:string;role:string};type Report={id:string;title:string;description:string;reportUrl:string;createdAt:string;createdBy:string};
 export default function ReportsPage(){
  const [orgs,setOrgs]=useState<Org[]>([]),[org,setOrg]=useState(''),[reports,setReports]=useState<Report[]>([]),[show,setShow]=useState(false),[title,setTitle]=useState(''),[description,setDescription]=useState(''),[url,setUrl]=useState(''),[notice,setNotice]=useState('Loading reports…'),[busy,setBusy]=useState(false);
- const active=orgs.find(o=>o.id===org),canManage=active&&['OWNER','ADMIN','MANAGER'].includes(active.role);
+ const active=orgs.find(o=>o.id===org),canManage=active?.role==='OWNER';
  async function call(path:string,options:RequestInit={}){const r=await fetch(API+path,{...options,credentials:'include',headers:{'Content-Type':'application/json','X-Hub-Request':'1',...(options.headers||{})}});const d=await r.json();if(!r.ok)throw new Error(d.error||'Request failed');return d;}
  async function load(id:string){const d=await call('/api/organizations/'+id+'/reports');setReports(d.reports||[]);}
  useEffect(()=>{call('/api/organizations').then(d=>{setOrgs(d.organizations||[]);if(d.organizations?.length)setOrg(d.organizations[0].id);setNotice('');}).catch(e=>setNotice(e.message));},[]);
