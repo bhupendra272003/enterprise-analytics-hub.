@@ -91,7 +91,7 @@ export default function TeamPage() {
     <section className="team-main">
       <header className="team-header"><div><span className="breadcrumb">VYRON / WORKSPACE /</span><b> TEAM & ACCESS</b></div><a href="/workspace" className="back-link">← Overview</a></header>
       <div className="team-content">
-        <div className="team-heading"><div><div className="eyebrow"><span/> PEOPLE & PERMISSIONS</div><h1>Build your <em>team.</em></h1><p>Bring the right people into the right workspace, with access that makes sense.</p></div><button className="primary-action" onClick={() => setShowCreate(v => !v)}>＋ New organization</button></div>
+        <div className="team-heading"><div><div className="eyebrow"><span/> PEOPLE & PERMISSIONS</div><h1>Build your <em>team.</em></h1><p>Bring the right people into the right workspace, with access that makes sense.</p></div><button className="primary-action" type="button" aria-expanded={showCreate} aria-controls="create-organization-panel" onClick={() => setShowCreate(v => !v)}>＋ New organization</button></div>
 
         <div className="team-stats">
           <article><small>YOUR ORGANIZATIONS</small><strong>{orgs.length.toString().padStart(2, '0')}</strong><span>Workspaces you belong to</span></article>
@@ -99,9 +99,9 @@ export default function TeamPage() {
           <article><small>ACCESS MODEL</small><strong className="stat-text">Role-based</strong><span>Permissions are enforced by the API</span></article>
         </div>
 
-        {showCreate && <form className="panel create-panel" onSubmit={createOrganization}>
+        {showCreate && <form id="create-organization-panel" className="panel create-panel" onSubmit={createOrganization}>
           <div className="panel-title"><div><small>START A NEW WORKSPACE</small><h2>Create organization</h2></div><button type="button" className="close-button" onClick={() => setShowCreate(false)}>×</button></div>
-          <div className="form-grid"><label>INDUSTRY / BUSINESS DOMAIN<select value={industry} onChange={e => setIndustry(e.target.value)} required><option value="BFSI">BFSI · Banking, Finance & Insurance</option><option value="ECOMMERCE">E-commerce</option><option value="LOGISTICS">Logistics & Supply Chain</option><option value="HOTELS">Hotels & Hospitality</option></select></label><label>ORGANIZATION NAME<input value={name} onChange={e => { setName(e.target.value); if (!slug) setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')); }} placeholder="e.g. Northstar Analytics" required minLength={2}/></label><label>WORKSPACE SLUG<input value={slug} onChange={e => setSlug(e.target.value)} placeholder="northstar-analytics" required pattern="[a-z0-9-]{3,180}"/></label></div>
+          <div className="form-grid"><label>INDUSTRY / BUSINESS DOMAIN<select value={industry} onChange={e => setIndustry(e.target.value)} required><option value="BFSI">BFSI · Banking, Finance & Insurance</option><option value="ECOMMERCE">E-commerce</option><option value="LOGISTICS">Logistics & Supply Chain</option><option value="HOTELS">Hotels & Hospitality</option></select></label><label>ORGANIZATION NAME<input value={name} onChange={e => { setName(e.target.value); if (!slug) setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')); }} placeholder="Bhupendra's Vyron" required minLength={2}/></label><label>WORKSPACE SLUG<input value={slug} onChange={e => setSlug(e.target.value)} placeholder="northstar-analytics" required pattern="[a-z0-9-]{3,180}"/></label></div>
           <button className="primary-action" disabled={busy}>{busy ? 'Creating…' : 'Create workspace ↗'}</button>
         </form>}
 
