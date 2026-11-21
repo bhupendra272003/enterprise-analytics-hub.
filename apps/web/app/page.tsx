@@ -74,7 +74,7 @@ export default function Home() {
           <div className="auth-card">
             <div className="card-kicker">YOUR WORKSPACE AWAITS</div>
             <h2>{mode === 'login' ? 'Welcome back.' : 'Create your account.'}</h2>
-            <p className="card-sub">{mode === 'login' ? 'Sign in to continue to your organization.' : 'Join BHUPENDRA'S VYRON. Your access will be reviewed.'}</p>
+            <p className="card-sub">{mode === 'login' ? 'Sign in to continue to your organization.' : "Join BHUPENDRA'S VYRON. Your access will be reviewed."}</p>
             <div className="tabs">
               <button className={mode === 'login' ? 'active' : ''} onClick={() => { setMode('login'); setNotice(''); }}>Sign in</button>
               <button className={mode === 'register' ? 'active' : ''} onClick={() => { setMode('register'); setNotice(''); }}>Create account</button>
