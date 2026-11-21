@@ -1,6 +1,6 @@
 type Env = { DB: D1Database; APP_ORIGIN: string; MAIL_API_KEY?: string; MAIL_FROM?: string };
 type User = { id:string; email:string; account_status:string };
-type Role = "OWNER"|"ADMIN"|"MANAGER"|"ANALYST"|"VIEWER";
+type Role = "OWNER"|"MANAGER"|"LEADER"|"ANALYST";
 const json=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store"}});
 const getUser=async(req:Request,env:Env):Promise<User|null>=>{
  const cookie=req.headers.get("Cookie")||"";
@@ -73,11 +73,10 @@ export async function handleInvitations(req:Request,env:Env,path:string):Promise
   if(!user)return json({error:"Authentication required."},401);
   if(user.account_status!=="ACTIVE")return json({error:"An active account is required."},403);
   const orgId=create[1],m=await member(env,orgId,user.id);
-  if(!m||!["OWNER","ADMIN"].includes(m.role))return json({error:"Only owners and administrators can invite members."},403);
+  if(!m||m.role!=="OWNER")return json({error:"Only the Owner can invite members and assign organization roles."},403);
   let body:any;try{body=await req.json();}catch{return json({error:"Invalid JSON body."},400);}
   const email=typeof body.email==="string"?body.email.trim().toLowerCase():"",role=body.role;
-  if(!validEmail(email)||!["ADMIN","MANAGER","ANALYST","VIEWER"].includes(role))return json({error:"Enter a valid email and invitation role."},400);
-  if(m.role==="ADMIN"&&role==="ADMIN")return json({error:"Only the owner can invite administrators."},403);
+  if(!validEmail(email)||!["MANAGER","LEADER","ANALYST"].includes(role))return json({error:"Enter a valid email and choose Manager, Leader or Analyst."},400);
   const org=await env.DB.prepare("SELECT name FROM organizations WHERE id=?").bind(orgId).first<{name:string}>();
   if(!org)return json({error:"Organization not found."},404);
   const token=Array.from(crypto.getRandomValues(new Uint8Array(32))).map(v=>v.toString(16).padStart(2,"0")).join("");

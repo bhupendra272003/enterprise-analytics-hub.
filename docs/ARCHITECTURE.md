@@ -1,53 +1,84 @@
-# NEXUS ANALYTICS — Architecture
+# Bhupendra's Vyron — Architecture & Delivery Boundaries
 
-## Current architecture
+## Product intent
+A multi-tenant, multi-industry analytics and collaboration workspace that takes work from requirements and raw data through cleaning, validation, analysis, dashboarding, QA and delivery. Participant count, team count and selected industries remain configurable after trainer/institution approval.
 
-- Web application: Next.js 15, React 19 and TypeScript.
-- API: Node.js 20 and Express.
-- Identity: server-side MySQL sessions, bcrypt password hashing, email verification and password-reset tokens.
-- Tenant model: organizations, memberships and role-based API authorization.
-- Database: MySQL 8.
-- Data ingestion: CSV upload with a private local-disk storage adapter, metadata catalog, 10-row preview, Python standard-library cleaning worker and quality scoring.
-- Reporting: organization-scoped Power BI report-link catalog. Power BI itself remains responsible for report access.
-- Notifications: user-scoped in-app inbox for access decisions, invitations, task assignments and report publication.
-- Audit: organization-scoped activity feed for owners/admins.
+## Repository architecture observed
+- Web: Next.js 15, React 19, TypeScript.
+- Express API path: Node.js, Express and MySQL; includes account, organization, project, task, dataset, report, notification and audit routes.
+- Cloudflare Worker path: TypeScript Worker with D1, KV and Queues; includes authentication and organization, project, dataset, report and background dataset-job handlers.
+- Data: CSV upload and Python cleaning/profiling capabilities exist in the Express application. The Worker path includes queued dataset profiling jobs with a current small-file safety limit.
+- BI: organization-scoped Power BI report-link catalog. Secure Power BI embedding is not implemented.
+- Storage: the Express CSV adapter uses local disk. The Worker bindings shown in wrangler configuration include D1, KV and Queues; no R2 binding is currently declared in that configuration.
 
-## Multi-tenant security
+**Deployment caution:** both application paths are present. Confirm which API path is actually routed in production before changing schema, storage, job scheduling or data generation. Do not assume the Express/MySQL and Worker/D1 schemas are interchangeable.
 
-Every organization-owned API operation checks the signed-in user's active membership in the requested organization. Never rely on frontend visibility for authorization. User-level notifications are filtered by the authenticated user. Dataset previews and files are accessible only after membership checks.
+## Existing implementation foundation
+- Registration, email verification, login, session handling and password recovery.
+- Organizations, membership roles, access requests, invitations and membership management.
+- Projects, tasks, statuses, priorities, assignees and due dates.
+- CSV dataset catalog, preview, Python cleaning, profiling and validation.
+- Immutable dataset versions, version comparison and restore-as-new-version.
+- Quality/anomaly history and organization audit events.
+- In-app notifications and Power BI report-link catalog.
+- Worker background profiling job queue.
 
-## Roles
+These are initial product capabilities and require testing/hardening; this is not a production-certification claim.
 
-- OWNER: full organization administration, member management and access decisions.
-- ADMIN: manage organization members and settings; cannot grant administrator privileges or modify another admin.
-- MANAGER: coordinate projects, assign tasks, review access requests and view the member directory.
-- ANALYST: create tasks, work with authorized datasets and reports; can update only tasks assigned to them.
-- VIEWER: read-only organization access.
+## Target product modules
+1. Overview and project health.
+2. Industry and dataset catalog with data dictionary, lineage and sensitivity.
+3. Governed ingestion, cleaning, validation and immutable versioning.
+4. SQL/Python analyst workspace and documented business questions.
+5. Project delivery: milestones, dependencies, assignments, handoffs and review.
+6. BI and reporting: KPI definitions, Power BI integration and approved exports.
+7. People and governance: organization roles plus project-scoped responsibilities and dataset permissions.
+8. Synthetic data engine: scheduled, idempotent, chunked background jobs and run history.
+9. Trainer/reviewer view with explicitly granted, limited access.
+
+## Role model
+### Organization roles currently present
+- OWNER: accountable organization owner.
+- ADMIN: organization member/settings administration subject to server-side rules.
+- MANAGER: project coordination and task management.
+- ANALYST: authorized analysis and assigned work.
+- VIEWER: read-only access.
+
+### Project responsibilities proposed
+Project Lead, Data Engineer/Data Steward, Data Cleaner, Analyst, BI Developer, QA/Reviewer and Trainer/Mentor. These are responsibilities, not necessarily new organization roles. A person may hold multiple responsibilities in a small cohort and roles may rotate.
+
+### Trainer access recommendation
+Start with limited Reviewer/Mentor access to approved project information. Consider Manager only if the trainer agrees to coordinate daily delivery. Grant Admin only with explicit consent and a defined administrative responsibility. Do not grant platform-wide administrator rights by default. Project-scoped reviewer permissions still need implementation before being promised as a live feature.
+
+## Approval gates
+1. Proposal and scope prepared.
+2. Trainer/institution approves objectives, industries, data rules, workload and tools.
+3. Participant count and consent confirmed.
+4. Invitations and memberships activated.
+5. Teams, leads, tasks and project permissions configured.
+6. Operational launch after storage, security and performance checks.
+
+No team, participant or recurring generation schedule is created by the blueprint itself.
 
 ## Data lifecycle
+Requirements → Discovery → Ingestion → Profiling → Cleaning → Validation → SQL/Python → Dashboarding → QA/Reconciliation → Insights → Review → Delivery → Monitoring.
 
-The current CSV adapter stores source files outside the public web directory and persists metadata plus a small preview in MySQL. Each initial upload is registered as immutable version 1 in `dataset_versions`, including its own storage path, row/column counts, schema and preview. The adapter remains development/local-disk; production requires a persistent private volume or managed object storage. Re-uploads create immutable snapshots. Members can compare row counts and column names between two versions; authorized analyst roles can restore an older snapshot by creating a new version rather than overwriting history. The Python worker trims whitespace, optionally removes duplicate rows, fills missing values with a selected strategy, detects potential numeric outliers using the IQR rule without deleting them, and reports before/after quality scores. Each cleaned output is committed as a new immutable version. Row-level diffs, automated quality rules, retention controls and managed object storage remain planned.
+Raw files remain immutable. Cleaning and validation create versioned outputs. Every handoff should record dataset version, owner, status, checks performed and approval. Use synthetic or formally approved de-identified data; do not introduce real patient, bank-customer or payment-card data without authorization and safeguards.
 
-## Security controls currently present
+## Synthetic data generation
+The discussed planning volumes are 50,000+ initial rows and 10,000+ daily additions. Whether those are per industry or aggregate is not yet confirmed. Keep volume configurable and generation disabled until confirmation, trainer approval, storage selection and load testing. Use queue-based chunk processing, idempotency keys, bounded concurrency, retries, run logs and safe failure recovery. Never generate a large batch synchronously in a web request.
 
-- Password hashing with bcrypt.
-- Email verification required before sign-in for open registration.
-- One-time, expiring verification and password-reset tokens stored as SHA-256 hashes.
-- Password reset revokes sessions stored in the MySQL session table.
-- Session regeneration on login.
-- Secure cookie settings configurable by environment.
-- Helmet, exact-origin CORS, request-origin/header guard and authentication rate limiting.
-- Tenant-scoped membership checks and audit events for key operations.
+## Security and production gaps
+- Project-scoped roles and dataset/column-level access controls.
+- Durable private object storage and retention/lifecycle policy.
+- Approved database/API connectors with least-privilege credentials.
+- Safe concurrent editing, conflict handling and lineage.
+- Secure Power BI embedding and token lifecycle.
+- CSRF review, MFA, tenant-isolation tests and independent security review.
+- Backups, restore drills, monitoring, alerting and secret management.
+- Load tests for large datasets and dashboard responsiveness.
 
-## Production gaps
+Do not claim these gaps are already implemented.
 
-Complete a dedicated CSRF review and token strategy, MFA, automated security/dependency scanning, tenant-isolation integration tests, object-storage adapter, monitoring/alerting, backup/restore drills, and independent security review. Power BI secure embedding and service-principal token handling are not implemented; current integration is a link catalog only.
-
-## Roadmap
-
-1. Complete identity and access management with MFA and security review.
-2. Add persistent object storage, row-level dataset diffs, snapshot retention and lifecycle policies.
-3. Add Python profiling/cleaning jobs and governed analyst workspace.
-4. Add approved data connectors and scheduled ingestion.
-5. Add secure Power BI embedding and dashboard integration.
-6. Add operational alerts, monitoring and recovery automation.
+## Trainer presentation
+See [Trainer Proposal](TRAINER_PROPOSAL.md), [Platform Blueprint](PLATFORM_BLUEPRINT.md), [Role Governance](ROLE_GOVERNANCE.md), [Industry Data Catalog](INDUSTRY_DATA_CATALOG.md) and [Data Generation Specification](DATA_GENERATION_SPEC.md).

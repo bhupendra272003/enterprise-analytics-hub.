@@ -16,26 +16,28 @@ export default function PeoplePanel({ organizationId, role }: { organizationId:s
   const [roleFilter,setRoleFilter]=useState('ALL');
   const [statusFilter,setStatusFilter]=useState('ALL');
   const [refreshing,setRefreshing]=useState(false);
-  const canReview=['OWNER','ADMIN'].includes(role);
+  const canReview=role==='OWNER';
   const canManageMembers=canReview;
-  const canView=['OWNER','ADMIN','MANAGER'].includes(role);
+  const canView=['OWNER','MANAGER'].includes(role);
 
   const load=useCallback(async()=>{
     if(!organizationId || !canView) return;
     setRefreshing(true);
     try {
       const headers={'X-Hub-Request':'1'};
-      const [m,r]=await Promise.all([
-        fetch(`${API}/api/organizations/${organizationId}/members`,{credentials:'include',headers}),
-        fetch(`${API}/api/organizations/${organizationId}/requests`,{credentials:'include',headers})
-      ]);
-      const md=await m.json(); const rd=await r.json();
+      const m=await fetch(`${API}/api/organizations/${organizationId}/members`,{credentials:'include',headers});
+      const md=await m.json();
       if(!m.ok) throw new Error(md.error||'Could not load members.');
-      if(!r.ok) throw new Error(rd.error||'Could not load access requests.');
-      setMembers(md.members||[]); setRequests(rd.requests||[]);
+      setMembers(md.members||[]);
+      if(canReview){
+        const r=await fetch(`${API}/api/organizations/${organizationId}/requests`,{credentials:'include',headers});
+        const rd=await r.json();
+        if(!r.ok) throw new Error(rd.error||'Could not load access requests.');
+        setRequests(rd.requests||[]);
+      } else setRequests([]);
     } catch(e) { setNotice(e instanceof Error?e.message:'Could not load people.'); }
     finally { setRefreshing(false); }
-  },[organizationId,canView]);
+  },[organizationId,canView,canReview]);
 
   useEffect(()=>{load();},[load]);
 
@@ -93,7 +95,7 @@ export default function PeoplePanel({ organizationId, role }: { organizationId:s
     {notice&&<div className="team-notice" role="status">{notice}</div>}
     <div className="directory-toolbar">
       <label className="directory-search"><span>SEARCH PEOPLE</span><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search by name or work email…" /></label>
-      <label><span>ROLE</span><select value={roleFilter} onChange={e=>setRoleFilter(e.target.value)}><option value="ALL">All roles</option><option value="OWNER">Owner</option><option value="ADMIN">Admin</option><option value="MANAGER">Manager</option><option value="ANALYST">Analyst</option><option value="VIEWER">Viewer</option></select></label>
+      <label><span>ROLE</span><select value={roleFilter} onChange={e=>setRoleFilter(e.target.value)}><option value="ALL">All roles</option><option value="OWNER">Owner</option><option value="MANAGER">Manager</option><option value="LEADER">Team Leader</option><option value="ANALYST">Analyst</option></select></label>
       <label><span>MEMBERSHIP</span><select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)}><option value="ALL">All statuses</option><option value="ACTIVE">Active</option><option value="SUSPENDED">Suspended</option></select></label>
       {(search||roleFilter!=='ALL'||statusFilter!=='ALL')&&<button className="directory-clear" onClick={()=>{setSearch('');setRoleFilter('ALL');setStatusFilter('ALL');}}>Clear filters</button>}
     </div>
@@ -104,14 +106,14 @@ export default function PeoplePanel({ organizationId, role }: { organizationId:s
         <td><span className="role-pill">{member.role}</span></td>
         <td><span className="directory-status">{member.accountStatus}</span></td>
         <td><span className={member.membershipStatus==='ACTIVE'?'membership-badge active':'membership-badge suspended'}><i/>{member.membershipStatus}</span></td>
-        {canManageMembers&&<td>{member.role!=='OWNER'&&!(role==='ADMIN'&&member.role==='ADMIN')?<div className="member-actions"><select aria-label={`Role for ${member.fullName}`} value={draftRoles[member.id]||member.role} onChange={e=>setDraftRoles(v=>({...v,[member.id]:e.target.value}))}>{role==='OWNER'&&<option value="ADMIN">Admin</option>}<option value="MANAGER">Manager</option><option value="ANALYST">Analyst</option><option value="VIEWER">Viewer</option></select><button disabled={!!busy||((draftRoles[member.id]||member.role)===member.role)} onClick={()=>updateMember(member,{role:draftRoles[member.id]||member.role})}>{busy===member.id?'…':'Save'}</button><button className="member-status-button" disabled={!!busy} onClick={()=>updateMember(member,{membershipStatus:member.membershipStatus==='ACTIVE'?'SUSPENDED':'ACTIVE'})}>{member.membershipStatus==='ACTIVE'?'Suspend':'Restore'}</button></div>:<span className="people-empty">Protected</span>}</td>}
+        {canManageMembers&&<td>{member.role!=='OWNER'?<div className="member-actions"><select aria-label={`Role for ${member.fullName}`} value={draftRoles[member.id]||member.role} onChange={e=>setDraftRoles(v=>({...v,[member.id]:e.target.value}))}><option value="MANAGER">Manager</option><option value="LEADER">Team Leader</option><option value="ANALYST">Analyst</option></select><button disabled={!!busy||((draftRoles[member.id]||member.role)===member.role)} onClick={()=>updateMember(member,{role:draftRoles[member.id]||member.role})}>{busy===member.id?'…':'Save'}</button><button className="member-status-button" disabled={!!busy} onClick={()=>updateMember(member,{membershipStatus:member.membershipStatus==='ACTIVE'?'SUSPENDED':'ACTIVE'})}>{member.membershipStatus==='ACTIVE'?'Suspend':'Restore'}</button></div>:<span className="people-empty">Protected</span>}</td>}
       </tr>)}
       {!filteredMembers.length&&<tr><td colSpan={canManageMembers?5:4} className="people-empty">{members.length?'No members match these filters.':'No members found in this workspace.'}</td></tr>}
     </tbody></table></div>
     <div className="panel-title requests-title"><div><small>REVIEW QUEUE</small><h2>Pending access requests</h2></div><span className="count-chip">{requests.length} PENDING</span></div>
     {requests.length?requests.map(item=><article className="request-card" key={item.id}>
       <div className="request-person"><span className="org-avatar">{item.fullName.slice(0,1).toUpperCase()}</span><span><b>{item.fullName}</b><small>{item.email}</small></span></div>
-      {canReview?<div className="request-actions"><select aria-label={`Role for ${item.fullName}`} id={`role-${item.id}`} defaultValue="ANALYST"><option value="ANALYST">Analyst</option><option value="MANAGER">Manager</option><option value="VIEWER">Viewer</option></select><button disabled={!!busy} onClick={()=>{const el=document.getElementById(`role-${item.id}`) as HTMLSelectElement|null;decide(item.id,'APPROVE',el?.value||'ANALYST')}}>{busy===item.id?'…':'Approve'}</button><button className="reject-button" disabled={!!busy} onClick={()=>decide(item.id,'REJECT')}>Reject</button></div>:<span className="role-pill">Awaiting admin review</span>}
+      {canReview?<div className="request-actions"><select aria-label={`Role for ${item.fullName}`} id={`role-${item.id}`} defaultValue="ANALYST"><option value="ANALYST">Analyst</option><option value="MANAGER">Manager</option><option value="LEADER">Team Leader</option></select><button disabled={!!busy} onClick={()=>{const el=document.getElementById(`role-${item.id}`) as HTMLSelectElement|null;decide(item.id,'APPROVE',el?.value||'ANALYST')}}>{busy===item.id?'…':'Approve'}</button><button className="reject-button" disabled={!!busy} onClick={()=>decide(item.id,'REJECT')}>Reject</button></div>:<span className="role-pill">Awaiting Owner review</span>}
     </article>):<div className="people-empty">You're all caught up. No pending access requests.</div>}
   </section>;
 }

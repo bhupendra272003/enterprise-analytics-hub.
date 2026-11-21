@@ -5,11 +5,16 @@ import { handleNotifications } from "./notifications";
 import { handleDatasets } from "./datasets";
 import datasetJobs, { handleDatasetJobs } from "./dataset-jobs";
 import { handleReports } from "./reports";
+import { handleTeams } from "./teams";
+import { handlePerformance } from "./performance";
+import { handleGenerator } from "./generator";
+import generationJobs from "./generator-jobs";
 
 interface Env {
   DB: D1Database;
   DATASETS: KVNamespace;
   DATASET_JOBS: Queue<{ jobId: string }>;
+  GENERATION_JOBS: Queue<{ jobId: string }>;
   APP_ORIGIN: string;
   SESSION_TTL_SECONDS?: string;
   MAIL_API_KEY?: string;
@@ -333,6 +338,30 @@ export default {
         return new Response(response.body, { status: response.status, headers: merged });
       }
     }
+    if ((url.pathname.startsWith("/api/organizations/") && url.pathname.includes("/generator")) || url.pathname.startsWith("/api/generator/jobs/")) {
+      const response = await handleGenerator(request, env, url.pathname);
+      if (response) {
+        const merged = new Headers(response.headers);
+        for (const [key, value] of Object.entries(headers)) merged.set(key, value);
+        return new Response(response.body, { status: response.status, headers: merged });
+      }
+    }
+    if (url.pathname.startsWith("/api/teams/") || (url.pathname.startsWith("/api/organizations/") && url.pathname.endsWith("/teams")) || url.pathname.startsWith("/api/tasks/")) {
+      const response = await handleTeams(request, env, url.pathname);
+      if (response) {
+        const merged = new Headers(response.headers);
+        for (const [key, value] of Object.entries(headers)) merged.set(key, value);
+        return new Response(response.body, { status: response.status, headers: merged });
+      }
+    }
+    if (url.pathname.startsWith("/api/organizations/") && url.pathname.endsWith("/performance")) {
+      const response = await handlePerformance(request, env, url.pathname);
+      if (response) {
+        const merged = new Headers(response.headers);
+        for (const [key, value] of Object.entries(headers)) merged.set(key, value);
+        return new Response(response.body, { status: response.status, headers: merged });
+      }
+    }
     if (url.pathname.startsWith("/api/projects/") || url.pathname.startsWith("/api/tasks/") || (url.pathname.startsWith("/api/organizations/") && url.pathname.endsWith("/projects"))) {
       const response = await handleProjects(request, env, url.pathname);
       if (response) {
@@ -360,6 +389,8 @@ export default {
     return json({ error: "Not found." }, 404, headers);
   },
   async queue(batch: MessageBatch<{ jobId: string }>, env: Env) {
-    await datasetJobs.queue(batch, env);
+    const queueName = (batch as MessageBatch<{ jobId: string }> & { queue?: string }).queue;
+    if (queueName === "vyron-generation-jobs") await generationJobs.queue(batch, env);
+    else await datasetJobs.queue(batch, env);
   }
 };

@@ -40,7 +40,7 @@ export async function handleOrganizations(request: Request, env: Env, path: stri
     } catch {
       return reply({error:"Your access request is already pending."},409);
     }
-    const {results:admins}=await env.DB.prepare("SELECT user_id FROM memberships WHERE organization_id=? AND role IN ('OWNER','ADMIN') AND membership_status='ACTIVE'").bind(orgId).all<{user_id:string}>();
+    const {results:admins}=await env.DB.prepare("SELECT user_id FROM memberships WHERE organization_id=? AND role IN ('OWNER','MANAGER') AND membership_status='ACTIVE'").bind(orgId).all<{user_id:string}>();
     for(const admin of admins) await env.DB.prepare("INSERT INTO notifications (id,user_id,organization_id,type,title,message,href) VALUES (?,?,?,'ACCESS_REQUEST','New access request','A user requested to join your organization.','/workspace/team')").bind(crypto.randomUUID(),admin.user_id,orgId).run();
     return reply({message:"Access request submitted. An organization administrator can now review it."},201);
   }
@@ -80,7 +80,7 @@ export async function handleOrganizations(request: Request, env: Env, path: stri
   const memberMatch=path.match(/^\/api\/organizations\/([^/]+)\/members$/);
   if(memberMatch && request.method==="GET") {
     const orgId=memberMatch[1], m=await membership(env,orgId,user.id);
-    if(!m||!["OWNER","ADMIN","MANAGER"].includes(m.role)) return reply({error:"Insufficient organization permissions."},403);
+    if(!m||!["OWNER","MANAGER"].includes(m.role)) return reply({error:"Insufficient organization permissions."},403);
     const {results}=await env.DB.prepare("SELECT u.id,u.full_name AS fullName,u.email,u.account_status AS accountStatus,m.role,m.membership_status AS membershipStatus,m.created_at AS joinedAt FROM memberships m JOIN users u ON u.id=m.user_id WHERE m.organization_id=? ORDER BY m.created_at DESC").bind(orgId).all();
     return reply({members:results});
   }
@@ -88,15 +88,14 @@ export async function handleOrganizations(request: Request, env: Env, path: stri
   const updateMatch=path.match(/^\/api\/organizations\/([^/]+)\/members\/([^/]+)$/);
   if(updateMatch && request.method==="PATCH") {
     const [,orgId,targetId]=updateMatch, m=await membership(env,orgId,user.id);
-    if(!m||!["OWNER","ADMIN"].includes(m.role)) return reply({error:"Insufficient organization permissions."},403);
+    if(!m||m.role!=="OWNER") return reply({error:"Insufficient organization permissions."},403);
     if(targetId===user.id) return reply({error:"You cannot change your own membership here."},400);
     let body:any; try { body=await request.json(); } catch { return reply({error:"Invalid JSON body."},400); }
     const role=body.role, status=body.membershipStatus;
-    if((role!==undefined&&!["ADMIN","MANAGER","ANALYST","VIEWER"].includes(role))||(status!==undefined&&!["ACTIVE","SUSPENDED"].includes(status))||(role===undefined&&status===undefined)) return reply({error:"Invalid membership update."},400);
+    if((role!==undefined&&!["MANAGER","LEADER","ANALYST"].includes(role))||(status!==undefined&&!["ACTIVE","SUSPENDED"].includes(status))||(role===undefined&&status===undefined)) return reply({error:"Invalid membership update."},400);
     const target=await env.DB.prepare("SELECT role FROM memberships WHERE organization_id=? AND user_id=?").bind(orgId,targetId).first<{role:string}>();
     if(!target) return reply({error:"Organization member not found."},404);
     if(target.role==="OWNER") return reply({error:"The organization owner cannot be modified here."},403);
-    if(m.role==="ADMIN"&&(target.role==="ADMIN"||role==="ADMIN")) return reply({error:"Only the owner can manage administrator roles."},403);
     await env.DB.prepare("UPDATE memberships SET role=COALESCE(?,role),membership_status=COALESCE(?,membership_status) WHERE organization_id=? AND user_id=?").bind(role??null,status??null,orgId,targetId).run();
     await audit(env,orgId,user.id,"MEMBERSHIP_UPDATED","MEMBERSHIP",targetId,{role:role??null,membershipStatus:status??null});
     await env.DB.prepare("INSERT INTO notifications (id,user_id,organization_id,type,title,message,href) VALUES (?,?,?,'MEMBERSHIP_UPDATED','Your workspace access changed','Your organization role or membership status was updated.','/workspace')").bind(crypto.randomUUID(),targetId,orgId).run();
@@ -106,7 +105,7 @@ export async function handleOrganizations(request: Request, env: Env, path: stri
   const accessMatch=path.match(/^\/api\/organizations\/([^/]+)\/requests$/);
   if(accessMatch && request.method==="GET") {
     const orgId=accessMatch[1], m=await membership(env,orgId,user.id);
-    if(!m||!["OWNER","ADMIN","MANAGER"].includes(m.role)) return reply({error:"Insufficient organization permissions."},403);
+    if(!m||!["OWNER","MANAGER"].includes(m.role)) return reply({error:"Insufficient organization permissions."},403);
     const {results}=await env.DB.prepare("SELECT r.id,r.status,r.created_at AS requestedAt,u.id AS userId,u.full_name AS fullName,u.email FROM organization_access_requests r JOIN users u ON u.id=r.user_id WHERE r.organization_id=? AND r.status='PENDING' ORDER BY r.created_at").bind(orgId).all();
     return reply({requests:results});
   }
@@ -114,9 +113,9 @@ export async function handleOrganizations(request: Request, env: Env, path: stri
   const decideMatch=path.match(/^\/api\/organizations\/([^/]+)\/requests\/([^/]+)$/);
   if(decideMatch && request.method==="PATCH") {
     const [,orgId,requestId]=decideMatch, m=await membership(env,orgId,user.id);
-    if(!m||!["OWNER","ADMIN"].includes(m.role)) return reply({error:"Insufficient organization permissions."},403);
+    if(!m||m.role!=="OWNER") return reply({error:"Insufficient organization permissions."},403);
     let body:any; try { body=await request.json(); } catch { return reply({error:"Invalid JSON body."},400); }
-    if(!["APPROVE","REJECT"].includes(body.decision)|| (body.decision==="APPROVE"&&!["MANAGER","ANALYST","VIEWER"].includes(body.role))) return reply({error:"Choose a valid decision and role."},400);
+    if(!["APPROVE","REJECT"].includes(body.decision)|| (body.decision==="APPROVE"&&!["MANAGER","LEADER","ANALYST"].includes(body.role))) return reply({error:"Choose a valid decision and role."},400);
     const access=await env.DB.prepare("SELECT id,user_id,status FROM organization_access_requests WHERE id=? AND organization_id=?").bind(requestId,orgId).first<{id:string;user_id:string;status:string}>();
     if(!access||access.status!=="PENDING") return reply({error:"Pending access request not found."},404);
     if(body.decision==="APPROVE") {

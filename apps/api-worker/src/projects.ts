@@ -1,6 +1,6 @@
 type Env = { DB: D1Database };
 type User = { id: string; account_status: string };
-type Member = { role: "OWNER"|"ADMIN"|"MANAGER"|"ANALYST"|"VIEWER" };
+type Member = { role: "OWNER"|"MANAGER"|"LEADER"|"ANALYST" };
 
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), {
   status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }
@@ -18,7 +18,7 @@ const memberOf = (env: Env, orgId: string, userId: string) =>
 const audit = (env: Env, orgId: string, userId: string, action: string, type: string, id: string, metadata?: unknown) =>
   env.DB.prepare("INSERT INTO audit_logs (organization_id,actor_user_id,action,target_type,target_id,metadata) VALUES (?,?,?,?,?,?)")
     .bind(orgId,userId,action,type,id,metadata===undefined?null:JSON.stringify(metadata)).run();
-const roles = ["OWNER","ADMIN","MANAGER","ANALYST","VIEWER"];
+const roles = ["OWNER","MANAGER","LEADER","ANALYST"];
 const priorities = ["LOW","MEDIUM","HIGH","URGENT"];
 const statuses = ["TODO","IN_PROGRESS","BLOCKED","DONE"];
 const isDate = (v: unknown): v is string => typeof v==="string" && v.length===10 && v[4]==="-" && v[7]==="-" && !Number.isNaN(Date.parse(v)) && new Date(v).toISOString().slice(0,10)===v;
@@ -38,7 +38,7 @@ export async function handleProjects(request: Request, env: Env, path: string): 
   }
   if(orgProjects && request.method==="POST") {
     const orgId=orgProjects[1], member=await memberOf(env,orgId,user.id);
-    if(!member||!["OWNER","ADMIN","MANAGER"].includes(member.role)) return json({error:"Insufficient organization permissions."},403);
+    if(!member||member.role!=="OWNER") return json({error:"Only the Owner can create projects."},403);
     let body: any; try{body=await request.json();}catch{return json({error:"Invalid JSON body."},400);}
     const name=typeof body.name==="string"?body.name.trim():"";
     const description=typeof body.description==="string"?body.description.trim():"";
@@ -60,9 +60,14 @@ export async function handleProjects(request: Request, env: Env, path: string): 
     if(!project) return json({error:"Project not found."},404);
     const member=await memberOf(env,project.organization_id,user.id);
     if(!member) return json({error:"Insufficient organization permissions."},403);
-    const {results}=await env.DB.prepare("SELECT t.id,t.title,t.description,t.status,t.priority,t.due_date AS dueDate,t.assignee_id AS assigneeId,u.full_name AS assigneeName,t.created_at AS createdAt FROM tasks t LEFT JOIN users u ON u.id=t.assignee_id WHERE t.project_id=? ORDER BY t.created_at DESC")
-      .bind(projectId).all<{assigneeId:string|null}>();
-    const manager=["OWNER","ADMIN","MANAGER"].includes(member.role);
+    let taskSql="SELECT t.id,t.title,t.description,t.status,t.priority,t.due_date AS dueDate,t.assignee_id AS assigneeId,u.full_name AS assigneeName,t.created_at AS createdAt,t.team_id AS teamId FROM tasks t LEFT JOIN users u ON u.id=t.assignee_id WHERE t.project_id=?";
+    const taskParams:unknown[]=[projectId];
+    if(member.role==="LEADER"){taskSql+=" AND t.team_id IN (SELECT id FROM teams WHERE leader_user_id=?)";taskParams.push(user.id);}
+    else if(member.role==="ANALYST"){taskSql+=" AND t.assignee_id=?";taskParams.push(user.id);}
+    else if(!["OWNER","MANAGER"].includes(member.role))return json({error:"Insufficient organization permissions."},403);
+    taskSql+=" ORDER BY t.created_at DESC";
+    const {results}=await env.DB.prepare(taskSql).bind(...taskParams).all<{assigneeId:string|null}>();
+    const manager=["OWNER","MANAGER"].includes(member.role);
     return json({tasks:results.map((task:any)=>({...task,canUpdate:manager||task.assigneeId===user.id}))});
   }
   if(projectTasks && request.method==="POST") {
@@ -70,14 +75,14 @@ export async function handleProjects(request: Request, env: Env, path: string): 
     const project=await env.DB.prepare("SELECT organization_id FROM projects WHERE id=?").bind(projectId).first<{organization_id:string}>();
     if(!project) return json({error:"Project not found."},404);
     const orgId=project.organization_id, member=await memberOf(env,orgId,user.id);
-    if(!member||!["OWNER","ADMIN","MANAGER","ANALYST"].includes(member.role)) return json({error:"Insufficient organization permissions."},403);
+    if(!member||member.role!=="OWNER") return json({error:"Only the Owner can create unscoped project tasks. Leaders should assign work inside their own team."},403);
     let body:any; try{body=await request.json();}catch{return json({error:"Invalid JSON body."},400);}
     const title=typeof body.title==="string"?body.title.trim():"";
     const description=typeof body.description==="string"?body.description.trim():"";
     const priority=body.priority??"MEDIUM", dueDate=body.dueDate, assigneeId=body.assigneeId;
     if(title.length<2||title.length>180||description.length>2000||!priorities.includes(priority)||(dueDate!==undefined&&!isDate(dueDate))||(assigneeId!==undefined&&typeof assigneeId!=="string"))
       return json({error:"Enter valid task details."},400);
-    if(assigneeId && !["OWNER","ADMIN","MANAGER"].includes(member.role)) return json({error:"Only managers can assign tasks."},403);
+    if(assigneeId) return json({error:"Assign work through the team task workflow so assignment history and fairness reporting remain complete."},400);
     if(assigneeId){
       const assignee=await memberOf(env,orgId,assigneeId);
       if(!assignee) return json({error:"Assignee must be an active member of this organization."},400);
@@ -106,9 +111,9 @@ export async function handleProjects(request: Request, env: Env, path: string): 
     if(!task) return json({error:"Task not found."},404);
     const member=await memberOf(env,task.organization_id,user.id);
     if(!member) return json({error:"Insufficient organization permissions."},403);
-    const manager=["OWNER","ADMIN","MANAGER"].includes(member.role);
-    if(!manager&&(body.assigneeId!==undefined||body.priority!==undefined)) return json({error:"Only managers can change task assignments or priority."},403);
-    if(!manager&&task.assignee_id!==user.id) return json({error:"Only managers or the assigned member can update this task."},403);
+    const manager=member.role==="OWNER";
+    if(!manager&&(body.assigneeId!==undefined||body.priority!==undefined)) return json({error:"Only the Owner can change unscoped task assignment or priority."},403);
+    if(!manager) return json({error:"Unscoped tasks are read-only for non-Owners. Team tasks use the team workflow."},403);
     if(body.assigneeId){
       const assignee=await memberOf(env,task.organization_id,body.assigneeId);
       if(!assignee) return json({error:"Assignee must be an active organization member."},400);

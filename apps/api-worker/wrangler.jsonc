@@ -20,11 +20,21 @@
       {
         "binding": "DATASET_JOBS",
         "queue": "nexus-dataset-jobs"
+      },
+      {
+        "binding": "GENERATION_JOBS",
+        "queue": "vyron-generation-jobs"
       }
     ],
     "consumers": [
       {
         "queue": "nexus-dataset-jobs",
+        "max_batch_size": 1,
+        "max_batch_timeout": 5,
+        "max_retries": 3
+      },
+      {
+        "queue": "vyron-generation-jobs",
         "max_batch_size": 1,
         "max_batch_timeout": 5,
         "max_retries": 3
