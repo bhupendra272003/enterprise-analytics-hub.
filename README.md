@@ -40,7 +40,7 @@ npm run dev
 The API listens on port 4000 by default. Check `http://localhost:4000/health`. Set `DATA_STORAGE_DIR` to a private, persistent disk path for CSV uploads; never place it inside the public web root. The default local path is `apps/api/storage/datasets` when starting from `apps/api`. Install Python 3 for the CSV cleaning engine; set `PYTHON_EXECUTABLE` if the executable is not available as `python` (Windows) or `python3` (Linux/macOS). The cleaning engine uses only Python's standard library.
 
 ### Database migrations
-For an existing database, apply migrations in numeric order from `database/migrations/`. Migrations 001–009 add the existing identity, dataset, validation and anomaly foundations. Migration 010 proposes the four-role model, teams, performance events and Owner generator settings/jobs. Back up the database and review legacy role mapping before applying it.
+For an existing database, apply migrations in numeric order from `database/migrations/`. Migrations 001–009 add the existing identity, dataset, validation and anomaly foundations. Migration 010 proposes the four-role model, teams, performance events and Owner generator settings/jobs. Migration 011 adds auditable task assignment history and performance correction requests. Back up the database and review legacy role mapping before applying either migration.
 
 ### 3. Web app
 Copy `apps/web/.env.example` to `apps/web/.env.local`. Set `NEXT_PUBLIC_API_URL=http://localhost:4000`.
@@ -76,7 +76,7 @@ For local development, configure the API `APP_ORIGIN=http://localhost:3000` and 
 - `/`: sign in and open registration
 - `/workspace`: authenticated profile and organization overview
 - `/workspace/blueprint`: project briefing, industry templates, analytics lifecycle and governance overview
-- `/workspace/team`: organization creation, invitations, member directory, member role changes, suspension and access approval queue
+- `/workspace/team`: organization creation, Owner-managed invitations, member directory, four-role changes, suspension and access approval queue\n- `/workspace/teams`: Owner-managed team creation, one designated Leader per team and Analyst assignment\n- `/workspace/performance`: Owner/Manager organization-wide team, member, allocation and Leader contribution reporting
 - `/workspace/access`: browse organizations and request membership
 - `/workspace/projects`: create projects, add tasks and update task status
 - `/workspace/data`: upload CSV files, inspect metadata, preview 10 rows, run column profiles, clean CSV data with Python, inspect before/after quality scores, define required/type/allowed-value/range/unique rules, validate immutable versions, review issue samples, quality trends, validation pass rates, recurring issue patterns, downloadable validation reports, version-to-version anomaly detection for numeric outliers, missingness spikes, category shifts, row-count changes and duplicate increases, with saved scan history and report replay, upload new versions, compare schema and row-level changes, and restore prior versions as a new version
