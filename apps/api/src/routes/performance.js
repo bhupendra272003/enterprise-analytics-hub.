@@ -75,8 +75,9 @@ router.get('/organizations/:orgId/performance', async (req, res, next) => {
       [req.params.orgId]
     );
     const teamReports = teams.map(team => {
-      const roster = members.filter(member => member.teamId === team.id);
+      const roster = members.filter(member => member.teamId === team.id).map(member => ({...member,...(allocationHistory.find(row=>row.teamId===team.id&&row.userId===member.userId)||{assignmentEvents:0,distinctTasksAssigned:0,distinctAssigners:0,lastAssignedAt:null})}));
       const counts = roster.map(member => Number(member.assignedTasks));
+      const historyCounts = roster.map(member => Number(member.assignmentEvents));
       const max = counts.length ? Math.max(...counts) : 0;
       const min = counts.length ? Math.min(...counts) : 0;
       const leader = {...(leaderWork.find(row => row.teamId === team.id) || {}),...(leaderAssignmentHistory.find(row=>row.teamId===team.id&&row.leaderId===team.leaderId)||{assignmentEvents:0,distinctRecipients:0,distinctTasksTouched:0})};
