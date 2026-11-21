@@ -59,21 +59,36 @@ router.get('/organizations/:orgId/performance', async (req, res, next) => {
        WHERE t.organization_id=? GROUP BY t.id,t.leader_user_id`,
       [req.params.orgId]
     );
+    const [allocationHistory] = await pool.execute(
+      `SELECT team_id AS teamId,new_assignee_id AS userId,
+        COUNT(*) AS assignmentEvents,COUNT(DISTINCT task_id) AS distinctTasksAssigned,
+        COUNT(DISTINCT assigned_by) AS distinctAssigners,MAX(created_at) AS lastAssignedAt
+       FROM task_assignment_history WHERE organization_id=? AND new_assignee_id IS NOT NULL
+       GROUP BY team_id,new_assignee_id`,
+      [req.params.orgId]
+    );
+    const [leaderAssignmentHistory] = await pool.execute(
+      `SELECT team_id AS teamId,assigned_by AS leaderId,COUNT(*) AS assignmentEvents,
+        COUNT(DISTINCT new_assignee_id) AS distinctRecipients,
+        COUNT(DISTINCT task_id) AS distinctTasksTouched
+       FROM task_assignment_history WHERE organization_id=? GROUP BY team_id,assigned_by`,
+      [req.params.orgId]
+    );
     const teamReports = teams.map(team => {
       const roster = members.filter(member => member.teamId === team.id);
       const counts = roster.map(member => Number(member.assignedTasks));
       const max = counts.length ? Math.max(...counts) : 0;
       const min = counts.length ? Math.min(...counts) : 0;
-      const leader = leaderWork.find(row => row.teamId === team.id) || {};
+      const leader = {...(leaderWork.find(row => row.teamId === team.id) || {}),...(leaderAssignmentHistory.find(row=>row.teamId===team.id&&row.leaderId===team.leaderId)||{assignmentEvents:0,distinctRecipients:0,distinctTasksTouched:0})};
       const signals = [];
       if (roster.length > 1 && Number(team.taskCount) > 0 && roster.some(member => Number(member.assignedTasks) === 0)) signals.push('MEMBER_WITH_NO_ASSIGNED_TASKS');
-      if (roster.length > 1 && min > 0 && max >= min * 2 && max - min >= 2) signals.push('POSSIBLE_WORKLOAD_IMBALANCE');
+      if (roster.length > 1 && min > 0 && max >= min * 2 && max - min >= 2) signals.push('POSSIBLE_WORKLOAD_IMBALANCE');\n      if (roster.length > 1 && historyCounts.some(value=>value===0) && Math.max(...historyCounts)>0) signals.push('POSSIBLE_ASSIGNMENT_EXCLUSION');\n      if (roster.length > 1 && Math.min(...historyCounts)>0 && Math.max(...historyCounts)>=Math.min(...historyCounts)*2 && Math.max(...historyCounts)-Math.min(...historyCounts)>=2) signals.push('ASSIGNMENT_HISTORY_IMBALANCE');
       if (Number(leader.tasksAssignedByLeader || 0) > 0 && Number(leader.tasksPersonallyOwnedByLeader || 0) === 0) signals.push('LEADER_HAS_NO_PERSONAL_TASK_OWNERSHIP');
       return { ...team, members: roster, leaderWork: leader, allocationSignals: signals };
     });
     res.json({ teams: teamReports, methodology: {
       note: 'Signals are prompts for human review, not proof of favoritism or misconduct. Compare task complexity, availability, leave, skills and agreed workload before drawing conclusions.',
-      taskCounts: 'Counts reflect tasks currently assigned to each member; assignment history and task review events are exposed separately when available.'
+      taskCounts: 'Current task counts are paired with auditable assignment-history events, distinct tasks and distinct assigners. Compare task complexity, member capacity, leave and skill fit before deciding whether distribution is unfair.'
     }});
   } catch (err) { next(err); }
 });
