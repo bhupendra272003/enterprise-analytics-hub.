@@ -44,6 +44,9 @@ CREATE TABLE IF NOT EXISTS performance_corrections (
   CONSTRAINT fk_perf_correction_reviewer FOREIGN KEY (reviewed_by) REFERENCES users(id)
 ) ENGINE=InnoDB;
 
+ALTER TABLE teams
+  ADD UNIQUE KEY uq_team_org_leader (organization_id, leader_user_id);
+
 ALTER TABLE tasks
   ADD KEY idx_tasks_team_assignee_status (team_id, assignee_id, status),
   ADD KEY idx_tasks_team_assigner (team_id, assigned_by);
