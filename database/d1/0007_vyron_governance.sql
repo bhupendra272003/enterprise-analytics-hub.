@@ -126,6 +126,8 @@ CREATE TABLE generation_jobs (
   id TEXT PRIMARY KEY,
   organization_id TEXT NOT NULL REFERENCES organizations(id),
   requested_by TEXT NOT NULL REFERENCES users(id),
+  project_id TEXT NOT NULL REFERENCES projects(id),
+  team_id TEXT NOT NULL REFERENCES teams(id),
   industry TEXT NOT NULL,
   dataset_key TEXT NOT NULL,
   requested_rows INTEGER NOT NULL CHECK(requested_rows > 0),
