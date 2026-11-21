@@ -1,6 +1,6 @@
 type Env={DB:D1Database};
 type User={id:string;account_status:string};
-type Role="OWNER"|"ADMIN"|"MANAGER"|"ANALYST"|"VIEWER";
+type Role="OWNER"|"MANAGER"|"LEADER"|"ANALYST";
 const json=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store"}});
 const getUser=async(req:Request,env:Env):Promise<User|null>=>{
  const raw=req.headers.get("Cookie")||"",sid=raw.split(";").map(v=>v.trim()).find(v=>v.startsWith("hub.sid="))?.slice(8);
