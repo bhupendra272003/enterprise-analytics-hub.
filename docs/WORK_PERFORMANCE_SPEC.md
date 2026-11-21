@@ -4,7 +4,7 @@
 Give Owners, Managers and Leaders a reliable view of delivery health while allowing every Analyst to understand and verify their own contribution. Performance data must be evidence-based, explainable and correctable.
 
 ## Events to capture
-- Assignment, acceptance, start, blocked state, submission, review acceptance, revision request and reopening.
+- Assignment, reassignment, previous/new assignee, assigning Leader/Owner, assignment reason, acceptance, start, blocked state, submission, review acceptance, revision request and reopening.
 - Data cleaning and validation runs, with dataset/version references and quality outcomes.
 - Analysis and dashboard submissions, linked to project deliverables.
 - Peer review and completed handoffs.
@@ -19,7 +19,7 @@ Every event records actor, organization, optional team/project/task, event type,
 - Quality: validation pass rate and documented issue reduction on approved datasets.
 - Delivery: accepted analysis/dashboard deliverables against a project checklist.
 - Collaboration: peer reviews and documented handoffs.
-- Workload: open tasks and estimated hours only when transparently entered by the member.
+- Workload: open tasks, current assigned tasks, historical assignment events, distinct tasks, assignment concentration and estimated hours only when transparently entered by the member.\n- Leader accountability: tasks assigned by the Leader, distinct recipients, tasks personally owned by the Leader, and the Leader's own completion/on-time outcomes. A Leader is expected to contribute work as well as coordinate it.
 
 ## Visibility
 - OWNER: organization-wide and team-level reports, all members, generator audit and approvals.
@@ -29,7 +29,7 @@ Every event records actor, organization, optional team/project/task, event type,
 
 ## Fairness and safeguards
 - Never score people by login duration, online status, keystrokes, mouse activity or raw task count alone.
-- Compare only similar task types and agreed expectations.
+- Compare only similar task types and agreed expectations.\n- Flag possible workload imbalance, repeated concentration of assignments, members receiving no assignments, and Leaders who assign work but have no personally owned tasks. These are review signals only, never automated findings of favoritism or misconduct.\n- Consider task complexity, skills, availability, leave, estimated effort and member-approved workload before judging equality.
 - Show the underlying events behind each metric.
 - Let members add context and request corrections.
 - Separate work quantity from quality and complexity.
@@ -38,4 +38,4 @@ Every event records actor, organization, optional team/project/task, event type,
 - Performance reports are internal project evidence, not a definitive measure of a person's ability.
 
 ## Implementation status
-Migration 010 adds an event table and task review fields. A complete event-capture service, aggregation/report API, role-scoped UI, correction workflow and automated tests are still required before performance dashboards can be considered live.
+Migrations 010–011 add team, assignment-history and correction-request foundations. The current branch adds role-scoped team/performance API routes and Owner/Manager dashboard foundations. Full work-event capture for data cleaning, validation, dashboards and peer review, correction review UI, exhaustive API/UI tests and deployment remain required before production readiness.
