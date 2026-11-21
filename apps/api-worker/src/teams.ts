@@ -55,7 +55,7 @@ export async function handleTeams(req:Request,env:Env,path:string):Promise<Respo
   const m=await member(env,team.organization_id,user.id);if(!m||m.role!=="OWNER")return json({error:"Only the Owner can add or move Analysts between teams."},403);
   let body:any;try{body=await req.json();}catch{return json({error:"Invalid JSON body."},400);}
   if(typeof body.userId!=="string"||!await activeUser(env,team.organization_id,body.userId,"ANALYST"))return json({error:"Only an active Analyst in this organization can be added."},400);
-  const exists=await env.DB.prepare("SELECT team_id FROM team_members WHERE user_id=? LIMIT 1").bind(body.userId).first();
+  const exists=await env.DB.prepare("SELECT tm.team_id FROM team_members tm JOIN teams t ON t.id=tm.team_id WHERE t.organization_id=? AND tm.user_id=? LIMIT 1").bind(team.organization_id,body.userId).first();
   if(exists)return json({error:"This Analyst already belongs to a team. Remove them from the existing team first."},409);
   await env.DB.prepare("INSERT INTO team_members (team_id,user_id,added_by) VALUES (?,?,?)").bind(team.id,body.userId,user.id).run();
   await audit(env,team.organization_id,user.id,"TEAM_MEMBER_ADDED","TEAM",team.id,{userId:body.userId});
@@ -72,9 +72,9 @@ export async function handleTeams(req:Request,env:Env,path:string):Promise<Respo
   if(typeof projectId!=="string")return json({error:"A project in this organization is required for every team task."},400);
   const project=await env.DB.prepare("SELECT id FROM projects WHERE id=? AND organization_id=?").bind(projectId,team.organization_id).first();if(!project)return json({error:"Project not found in this organization."},400);
   if(typeof assigneeId!=="string")return json({error:"Choose a team Analyst or assign the task to yourself."},400);
-  const isLeaderSelf=assigneeId===user.id&&m.role==="LEADER"&&team.leader_user_id===user.id;
+  const isTeamLeader=assigneeId===team.leader_user_id;
   const isAnalyst=!!await env.DB.prepare("SELECT 1 FROM team_members tm JOIN memberships m ON m.user_id=tm.user_id JOIN teams t ON t.id=tm.team_id WHERE tm.team_id=? AND tm.user_id=? AND m.organization_id=t.organization_id AND m.role='ANALYST' AND m.membership_status='ACTIVE'").bind(team.id,assigneeId).first();
-  if(!isLeaderSelf&&!isAnalyst)return json({error:"Tasks may be assigned only to an Analyst in this team or to the Leader themself."},400);
+  if(!isTeamLeader&&!isAnalyst)return json({error:"Tasks may be assigned only to an Analyst in this team or to the Leader themself."},400);
   const id=crypto.randomUUID();
   await env.DB.batch([
    env.DB.prepare("INSERT INTO tasks (id,project_id,title,description,status,priority,due_date,assignee_id,created_by,team_id,assigned_by) VALUES (?,?,?,?,'TODO',?,?,?,?,?,?)").bind(id,projectId,title,description,priority,dueDate,assigneeId,user.id,team.id,user.id),
