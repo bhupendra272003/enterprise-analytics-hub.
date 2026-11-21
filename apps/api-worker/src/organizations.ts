@@ -46,6 +46,15 @@ export async function handleOrganizations(request: Request, env: Env, path: stri
   }
 
   if (path === "/api/organizations" && request.method === "GET") {
+    // One-time, owner-scoped legacy workspace rename. Keep the existing ID and
+    // slug intact so memberships, invitations, projects and saved links survive.
+    const {results:legacyOwned} = await env.DB.prepare("SELECT o.id FROM organizations o JOIN memberships m ON m.organization_id=o.id WHERE m.user_id=? AND m.role='OWNER' AND m.membership_status='ACTIVE' AND o.name COLLATE NOCASE='Vyron'").bind(user.id).all<{id:string}>();
+    for (const org of legacyOwned) {
+      await env.DB.batch([
+        env.DB.prepare("UPDATE organizations SET name=? WHERE id=? AND name COLLATE NOCASE='Vyron'").bind("Bhupendra's Vyron",org.id),
+        env.DB.prepare("INSERT INTO audit_logs (organization_id,actor_user_id,action,target_type,target_id,metadata) VALUES (?,?, 'ORGANIZATION_RENAMED','ORGANIZATION',?,?)").bind(org.id,user.id,org.id,JSON.stringify({from:"Vyron",to:"Bhupendra's Vyron"}))
+      ]);
+    }
     const {results} = await env.DB.prepare("SELECT o.id,o.name,o.slug,o.industry,m.role FROM organizations o JOIN memberships m ON m.organization_id=o.id WHERE m.user_id=? AND m.membership_status='ACTIVE' ORDER BY o.name").bind(user.id).all();
     return reply({organizations:results});
   }
