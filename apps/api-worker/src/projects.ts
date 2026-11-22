@@ -68,7 +68,7 @@ export async function handleProjects(request: Request, env: Env, path: string): 
     taskSql+=" ORDER BY t.created_at DESC";
     const {results}=await env.DB.prepare(taskSql).bind(...taskParams).all<{assigneeId:string|null}>();
     const manager=["OWNER","MANAGER"].includes(member.role);
-    return json({tasks:results.map((task:any)=>({...task,canUpdate:manager||task.assigneeId===user.id}))});
+    return json({tasks:results.map((task:any)=>({...task,canUpdate:task.teamId ? ((member.role==="ANALYST"||member.role==="LEADER") && task.assigneeId===user.id) : manager}))});
   }
   if(projectTasks && request.method==="POST") {
     const projectId=projectTasks[1];
