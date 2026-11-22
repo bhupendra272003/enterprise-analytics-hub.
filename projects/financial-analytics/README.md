@@ -32,7 +32,7 @@ These are public read-access source credentials. Do not save them in Vyron's bro
    pip install -r requirements.txt
    python python/profile_financial.py
    ```
-6. Export only approved analysis extracts to CSV for Vyron Data Workspace / Power BI. Keep raw source tables unchanged.
+6. Export only approved analysis extracts to CSV for Vyron Data Workspace / Power BI. Keep raw source tables unchanged.\n7. Follow `POWER_BI_MODEL.md` for model grain, relationships, measures, report pages, and validation checks.
 
 ## Analysis guardrails
 The documented prediction task is finished-loan classification (A vs B) at the loan start date. Do not use transactions or balances recorded after `loan.date` as predictors. The source documentation warns that ignoring the temporal constraint can create misleadingly perfect separation. Do not mix unfinished outcomes (C/D) into the finished-loan A/B target without explicitly changing the problem definition.
