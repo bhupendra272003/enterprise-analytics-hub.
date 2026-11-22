@@ -43,8 +43,15 @@ def main() -> None:
             inventory.append({"table": table, "rows": count, "columns": columns})
         cursor.close()
 
-        loans = pd.read_sql(
-            "SELECT status, date, duration, amount, account_id FROM loan", conn
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(
+            "SELECT status, date, duration, amount, account_id FROM loan"
+        )
+        loan_rows = cursor.fetchall()
+        cursor.close()
+        loans = pd.DataFrame(
+            loan_rows,
+            columns=["status", "date", "duration", "amount", "account_id"],
         )
         report = {
             "source": f"{HOST}:{PORT}/{DATABASE}",
