@@ -436,9 +436,14 @@ router.post('/datasets/:datasetId/anomalies',async(req,res,next)=>{
           const oldOutliers=oldNumeric.filter(value=>value<low||value>high).length;
           const currentOutliers=newNumeric.filter(value=>value<low||value>high);
           const oldRate=rate(oldOutliers,oldNumeric.length),currentRate=rate(currentOutliers.length,newNumeric.length);
-          if(currentOutliers.length>=3&&currentRate>=0.05&&currentRate-oldRate>=0.03){
+          const extremeLow=q1-3*iqr,extremeHigh=q3+3*iqr;
+          const oldExtreme=oldNumeric.filter(value=>value<extremeLow||value>extremeHigh).length;
+          const currentExtreme=currentOutliers.filter(value=>value<extremeLow||value>extremeHigh);
+          const regularShift=currentOutliers.length>=3&&currentRate>=0.05&&currentRate-oldRate>=0.03;
+          const extremeSignal=currentExtreme.length>=1&&currentExtreme.length>oldExtreme;
+          if(regularShift||extremeSignal){
             const delta=Number(((currentRate-oldRate)*100).toFixed(1));
-            add('NUMERIC_OUTLIERS',column,currentRate>=0.15?'HIGH':'MEDIUM','Unusual numeric values detected',currentOutliers.length+' values fall outside the earlier version IQR bounds ('+low.toFixed(2)+' to '+high.toFixed(2)+').',{beforeRate:Number((oldRate*100).toFixed(1)),afterRate:Number((currentRate*100).toFixed(1)),deltaPercentagePoints:delta,bounds:{low:Number(low.toFixed(4)),high:Number(high.toFixed(4))}},currentOutliers.slice(0,8).map(value=>({value})));
+            add('NUMERIC_OUTLIERS',column,currentExtreme.length?'HIGH':currentRate>=0.15?'HIGH':'MEDIUM',currentExtreme.length?'Extreme numeric value detected':'Unusual numeric values detected',currentExtreme.length?currentExtreme.length+' value(s) crossed the stricter 3×IQR extreme fence ('+extremeLow.toFixed(2)+' to '+extremeHigh.toFixed(2)+').':currentOutliers.length+' values fall outside the earlier version IQR bounds ('+low.toFixed(2)+' to '+high.toFixed(2)+').',{beforeRate:Number((oldRate*100).toFixed(1)),afterRate:Number((currentRate*100).toFixed(1)),deltaPercentagePoints:delta,bounds:{low:Number(low.toFixed(4)),high:Number(high.toFixed(4)),extremeLow:Number(extremeLow.toFixed(4)),extremeHigh:Number(extremeHigh.toFixed(4))},extremeCount:currentExtreme.length},(currentExtreme.length?currentExtreme:currentOutliers).slice(0,8).map(value=>({value})));
           }
         }
       }else if(oldNumericRatio<0.8&&newNumericRatio<0.8&&oldPresent.length>=20&&newPresent.length>=20){
@@ -448,9 +453,9 @@ router.post('/datasets/:datasetId/anomalies',async(req,res,next)=>{
         if(oldCounts.size<=50&&newCounts.size<=50){
           const categories=new Set([...oldCounts.keys(),...newCounts.keys()]);
           const distance=[...categories].reduce((sum,value)=>sum+Math.abs(rate(oldCounts.get(value)||0,oldPresent.length)-rate(newCounts.get(value)||0,newPresent.length)),0)/2;
-          if(distance>=0.25){
+          if(distance>=0.08){
             const changed=[...categories].map(value=>({value,before:Number((rate(oldCounts.get(value)||0,oldPresent.length)*100).toFixed(1)),after:Number((rate(newCounts.get(value)||0,newPresent.length)*100).toFixed(1))})).sort((a,b)=>Math.abs(b.after-b.before)-Math.abs(a.after-a.before)).slice(0,5);
-            add('CATEGORY_SHIFT',column,distance>=0.4?'HIGH':'MEDIUM','Category distribution shifted','Category mix changed substantially (total variation distance '+(distance*100).toFixed(1)+'%).',{distance:Number(distance.toFixed(3)),topChanges:changed},changed);
+            add('CATEGORY_SHIFT',column,distance>=0.25?'HIGH':'MEDIUM','Category distribution shifted','Category mix changed substantially (total variation distance '+(distance*100).toFixed(1)+'%).',{distance:Number(distance.toFixed(3)),topChanges:changed},changed);
           }
         }
       }
@@ -462,7 +467,7 @@ router.post('/datasets/:datasetId/anomalies',async(req,res,next)=>{
     if(newDup.count-oldDup.count>=3&&newDup.rate-oldDup.rate>=0.05)add('DUPLICATE_SPIKE',null,newDup.rate>=0.15?'HIGH':'MEDIUM','Duplicate rows increased','Duplicate-row rate rose from '+(oldDup.rate*100).toFixed(1)+'% to '+(newDup.rate*100).toFixed(1)+'%.',{before:oldDup.count,after:newDup.count,beforeRate:Number((oldDup.rate*100).toFixed(1)),afterRate:Number((newDup.rate*100).toFixed(1))});
     const severityOrder={HIGH:0,MEDIUM:1,LOW:2};
     anomalies.sort((a,b)=>severityOrder[a.severity]-severityOrder[b.severity]);
-    const report={fromVersion:from,toVersion:to,fromRows:oldRecords.length,toRows:newRecords.length,columnsAnalyzed:common.length,anomalyCount:anomalies.length,highCount:anomalies.filter(item=>item.severity==='HIGH').length,mediumCount:anomalies.filter(item=>item.severity==='MEDIUM').length,anomalies,methodology:{numeric:'1.5×IQR fences from the earlier version; flag at least 3 later values and a 3 percentage-point outlier-rate increase.',missingness:'Flag at least 3 additional missing cells and a 10 percentage-point missing-rate increase.',category:'Total variation distance ≥0.25 for low-cardinality text columns with at least 20 populated values.',rowCount:'Flag an absolute row-count change of at least 20%.',duplicates:'Flag at least 3 additional duplicate rows and a 5 percentage-point duplicate-rate increase.'}};
+    const report={fromVersion:from,toVersion:to,fromRows:oldRecords.length,toRows:newRecords.length,columnsAnalyzed:common.length,anomalyCount:anomalies.length,highCount:anomalies.filter(item=>item.severity==='HIGH').length,mediumCount:anomalies.filter(item=>item.severity==='MEDIUM').length,anomalies,methodology:{numeric:'Flag a new value beyond a 3×IQR extreme fence immediately; otherwise flag at least 3 values outside 1.5×IQR fences with a 3 percentage-point outlier-rate increase.',missingness:'Flag at least 3 additional missing cells and a 10 percentage-point missing-rate increase.',category:'Total variation distance ≥0.08 for low-cardinality text columns with at least 20 populated values; newly introduced categories are included.',rowCount:'Flag an absolute row-count change of at least 20%.',duplicates:'Flag at least 3 additional duplicate rows and a 5 percentage-point duplicate-rate increase.'}};
     await pool.execute('INSERT INTO dataset_anomaly_runs (id,dataset_id,from_version,to_version,executed_by,anomaly_count,high_count,medium_count,result_json) VALUES (?,?,?,?,?,?,?,?,?)',[randomUUID(),req.params.datasetId,from,to,req.user.id,report.anomalyCount,report.highCount,report.mediumCount,JSON.stringify(report)]);
     await audit({orgId:rows[0].organization_id,actorId:req.user.id,action:'DATASET_ANOMALY_SCANNED',targetType:'DATASET',targetId:req.params.datasetId,metadata:{fromVersion:from,toVersion:to,anomalyCount:report.anomalyCount,highCount:report.highCount},ip:req.ip});
     res.status(201).json({report});
