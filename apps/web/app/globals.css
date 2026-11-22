@@ -341,3 +341,23 @@ body{background-image:radial-gradient(ellipse at 78% 4%,rgba(164,137,91,.13),tra
 .vyron-teams-page button:disabled{opacity:.55!important;cursor:not-allowed}
 .vyron-teams-page button:focus-visible,.vyron-teams-page a:focus-visible,.vyron-teams-page input:focus-visible,.vyron-teams-page select:focus-visible{outline:2px solid #e0cca2!important;outline-offset:3px}
 @media(max-width:640px){.vyron-teams-page{padding:18px 14px!important}.vyron-teams-page h1{font-size:clamp(30px,9vw,42px)!important}.vyron-teams-page header{gap:12px;align-items:center}.vyron-teams-page header a:first-child{font-size:11px;letter-spacing:.08em}.vyron-teams-page section[style]{padding:16px!important}.vyron-teams-page form{grid-template-columns:minmax(0,1fr)!important}.vyron-teams-page select{max-width:100%;min-width:0}}
+
+
+/* Royal Vyron delivery-intelligence page */
+.vyron-performance-page{background:radial-gradient(ellipse at 78% 2%,rgba(190,161,108,.14),transparent 34%),linear-gradient(135deg,#080d17,#101b2a 58%,#090f19)!important;color:#f4f0e7!important}
+.vyron-performance-page header{border-bottom-color:rgba(207,185,139,.22)!important}
+.vyron-performance-page header a:first-child{color:#e4d2ac!important}
+.vyron-performance-page header a:last-child,.vyron-performance-page section a{color:#ddc796!important}
+.vyron-performance-page h1,.vyron-performance-page h2,.vyron-performance-page b{color:#f4f0e7}
+.vyron-performance-page small{color:#d0bd91!important}
+.vyron-performance-page p{color:#b8b4a9!important}
+.vyron-performance-page select{background:#0c1522!important;color:#f4f0e7!important;border:1px solid rgba(185,170,139,.36)!important;border-radius:10px!important;min-height:44px}
+.vyron-performance-page option{background:#0c1522!important;color:#f4f0e7!important}
+.vyron-performance-page article[style],.vyron-performance-page section[style]{background:linear-gradient(145deg,rgba(23,32,47,.97),rgba(13,21,34,.98))!important;border:1px solid rgba(207,185,139,.22)!important;border-radius:16px!important;box-shadow:0 14px 40px rgba(0,0,0,.18)!important}
+.vyron-performance-page table{color:#eee9dc!important}
+.vyron-performance-page th{color:#d1bf96!important;border-bottom-color:rgba(207,185,139,.25)!important}
+.vyron-performance-page td{border-bottom-color:rgba(207,185,139,.13)!important}
+.vyron-performance-page details{border-top-color:rgba(207,185,139,.2)!important}
+.vyron-performance-page summary{color:#e1cca0!important}
+.vyron-performance-page a:focus-visible,.vyron-performance-page select:focus-visible{outline:2px solid #e0cca2!important;outline-offset:3px}
+@media(max-width:640px){.vyron-performance-page{padding:20px 13px 42px!important}.vyron-performance-page h1{font-size:clamp(30px,9vw,42px)!important}.vyron-performance-page header{gap:10px}.vyron-performance-page header a{font-size:12px}.vyron-performance-page section[style]{padding:15px!important}.vyron-performance-page table{min-width:650px}}
