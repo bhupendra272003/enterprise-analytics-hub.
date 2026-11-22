@@ -26,7 +26,7 @@ GROUP BY duration, status
 ORDER BY duration, status;
 
 -- Account-level loan history; use only if the project definition permits
--- multiple loans per account. Do not use post-loan transactions as predictors.
+-- multiple loans per account.
 SELECT account_id, COUNT(*) AS loan_count,
        MIN(date) AS first_loan_date, MAX(date) AS latest_loan_date
 FROM financial.loan
@@ -35,21 +35,7 @@ HAVING COUNT(*) > 1
 ORDER BY loan_count DESC, account_id
 LIMIT 100;
 
--- Transaction aggregates strictly before each loan date.
--- These are safe as-of features only if transaction dates are validated
--- and no future-dated or same-day leakage is introduced.
-SELECT l.account_id, l.date AS loan_date, l.status,
-       COUNT(t.trans_id) AS prior_transaction_count,
-       SUM(CASE WHEN t.type = 'PRIJEM' THEN t.amount ELSE 0 END) AS prior_incoming_amount,
-       SUM(CASE WHEN t.type = 'VYDAJ' THEN t.amount ELSE 0 END) AS prior_outgoing_amount,
-       AVG(t.balance) AS avg_prior_balance,
-       MIN(t.balance) AS min_prior_balance
-FROM financial.loan l
-LEFT JOIN financial.trans t
-  ON t.account_id = l.account_id
- AND t.date < l.date
-GROUP BY l.account_id, l.date, l.status
-ORDER BY l.date, l.account_id;
-
--- IMPORTANT: Validate transaction type values and the transaction primary key
--- against information_schema before relying on the feature query above.
+-- Loan-level prior-transaction features are maintained separately in
+-- sql/03_asof_loan_features.sql. That query preserves loan_id and groups
+-- observed transaction types instead of assuming a fixed income/expense map.
+-- It uses t.date < l.date to prevent same-day and post-loan leakage.

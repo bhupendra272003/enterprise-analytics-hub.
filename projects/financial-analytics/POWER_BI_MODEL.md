@@ -6,27 +6,39 @@ This guide defines a safe starting model for exported source extracts. It does n
 
 | Table | Grain | Suggested key |
 |---|---|---|
-| loan | One row per source loan | Confirm the source primary key in Workbench metadata |
+| loan | One row per source loan | loan_id |
 | account | One row per account | account_id |
 | client | One row per client | client_id |
-| disp | One row per account/client disposition | Confirm composite/source key |
+| disp | One row per account/client disposition | Confirm source key and cardinality |
 | district | One row per district | A1 / district identifier from source schema |
 | card | One row per issued card | card_id |
 | orders | One row per standing order | order_id |
 | trans | One row per transaction | trans_id |
-| loan_prior_features | One row per loan and transaction type | account_id + loan_date + transaction_type; validate uniqueness |
+| loan_prior_features | One row per loan and observed transaction type | loan_id + transaction_type |
 
-Do not assume that `account_id` alone is a unique loan key. The source task describes account-level prediction, but the source may contain multiple loans per account. Run the grain audit in `sql/03_asof_loan_features.sql` before creating relationships.
+The source loan key is retained in the as-of feature query. Do not collapse loans to account/date: an account may have multiple loan records, and the grain audit is included in sql/03_asof_loan_features.sql.
 
 ## Relationships
 
-- `account[account_id]` → `loan[account_id]` (one-to-many only after confirming account uniqueness and loan multiplicity).
-- `account[account_id]` → `trans[account_id]` (one-to-many).
-- Link client to account through `disp`, not by guessing a direct key.
+- account[account_id] → loan[account_id] (one-to-many only after confirming account uniqueness and loan multiplicity).
+- loan[loan_id] → loan_prior_features[loan_id] (one-to-many; validate the exported feature grain before creating the relationship).
+- account[account_id] → trans[account_id] (one-to-many).
+- Link client to account through disp, not by guessing a direct key.
 - Link district only after checking the actual district key and cardinality in the source schema.
-- Keep `loan_prior_features` separate until its row grain and relationship key are verified.
+- Keep loan_prior_features separate until its row grain and relationship key are verified.
 
 Use single-direction filtering from dimensions to facts where possible. Avoid many-to-many relationships unless the source key structure requires them and the model is documented.
+
+## Reproducible local outputs
+
+Run python python/profile_financial.py from this project directory after installing requirements.txt. It writes:
+
+- output/source_profile.json — source table counts, key-integrity checks, loan null/domain checks, status distribution, and run timestamp.
+- output/data_quality_summary.csv — metric/value rows suitable for a Power BI data-quality page.
+- output/loan_analysis_extract.csv — loan-grain extract with the source loan_id retained.
+- output/loan_outcome_summary.csv — loan count, average amount/duration, and share by observed status.
+
+Run sql/03_asof_loan_features.sql separately to export the leakage-safe transaction features. Do not present any of these outputs as generated until the script has successfully connected to the source and completed.
 
 ## Suggested report pages
 
@@ -53,9 +65,9 @@ If the report filters to completed target classes A/B, create an explicitly name
 
 ## Temporal leakage controls
 
-- Use transactions strictly earlier than `loan.date` for as-of features.
+- Use transactions strictly earlier than loan.date for as-of features.
 - Exclude same-day and post-loan transactions from predictors unless the source task explicitly defines another timestamp convention.
-- Keep target `loan.status` out of feature tables used for model training.
+- Keep target loan.status out of feature tables used for model training.
 - Preserve a reproducible source extract date and query version.
 - Document row counts before and after every merge; unexpected row multiplication is a model-quality defect.
 
