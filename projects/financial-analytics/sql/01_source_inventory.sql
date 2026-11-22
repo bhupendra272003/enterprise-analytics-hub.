@@ -33,3 +33,29 @@ SELECT
   SUM(date IS NULL) AS missing_loan_date,
   SUM(account_id IS NULL) AS missing_account_id
 FROM financial.loan;
+
+
+-- Transaction categories: do not assume a two-category inflow/outflow mapping.
+SELECT type, COUNT(*) AS transaction_count,
+       ROUND(100.0 * COUNT(*) / (SELECT COUNT(*) FROM financial.trans), 2) AS pct
+FROM financial.trans
+GROUP BY type
+ORDER BY transaction_count DESC;
+
+-- Duplicate checks for documented business identifiers.
+-- These queries report exceptions; they do not alter source records.
+SELECT 'account_id' AS key_name, COUNT(*) AS duplicate_groups
+FROM (
+  SELECT account_id FROM financial.account
+  GROUP BY account_id HAVING COUNT(*) > 1
+) d
+UNION ALL
+SELECT 'client_id', COUNT(*) FROM (
+  SELECT client_id FROM financial.client
+  GROUP BY client_id HAVING COUNT(*) > 1
+) d
+UNION ALL
+SELECT 'loan_id', COUNT(*) FROM (
+  SELECT loan_id FROM financial.loan
+  GROUP BY loan_id HAVING COUNT(*) > 1
+) d;
