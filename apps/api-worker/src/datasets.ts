@@ -169,6 +169,40 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
   await audit(env,dataset.organization_id,user.id,"DATASET_CLEANED",datasetId,{versionNumber:version,beforeScore:before.qualityScore,afterScore:after.qualityScore,removedDuplicates,filledCells});
   return json({versionNumber:version,report},201);
  }
+ if(sub==="insights"&&req.method==="GET"){
+  if(Number(dataset.file_size)>MAX_SYNC_CSV_BYTES)return syncLimitError();
+  const source=await readStored(env,dataset.storage_path);if(!source)return json({error:"Stored dataset file is missing."},500);
+  let parsed;try{parsed=parseCsv(await source.arrayBuffer());}catch{return json({error:"The stored CSV could not be parsed for full-dataset insights."},400);}
+  const category=url.searchParams.get("category")||"",measure=url.searchParams.get("measure")||"",filter=(url.searchParams.get("filter")||"").trim().slice(0,120).toLocaleLowerCase();
+  if(category&&!parsed.columns.includes(category))return json({error:"Choose a valid category column."},400);
+  if(measure&&!parsed.columns.includes(measure))return json({error:"Choose a valid measure column."},400);
+  const rows=parsed.records as Record<string,unknown>[],rowCount=rows.length,columnCount=parsed.columns.length;
+  let missingCells=0,duplicateRows=0;const seen=new Set<string>();
+  const numericStats:any[]=[];
+  for(const column of parsed.columns){
+   const values=rows.map(row=>String(row[column]??"").trim());missingCells+=values.filter(v=>!v).length;
+   const present=values.filter(Boolean),numbers=present.map(Number).filter(Number.isFinite);
+   if(present.length&&numbers.length/present.length>=.9){
+    const sum=numbers.reduce((a,b)=>a+b,0),sorted=numbers.slice().sort((a,b)=>a-b);
+    numericStats.push({column,count:numbers.length,mean:Number((sum/numbers.length).toFixed(3)),sum:Number(sum.toFixed(3)),min:sorted[0],max:sorted[sorted.length-1]});
+   }
+  }
+  for(const row of rows){const key=JSON.stringify(parsed.columns.map(c=>String(row[c]??"")));if(seen.has(key))duplicateRows++;else seen.add(key);}
+  const counts=new Map<string,number>();let numericCount=0,numericSum=0,numericMin=Infinity,numericMax=-Infinity;
+  if(category&&measure){
+   for(const row of rows){
+    const label=String(row[category]??"").trim()||"(blank)";
+    if(filter&&!label.toLocaleLowerCase().includes(filter))continue;
+    const value=Number(String(row[measure]??"").trim());if(!Number.isFinite(value)||String(row[measure]??"").trim()==="")continue;
+    counts.set(label,(counts.get(label)||0)+value);numericCount++;numericSum+=value;numericMin=Math.min(numericMin,value);numericMax=Math.max(numericMax,value);
+   }
+  }
+  const chartRows=[...counts.entries()].sort((a,b)=>b[1]-a[1]).slice(0,20).map(([label,value])=>({label,value:Number(value.toFixed(3))}));
+  const insights=[rowCount.toLocaleString()+" records analysed across the full dataset",missingCells.toLocaleString()+" missing cells ("+Number((missingCells/(Math.max(1,rowCount*columnCount))*100).toFixed(2))+"% of all cells)",duplicateRows.toLocaleString()+" duplicate rows detected",numericStats.length+" numeric columns detected"];
+  if(numericStats.length){const top=numericStats.slice().sort((a,b)=>b.sum-a.sum)[0];insights.push(top.column+" has the largest numeric total ("+top.sum.toLocaleString()+")");}
+  if(chartRows.length)insights.push("Top "+chartRows.length+" category groups by "+measure+": "+chartRows[0].label+" leads with "+chartRows[0].value.toLocaleString());
+  return json({summary:{rowCount,columnCount,missingCells,duplicateRows,numericColumns:numericStats.length,chartValueCount:numericCount,chartTotal:Number(numericSum.toFixed(3)),chartMin:numericCount?numericMin:null,chartMax:numericCount?numericMax:null},numericStats,chartRows,insights,scope:"FULL_DATASET"});
+ }
  if(sub==="profile"&&req.method==="GET"){
   const source=await readStored(env,dataset.storage_path);if(!source)return json({error:"Stored dataset file is missing."},500);
   let parsed;try{parsed=parseCsv(await source.arrayBuffer());}catch{return json({error:"The stored CSV is invalid."},400);}
