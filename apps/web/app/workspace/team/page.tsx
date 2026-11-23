@@ -59,7 +59,7 @@ export default function TeamPage() {
     event.preventDefault(); if (!selected) return;
     setBusy(true); setNotice(''); setInviteUrl('');
     try {
-      const data: InviteResult = await request(`/api/invitations/organizations/${selected}/invitations`, {
+      const data: InviteResult = await request(`/api/organizations/${selected}/invitations`, {
         method: 'POST', body: JSON.stringify({ email, role })
       });
       setInviteUrl(data.invitationUrl || ''); setEmail('');
