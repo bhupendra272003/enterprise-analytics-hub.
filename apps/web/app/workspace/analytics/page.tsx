@@ -64,7 +64,7 @@ export default function AnalyticsStudio(){
    const output:string[]=[];
    await new Promise<void>((resolve,reject)=>{
     const timer=window.setTimeout(()=>{worker?.terminate();reject(new Error('Python execution exceeded 60 seconds and was stopped.'));},60000);
-    worker!.onmessage=(event)=>{const d=event.data;if(d.type==='stdout'||d.type==='result'){output.push(d.text);setPythonOutput(output.join('\\n'));}else if(d.type==='error'){window.clearTimeout(timer);reject(new Error(d.text));}else if(d.type==='done'){window.clearTimeout(timer);resolve();}};
+    worker!.onmessage=(event)=>{const d=event.data;if(d.type==='stdout'||d.type==='result'){const remaining=100000-output.join('\\n').length;if(remaining<=0){window.clearTimeout(timer);worker?.terminate();reject(new Error('Python output exceeded the 100,000-character safety limit.'));return;}output.push(String(d.text).slice(0,remaining));setPythonOutput(output.join('\\n'));if(String(d.text).length>remaining){window.clearTimeout(timer);worker?.terminate();reject(new Error('Python output exceeded the 100,000-character safety limit.'));}}else if(d.type==='error'){window.clearTimeout(timer);reject(new Error(d.text));}else if(d.type==='done'){window.clearTimeout(timer);resolve();}};
     worker!.onerror=(event)=>{window.clearTimeout(timer);reject(new Error(event.message||'Python worker failed.'));};
     worker!.postMessage({code:pythonCode,csv});
    });
