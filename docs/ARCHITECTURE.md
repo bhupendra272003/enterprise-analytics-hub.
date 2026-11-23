@@ -5,13 +5,13 @@ A multi-tenant, multi-industry analytics and collaboration workspace that takes 
 
 ## Repository architecture observed
 - Web: Next.js 15, React 19, TypeScript.
-- Express API path: Node.js, Express and MySQL; includes account, organization, project, task, dataset, report, notification and audit routes.
-- Cloudflare Worker path: TypeScript Worker with D1, KV and Queues; includes authentication and organization, project, dataset, report and background dataset-job handlers.
-- Data: CSV upload and Python cleaning/profiling capabilities exist in the Express application. The Worker path includes queued dataset profiling jobs with a current small-file safety limit.
-- BI: organization-scoped Power BI report-link catalog. Secure Power BI embedding is not implemented.
-- Storage: the Express CSV adapter uses local disk. The Worker bindings shown in wrangler configuration include D1, KV and Queues; no R2 binding is currently declared in that configuration.
+- Express API path: Node.js, Express and MySQL; retained as a local/legacy implementation.
+- Cloudflare Worker path: TypeScript Worker with D1, KV and Queues; this is the currently deployed API path for the Cloudflare deployment workflow.
+- Data: CSV upload, profiling, cleaning, validation and background jobs exist across the two paths, but their storage and schemas are not interchangeable.
+- BI: organization-scoped Power BI report-link catalog. Secure Power BI embedding and automatic dataset refresh are not implemented.
+- Storage: Worker bindings/configuration must be checked for the active deployment. Do not assume local Express disk storage is production object storage.
 
-**Deployment caution:** both application paths are present. Confirm which API path is actually routed in production before changing schema, storage, job scheduling or data generation. Do not assume the Express/MySQL and Worker/D1 schemas are interchangeable.
+**Deployment caution:** both application paths are present. The Cloudflare Worker and Express/MySQL implementations have different route coverage and role/data models. Confirm the target path before changing schema, storage, job scheduling or data generation.
 
 ## Existing implementation foundation
 - Registration, email verification, login, session handling and password recovery.
@@ -21,7 +21,7 @@ A multi-tenant, multi-industry analytics and collaboration workspace that takes 
 - Immutable dataset versions, version comparison and restore-as-new-version.
 - Quality/anomaly history and organization audit events.
 - In-app notifications and Power BI report-link catalog.
-- Worker background profiling job queue.
+- Worker background profiling and synthetic-data job queues.
 
 These are initial product capabilities and require testing/hardening; this is not a production-certification claim.
 
@@ -37,18 +37,18 @@ These are initial product capabilities and require testing/hardening; this is no
 9. Trainer/reviewer view with explicitly granted, limited access.
 
 ## Role model
-### Organization roles currently present
-- OWNER: accountable organization owner.
-- ADMIN: organization member/settings administration subject to server-side rules.
-- MANAGER: project coordination and task management.
-- ANALYST: authorized analysis and assigned work.
-- VIEWER: read-only access.
+### Cloudflare Worker organization roles
+The deployed Worker path enforces four roles:
+- OWNER: organization owner; manages sensitive settings, invitations and role changes.
+- MANAGER: read-only organization reporting and access-request visibility.
+- LEADER: leads one team and assigns work within that team.
+- ANALYST: completes assigned work.
 
-### Project responsibilities proposed
-Project Lead, Data Engineer/Data Steward, Data Cleaner, Analyst, BI Developer, QA/Reviewer and Trainer/Mentor. These are responsibilities, not necessarily new organization roles. A person may hold multiple responsibilities in a small cohort and roles may rotate.
+### Legacy Express/MySQL path
+The local/legacy Express path may still contain older role names and permission behavior. Do not assume its role enforcement matches the Worker. Keep changes path-specific until parity tests prove otherwise.
 
 ### Trainer access recommendation
-Start with limited Reviewer/Mentor access to approved project information. Consider Manager only if the trainer agrees to coordinate daily delivery. Grant Admin only with explicit consent and a defined administrative responsibility. Do not grant platform-wide administrator rights by default. Project-scoped reviewer permissions still need implementation before being promised as a live feature.
+Start with limited Reviewer/Mentor access to approved project information. Project-scoped reviewer permissions still need implementation before being promised as a live feature. Do not grant platform-wide administrator rights by default.
 
 ## Approval gates
 1. Proposal and scope prepared.
@@ -58,7 +58,7 @@ Start with limited Reviewer/Mentor access to approved project information. Consi
 5. Teams, leads, tasks and project permissions configured.
 6. Operational launch after storage, security and performance checks.
 
-No team, participant or recurring generation schedule is created by the blueprint itself.
+No team, participant, trainer account or recurring generation schedule is created by the blueprint itself.
 
 ## Data lifecycle
 Requirements → Discovery → Ingestion → Profiling → Cleaning → Validation → SQL/Python → Dashboarding → QA/Reconciliation → Insights → Review → Delivery → Monitoring.
@@ -66,11 +66,11 @@ Requirements → Discovery → Ingestion → Profiling → Cleaning → Validati
 Raw files remain immutable. Cleaning and validation create versioned outputs. Every handoff should record dataset version, owner, status, checks performed and approval. Use synthetic or formally approved de-identified data; do not introduce real patient, bank-customer or payment-card data without authorization and safeguards.
 
 ## Synthetic data generation
-The discussed planning volumes are 50,000+ initial rows and 10,000+ daily additions. Whether those are per industry or aggregate is not yet confirmed. Keep volume configurable and generation disabled until confirmation, trainer approval, storage selection and load testing. Use queue-based chunk processing, idempotency keys, bounded concurrency, retries, run logs and safe failure recovery. Never generate a large batch synchronously in a web request.
+Generation is owner-controlled and approval-gated. The Cloudflare Worker has queued generator jobs and bounded limits, but large-scale scheduled generation, durable retention, multi-table relational generation and load testing remain outstanding. Never generate a large batch synchronously in a web request.
 
 ## Security and production gaps
 - Project-scoped roles and dataset/column-level access controls.
-- Durable private object storage and retention/lifecycle policy.
+- Durable private object storage and retention/lifecycle policy verification.
 - Approved database/API connectors with least-privilege credentials.
 - Safe concurrent editing, conflict handling and lineage.
 - Secure Power BI embedding and token lifecycle.
