@@ -1,13 +1,13 @@
 # PKDD'99 Financial Analytics — Vyron Project Pack
 
-This is the first real-data project pack for Bhupendra's Vyron. It uses the public CTU Relational Financial database directly; it does not copy or modify the source database.
+This is the reproducible real-data analytics project for Bhupendra's Vyron. It uses the public CTU Relational Financial database directly; it does not copy or modify the source database.
 
 ## Verified source facts
 
 - Dataset: PKDD'99 Financial (loan application)
 - 8 tables, 55 columns, 1,090,086 total rows, 78.8 MB
 - 682 loan records: 606 successful and 76 not successful
-- Target: loan.status; prediction unit: loan.account_id; prediction time: loan.date
+- Target: loan.status; CTU prediction unit: loan.account_id; prediction timestamp: loan.date
 - Missing values exist.
 - Source: https://relational.fel.cvut.cz/dataset/Financial
 
@@ -19,39 +19,53 @@ This is the first real-data project pack for Bhupendra's Vyron. It uses the publ
 - Password: ctu-relational
 - Default schema: financial
 
-These are public read-access source credentials. Do not save them in Vyron's browser code, repository secrets, or screenshots. Use a read-only connection and never run UPDATE, DELETE, DROP, ALTER, or INSERT against the source.
+These are the dataset publisher's public read-access connection details. Use a read-only connection and never run UPDATE, DELETE, DROP, ALTER, INSERT or REPLACE against the source. Do not place connection details or credentials in browser code, screenshots, or application settings.
 
-## Start
+## Reproducible local workflow
 
-1. Open MySQL Workbench and create the connection above.
-2. Select schema financial.
-3. Run sql/01_source_inventory.sql.
-4. Run sql/02_loan_outcome_analysis.sql.
-5. Run sql/03_asof_loan_features.sql and review its loan-grain and time-boundary audits.
-6. Run the Python inventory/profile script from this project directory:
-   ```bash
-   python -m venv .venv
-   # Windows: .venv\\Scripts\\activate
-   # macOS/Linux: source .venv/bin/activate
-   pip install -r requirements.txt
-   python python/profile_financial.py
-   ```
-7. Review output/data_quality_summary.csv, output/loan_outcome_summary.csv, and output/loan_analysis_extract.csv.
-8. Export the approved as-of feature query result separately, then follow POWER_BI_MODEL.md to build the model and report.
+Run from this project directory:
+
+~~~bash
+python -m venv .venv
+# Windows: .venv\\Scripts\\activate
+# macOS/Linux: source .venv/bin/activate
+pip install -r requirements.txt
+python python/profile_financial.py
+python python/validate_exports.py
+~~~
+
+The profiler prompts for the database user and password; it does not write them to disk. It runs SELECT-only queries and produces:
+
+| Output | Purpose |
+|---|---|
+| output/source_profile.json | Exact source inventory, key checks, missing-value counts, relationship checks, loan grain and temporal audit |
+| output/data_quality_summary.csv | Long-form metric/value table for Power BI |
+| output/missing_value_profile.csv | Missing row counts and percentages for every source column |
+| output/relationship_integrity.csv | Orphan-row counts for documented foreign-key relationships |
+| output/loan_analysis_extract.csv | Loan-grain source extract, retaining loan_id and account_id |
+| output/loan_outcome_summary.csv | Loan count, distinct accounts, average amount/duration and share by observed status |
+| output/loan_prior_features.csv | Transaction aggregates strictly before each loan date, without the target status |
+| output/validation_report.json | Offline consistency, grain, target-leakage and temporal-boundary validation |
+| output/validation_summary.csv | One row per validator check |
+
+The export validator is offline and uses only the Python standard library. A failed check exits with code 1; foreign-key orphan counts are surfaced as warnings so source exceptions are not silently hidden.
 
 ## Analysis guardrails
 
-The documented prediction task is finished-loan classification (A vs B) at the loan start date. Do not use transactions or balances recorded after loan.date as predictors. The source documentation warns that ignoring the temporal constraint can create misleadingly perfect separation. Do not mix unfinished outcomes (C/D) into the finished-loan A/B target without explicitly changing the problem definition.
+The documented classification task is finished-loan classification (A vs B) at the loan start date. The CTU page warns that ignoring temporal constraints or mixing finished and unfinished outcomes (A/B vs C/D) can produce misleadingly perfect separation. Do not use transactions on or after loan.date as predictors. The Python and SQL as-of extracts use the strict boundary transaction.date < loan.date.
 
-## Deliverables to record
+The feature extract deliberately excludes loan.status. It retains loan_id for traceability, while CTU documents account_id as the prediction unit. Review loan_grain_audit and account/date duplicate checks before defining the model split or aggregating to account grain. Loan date is a prediction timestamp and should not be used as a predictor without an explicit modelling decision.
 
-- Source inventory and row counts
-- Missing-value and key-integrity report
-- Loan outcome distribution
-- Account/transaction activity features calculated strictly as-of loan date
-- Power BI report with loan outcomes, customer/district profile, and risk indicators
-- Methodology, limitations, and reproducible SQL/Python scripts
+Transaction types are retained as observed categories. Do not label them income/expense until their source semantics are verified. C/D are not automatically treated as bad loans; they are unfinished contracts in the original task description.
 
-## Important
+## Power BI workflow
 
-This project pack is implemented in the repository, but it is not a live MariaDB connector inside Vyron yet. The current Vyron Data Workspace accepts CSV uploads. Direct server-side MariaDB integration, secure credential storage, and Power BI refresh/embed remain separate platform engineering work.
+1. Run the profiler and offline validator.
+2. Load source_profile.json, loan_analysis_extract.csv, loan_prior_features.csv, missing_value_profile.csv, and relationship_integrity.csv into Vyron's Financial Analytics page for local review.
+3. Import the CSV outputs into Power BI Desktop.
+4. Follow POWER_BI_MODEL.md for relationship cardinality, measures, temporal leakage controls and report pages.
+5. Keep source extract date, query version, row counts and validation report with the PBIX deliverable.
+
+## Important limitations
+
+The project pack and browser-local review workflow are implemented in the repository, but this does not mean the CTU MariaDB connection has been run from this automation or from Vyron. The user must run the profiler from a machine with database access and Python dependencies installed. The current Vyron page processes uploaded CSV/JSON locally in the browser; it does not send them to the server. Direct server-side MariaDB integration, secure credential storage, automated Power BI refresh and secure report embedding remain separate platform engineering work.
