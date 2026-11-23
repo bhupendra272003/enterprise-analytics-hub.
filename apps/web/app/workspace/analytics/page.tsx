@@ -77,7 +77,7 @@ export default function AnalyticsStudio(){
  const biRows=useMemo(()=>((biSummary?.chartRows||[]).map((r:any)=>[r.label,r.value] as [string,number])),[biSummary]);
  const biInsights:string[]=biSummary?.insights||[];
  function csvCell(value:unknown){
-  const raw=String(value??''),safe=/^[\\t\\r\\n ]*[=+\\-@]/.test(raw)?"'"+raw:raw;
+  const raw=String(value??''),first=raw.trimStart().charAt(0),safe="=+-@".includes(first)?"'"+raw:raw;
   return '"'+safe.replace(/"/g,'""')+'"';
  }
  function exportBiSummary(){
