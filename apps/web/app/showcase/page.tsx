@@ -1,15 +1,17 @@
-const panel: React.CSSProperties = {
+import type { CSSProperties } from 'react';
+
+const panel: CSSProperties = {
   background: 'linear-gradient(145deg, rgba(20,29,39,.98), rgba(13,19,27,.98))',
   border: '1px solid #293643',
   borderRadius: 16,
   padding: 28
 };
-const link: React.CSSProperties = {
+const link: CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 9, padding: '13px 17px',
   borderRadius: 8, background: '#b7f36b', color: '#11190a',
   fontSize: 12, fontWeight: 700, textDecoration: 'none'
 };
-const muted: React.CSSProperties = { color: '#9ba8b5', lineHeight: 1.8, fontSize: 14 };
+const muted: CSSProperties = { color: '#9ba8b5', lineHeight: 1.8, fontSize: 14 };
 
 export default function ShowcasePage() {
   return <main style={{ maxWidth: 1180, margin: '0 auto', padding: '0 6vw 50px', color: '#edf3f8' }}>
