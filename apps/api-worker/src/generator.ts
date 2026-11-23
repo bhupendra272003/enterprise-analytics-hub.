@@ -40,7 +40,7 @@ export async function handleGenerator(req:Request,env:Env,path:string):Promise<R
    return json({settings:settings||{enabled:0,perDatasetRowCap:0,perJobRowCap:0},context,jobs,manualTriggerOnly:true});
   }
   const ctx=await ownerContext(req,env,orgId);if(ctx.error)return ctx.error;const user=ctx.user!;
-  if(action==="settings"&&req.method==="PUT"){
+  if(action==="settings"&&["POST","PUT"].includes(req.method)){
    let body:any;try{body=await req.json();}catch{return json({error:"Invalid generator settings."},400);}
    const enabled=body.enabled===true?1:body.enabled===false?0:null;
    const old=await env.DB.prepare("SELECT per_dataset_row_cap,per_job_row_cap FROM generator_settings WHERE organization_id=?").bind(orgId).first<any>();
