@@ -66,6 +66,8 @@ class FinancialProjectAssetTests(unittest.TestCase):
         self.assertIn("getpass.getpass", script)
         self.assertIn("SELECT", script.upper())
         self.assertIn("source_tables", script)
+        self.assertIn("manifest.json", script)
+        self.assertIn("STAGING", script)
         self.assertNotRegex(script, r"(?i)\\b(INSERT|UPDATE|DELETE|DROP|ALTER|TRUNCATE|REPLACE)\\b")
 
     def test_readme_does_not_commit_dataset_password(self):
