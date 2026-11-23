@@ -298,6 +298,7 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
  if(sub==="download"&&req.method==="GET"){
   const source=await readStored(env,dataset.storage_path);
   if(!source)return json({error:"Stored dataset file is missing."},500);
+  await audit(env,dataset.organization_id,user.id,"DATASET_EXPORTED",datasetId,{exportType:"SOURCE_CSV",fileSize:Number(dataset.file_size),rowCount:Number(dataset.row_count)});
   const safeName=(dataset.original_filename||dataset.name||"dataset.csv").replace(/[\\r\\n"]/g,"_").replace(/[\\/\\\\]/g,"_");
   return new Response(await source.arrayBuffer(),{status:200,headers:{"content-type":"text/csv; charset=utf-8","content-disposition":'attachment; filename="'+safeName+'"',"cache-control":"private, no-store","x-content-type-options":"nosniff"}});
  }
