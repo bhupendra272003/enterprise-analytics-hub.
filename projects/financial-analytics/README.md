@@ -47,10 +47,11 @@ The profiler prompts for the database user and password; it does not write them 
 | output/loan_outcome_summary.csv | Loan count, distinct accounts, average amount/duration and share by observed status |
 | output/loan_prior_features.csv | Transaction aggregates strictly before each loan date, without the target status |
 | output/source_tables/*.csv | Full raw-table extracts for all eight source tables, streamed in 10,000-row batches |
+| output/source_tables/manifest.json | Export completion marker with UTC timestamp, row counts, column counts and source column names for all eight tables |
 | output/validation_report.json | Offline consistency, grain, target-leakage and temporal-boundary validation |
 | output/validation_summary.csv | One row per validator check |
 
-The optional raw-table exporter streams each of the eight source tables to separate CSV files under output/source_tables/ in bounded batches; it uses SELECT only and does not load the full transaction table into memory. The export validator is offline and uses only the Python standard library. A failed check exits with code 1; foreign-key orphan counts are surfaced as warnings so source exceptions are not silently hidden.
+The optional raw-table exporter streams each of the eight source tables to separate CSV files under output/source_tables/ in bounded batches; it uses SELECT only and does not load the full transaction table into memory. It stages all eight files first and publishes manifest.json last; treat that manifest as the export completion marker and use its row/column counts when validating a refresh. The export validator is offline and uses only the Python standard library. A failed check exits with code 1; foreign-key orphan counts are surfaced as warnings so source exceptions are not silently hidden.
 
 ## Analysis guardrails
 
