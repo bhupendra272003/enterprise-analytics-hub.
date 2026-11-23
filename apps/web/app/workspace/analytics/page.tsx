@@ -12,7 +12,7 @@ export default function AnalyticsStudio(){
  const [active,setActive]=useState<TableData|null>(null),[query,setQuery]=useState(''),[filter,setFilter]=useState(''),[pageRows,setPageRows]=useState<Record<string,string>[]>([]),[pageInfo,setPageInfo]=useState({page:1,pageSize:50,totalRows:0,totalPages:1}),[page,setPage]=useState(1),[notice,setNotice]=useState('Loading your internal data workspace…');
  const [tab,setTab]=useState<'grid'|'python'|'sql'|'bi'>('grid'),[sort,setSort]=useState(''),[ascending,setAscending]=useState(true);
  const pythonStarter='import pandas as pd\nimport numpy as np\n\n# The selected dataset is available as data.csv\ndf = pd.read_csv("data.csv")\n\nprint(df.head())\nprint(df.describe(include="all"))';
- const sqlStarter='-- Query the selected CSV dataset (read-only)\nSELECT *\nFROM data\nLIMIT 100;';';
+ const sqlStarter='-- Query the selected CSV dataset (read-only)\nSELECT *\nFROM data\nLIMIT 100;';
  const [pythonCode,setPythonCode]=useState(pythonStarter),[sqlCode,setSqlCode]=useState(sqlStarter);
  const [queryResult,setQueryResult]=useState<any>(null),[sqlBusy,setSqlBusy]=useState(false);
  const [pythonOutput,setPythonOutput]=useState('Select a dataset, then run Python in your browser. The runtime loads from the Pyodide CDN.'),[pythonBusy,setPythonBusy]=useState(false);
