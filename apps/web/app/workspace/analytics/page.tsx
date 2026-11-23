@@ -78,7 +78,7 @@ export default function AnalyticsStudio(){
  const biInsights:string[]=biSummary?.insights||[];
  function exportBiSummary(){
   if(!active||!biRows.length)return;
-  const rows=[[biX,biY],...biRows],csv=rows.map(row=>row.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\\r\\n');
+  const rows=[[biX,biY],...biRows],csv=rows.map((row:(string|number)[])=>row.map((v:string|number)=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\\r\\n');
   const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})),link=document.createElement('a');link.href=url;link.download=active.name.replace(/[^a-z0-9-_]+/gi,'_')+'_chart_data.csv';document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url);
  }
 
