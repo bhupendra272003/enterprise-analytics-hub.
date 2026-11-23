@@ -1,0 +1,31 @@
+order_id,order_date,customer_segment,region,shipping_mode,delivery_days,order_value,order_status
+ORD-1001,2026-01-03,Consumer,North,Standard,4,1299.00,Delivered
+ORD-1002,2026-01-04,Corporate,West,Express,2,8450.50,Delivered
+ORD-1003,2026-01-05,Home Office,South,Standard,6,2199.00,Delivered
+ORD-1004,2026-01-06,Consumer,East,Same Day,1,799.00,Delivered
+ORD-1005,2026-01-07,Corporate,North,Standard,5,15200.00,Delivered
+ORD-1006,2026-01-08,Consumer,West,Express,3,459.00,Delivered
+ORD-1007,2026-01-09,Home Office,South,Standard,7,3899.00,Delayed
+ORD-1008,2026-01-10,Consumer,East,Standard,4,999.00,Delivered
+ORD-1009,2026-01-11,Corporate,North,Express,2,12400.00,Delivered
+ORD-1010,2026-01-12,Consumer,West,Standard,5,1799.00,Delivered
+ORD-1011,2026-01-13,Home Office,South,Express,3,2599.00,Delivered
+ORD-1012,2026-01-14,Consumer,East,Standard,8,699.00,Delayed
+ORD-1013,2026-01-15,Corporate,North,Standard,4,9200.00,Delivered
+ORD-1014,2026-01-16,Consumer,West,Express,2,1499.00,Delivered
+ORD-1015,2026-01-17,Home Office,South,Standard,6,3199.00,Returned
+ORD-1016,2026-01-18,Consumer,East,Standard,5,1199.00,Delivered
+ORD-1017,2026-01-19,Corporate,North,Express,3,18500.00,Delivered
+ORD-1018,2026-01-20,Consumer,West,Standard,4,899.00,Delivered
+ORD-1019,2026-01-21,Home Office,South,Standard,9,4299.00,Delayed
+ORD-1020,2026-01-22,Consumer,East,Express,2,1599.00,Delivered
+ORD-1021,2026-01-23,Corporate,North,Standard,5,11200.00,Delivered
+ORD-1022,2026-01-24,Consumer,West,Express,3,2199.00,Delivered
+ORD-1023,2026-01-25,Home Office,South,Standard,6,2799.00,Delivered
+ORD-1024,2026-01-26,Consumer,East,Standard,4,999.00,Delivered
+ORD-1024,2026-01-26,Consumer,East,Standard,4,999.00,Delivered
+ORD-1026,2026-01-28,Corporate,North,Express,2,0.00,Delivered
+ORD-1027,2026-01-29,Consumer,West,Standard,,-450.00,Pending
+ORD-1028,2026-01-30,Home Office,South,Express,18,5199.00,Delayed
+ORD-1029,,Consumer,East,Standard,5,1399.00,Delivered
+ORD-1030,2026-02-01,,North,Standard,4,2999.00,Delivered
