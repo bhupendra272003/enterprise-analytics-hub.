@@ -76,5 +76,14 @@ class FinancialProjectAssetTests(unittest.TestCase):
         self.assertIn("export_source_tables.py", readme)
 
 
+    def test_validator_checks_optional_raw_exports_against_manifest(self):
+        script = (ROOT / "python" / "validate_exports.py").read_text(encoding="utf-8")
+        self.assertIn("validate_raw_source_exports", script)
+        self.assertIn("manifest.json", script)
+        self.assertIn("SOURCE_TABLES", script)
+        self.assertIn("row_count", script)
+        self.assertIn("raw_source_table_exports", script)
+
+
 if __name__ == "__main__":
     unittest.main()
