@@ -161,6 +161,22 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
   for(const run of runs)for(const [k,v] of Object.entries(run.issueCounts))issueBreakdown[k]=(issueBreakdown[k]||0)+Number(v||0);
   return json({summary:{totalRuns:runs.length,passedRuns:passed,failedRuns:runs.length-passed,passRate:runs.length?Number((passed/runs.length*100).toFixed(1)):0,averageScore:scored.length?Number((scored.reduce((s:number,r:any)=>s+r.score,0)/scored.length).toFixed(1)):null,totalIssues:runs.reduce((s:number,r:any)=>s+r.issueCount,0)},issueBreakdown,trend:runs.slice().reverse()});
  }
+ if(sub==="rows"&&req.method==="GET"){
+  if(Number(dataset.file_size)>MAX_SYNC_CSV_BYTES)return syncLimitError();
+  const source=await readStored(env,dataset.storage_path);
+  if(!source)return json({error:"Stored dataset file is missing."},500);
+  let parsed;try{parsed=parseCsv(await source.arrayBuffer());}catch(e){return e instanceof Error&&e.message==="TOO_LARGE"?syncLimitError():json({error:"The stored CSV could not be read."},400);}
+  const pageRaw=Number(url.searchParams.get("page")||1),sizeRaw=Number(url.searchParams.get("pageSize")||50);
+  const page=Number.isInteger(pageRaw)?Math.max(1,pageRaw):1,pageSize=[25,50,100,200].includes(sizeRaw)?sizeRaw:50;
+  const q=(url.searchParams.get("q")||"").trim().slice(0,200).toLocaleLowerCase();
+  const sort=(url.searchParams.get("sort")||"").trim(),direction=url.searchParams.get("direction")==="desc"?-1:1;
+  if(sort&&!parsed.columns.includes(sort))return json({error:"Choose a valid dataset column to sort."},400);
+  let rows:Record<string,string>[]=parsed.records.map((row:any)=>Object.fromEntries(parsed.columns.map(c=>[c,String(row[c]??"")])));
+  if(q)rows=rows.filter(row=>parsed.columns.some(c=>String(row[c]??"").toLocaleLowerCase().includes(q)));
+  if(sort)rows.sort((a,b)=>String(a[sort]??"").localeCompare(String(b[sort]??""),undefined,{numeric:true,sensitivity:"base"})*direction);
+  const totalRows=rows.length,totalPages=Math.max(1,Math.ceil(totalRows/pageSize)),safePage=Math.min(page,totalPages),start=(safePage-1)*pageSize;
+  return json({datasetId:datasetId,page:safePage,pageSize,totalRows,totalPages,columns:parsed.columns,rows:rows.slice(start,start+pageSize)});
+ }
  if(sub==="download"&&req.method==="GET"){
   const source=await readStored(env,dataset.storage_path);
   if(!source)return json({error:"Stored dataset file is missing."},500);
