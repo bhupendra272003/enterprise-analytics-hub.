@@ -158,6 +158,16 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
   if(dropEmptyRows){for(let i=rows.length-1;i>=0;i--)if(columns.every(k=>!String(rows[i][k]??"").trim())){rows.splice(i,1);removedEmptyRows++;}}
   let convertedNumericColumns:string[]=[];
   for(const column of numericTargets){const invalid=rows.some(row=>row[column].trim()!==""&&!isNum(row[column]));if(invalid)return json({error:"Column "+column+" contains non-numeric values; it was not converted."},400);for(const row of rows)if(row[column].trim()!=="")row[column]=String(Number(row[column]));convertedNumericColumns.push(column);}
+  const filterSpec=body.rowFilter&&typeof body.rowFilter==="object"?body.rowFilter:null;
+  let filteredRows=0;
+  if(filterSpec){
+   const column=typeof filterSpec.column==="string"?filterSpec.column:"",operator=typeof filterSpec.operator==="string"?filterSpec.operator:"",value=filterSpec.value===undefined?"":String(filterSpec.value);
+   if(!columns.includes(column)||!["equals","not_equals","contains","greater_than","less_than","is_empty","not_empty"].includes(operator)||value.length>500)return json({error:"Row filter is invalid. Choose a current column and a supported operator."},400);
+   const beforeFilter=rows.length;
+   const keep=(raw:string)=>{const current=String(raw??"");if(operator==="is_empty")return !current.trim();if(operator==="not_empty")return !!current.trim();if(operator==="equals")return current===value;if(operator==="not_equals")return current!==value;if(operator==="contains")return current.toLocaleLowerCase().includes(value.toLocaleLowerCase());if(!isNum(current)||!isNum(value))return false;return operator==="greater_than"?Number(current)>Number(value):Number(current)<Number(value);};
+   for(let i=rows.length-1;i>=0;i--)if(!keep(rows[i][column]))rows.splice(i,1);
+   filteredRows=beforeFilter-rows.length;
+  }
   let removedDuplicates=0;
   if(removeDuplicates){const seen=new Set<string>();for(let i=rows.length-1;i>=0;i--){const sig=JSON.stringify(columns.map(k=>rows[i][k]));if(seen.has(sig)){rows.splice(i,1);removedDuplicates++;}else seen.add(sig);}rows.reverse();}
   let filledCells=0;
@@ -175,12 +185,12 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
   for(const k of columns){const nonempty=rows.map(r=>r[k]).filter(v=>v.trim()),nums=nonempty.filter(isNum).map(Number);if(nums.length>=4&&nums.length/Math.max(1,nonempty.length)>=.9){const s=nums.slice().sort((a,b)=>a-b),median=(a:number[])=>{const n=Math.floor(a.length/2);return a.length%2?a[n]:(a[n-1]+a[n])/2;},q1=median(s.slice(0,Math.ceil(s.length/2))),q3=median(s.slice(Math.floor(s.length/2))),iqr=q3-q1,count=nums.filter(v=>v<q1-1.5*iqr||v>q3+1.5*iqr).length;if(count)outliersByColumn[k]=count;}}
   const latest=await env.DB.prepare("SELECT COALESCE(MAX(version_number),0) AS v FROM dataset_versions WHERE dataset_id=?").bind(datasetId).first<{v:number}>(),version=Number(latest?.v||0)+1,key=dataset.organization_id+"/"+datasetId+"/v"+version+"-cleaned.csv",output=csvEncode(rows,columns),bytes=new TextEncoder().encode(output);
   await env.DATASETS.put(key,bytes);
-  const report={before,after,removedDuplicates,removedEmptyRows,filledCells,fillStrategy:fillMissing,normalizedHeaders,convertedNumericColumns,outliersByColumn,columns,preview:rows.slice(0,10)};
+  const report={before,after,removedDuplicates,removedEmptyRows,filteredRows,fillStrategy:fillMissing,normalizedHeaders,convertedNumericColumns,outliersByColumn,columns,preview:rows.slice(0,10)};
   try{await env.DB.batch([
    env.DB.prepare("INSERT INTO dataset_versions (id,dataset_id,version_number,storage_path,file_size,row_count,column_count,columns_json,preview_json,uploaded_by,change_note) VALUES (?,?,?,?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(),datasetId,version,key,bytes.length,rows.length,columns.length,JSON.stringify(columns),JSON.stringify(report.preview),user.id,"Cloudflare cleaning · quality score "+before.qualityScore+" → "+after.qualityScore),
    env.DB.prepare("UPDATE datasets SET storage_path=?,file_size=?,row_count=?,column_count=?,columns_json=?,preview_json=?,uploaded_by=? WHERE id=?").bind(key,bytes.length,rows.length,columns.length,JSON.stringify(columns),JSON.stringify(report.preview),user.id,datasetId)
   ]);}catch{await env.DATASETS.delete(key);return json({error:"Cleaned dataset version could not be saved."},500);}
-  await audit(env,dataset.organization_id,user.id,"DATASET_CLEANED",datasetId,{versionNumber:version,beforeScore:before.qualityScore,afterScore:after.qualityScore,removedDuplicates,filledCells});
+  await audit(env,dataset.organization_id,user.id,"DATASET_CLEANED",datasetId,{versionNumber:version,beforeScore:before.qualityScore,afterScore:after.qualityScore,removedDuplicates,removedEmptyRows,filteredRows,filledCells});
   return json({versionNumber:version,report},201);
  }
  if(sub==="insights"&&req.method==="GET"){
