@@ -78,7 +78,7 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
  if(["clean","profile","validate","anomalies","quality-dashboard","compare"].includes(sub)&&Number(dataset.file_size)>MAX_SYNC_CSV_BYTES)return syncLimitError();
  if(sub==="dashboards"&&req.method==="GET"){
   const {results}=await env.DB.prepare("SELECT id,title,config_json AS configJson,created_by AS createdBy,created_at AS createdAt,updated_at AS updatedAt FROM analytics_dashboards WHERE organization_id=? AND dataset_id=? ORDER BY updated_at DESC").bind(dataset.organization_id,datasetId).all();
-  return json({dashboards:(results||[]).map((item:any)=>({...item,config:JSON.parse(String(item.configJson||"{}"))}))});
+  return json({dashboards:(results||[]).map((item:any)=>({...item,canDelete:m.role==="OWNER"||item.createdBy===user.id,config:JSON.parse(String(item.configJson||"{}"))}))});
  }
  if(sub==="dashboards"&&req.method==="POST"){
   if(!allowed(m.role))return json({error:"Only OWNER, LEADER and ANALYST can save dashboards."},403);
