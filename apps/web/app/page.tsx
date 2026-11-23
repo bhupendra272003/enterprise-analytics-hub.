@@ -67,6 +67,7 @@ export default function Home() {
             <div><span className="feature-icon">02</span><span><b>Governed data workflows</b><small>Traceable datasets, analysis and reporting.</small></span></div>
             <div><span className="feature-icon">03</span><span><b>Decisions with confidence</b><small>Insights designed to move work forward.</small></span></div>
           </div>
+          <a className="auth-action-link" href="/showcase">Explore the live project showcase ↗</a>
           <div className="hero-foot"><span>BUILT FOR COLLABORATIVE INTELLIGENCE</span><span>01 — 03</span></div>
         </div>
 
