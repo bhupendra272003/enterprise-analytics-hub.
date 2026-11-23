@@ -47,8 +47,9 @@ test("rejects writes, multiple statements and unknown columns", () => {
 
 
 test("keeps AND inside quoted string values intact", () => {
-  const result = runDatasetQuery("SELECT id FROM data WHERE region = 'North AND South' OR region = 'North' LIMIT 10", rows, columns);
-  assert.deepEqual(result.rows, [{ id: "1" }, { id: "3" }]);
+  const sample = [...rows, { id: "4", region: "North AND South", sales: "50" }];
+  const result = runDatasetQuery("SELECT id FROM data WHERE region = 'North AND South' AND id = '4' LIMIT 10", sample, columns);
+  assert.deepEqual(result.rows, [{ id: "4" }]);
 });
 
 test("supports LIKE and NULL predicates", () => {
