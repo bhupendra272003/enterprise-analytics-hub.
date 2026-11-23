@@ -13,16 +13,22 @@ class ExportValidatorTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.directory = Path(self.temp.name)
         profile = {
-            "inventory": [{"table": name} for name in (
+            "inventory": [{"table": name, "columns": 1} for name in (
                 "account", "client", "disp", "card", "loan", "orders", "trans", "district"
             )],
             "loan_rows_exported": 2,
             "feature_rows_exported": 1,
+            "relationship_integrity": [{"orphan_rows": 0}],
+            "status_distribution": {"A": 1, "B": 1},
         }
         (self.directory / "source_profile.json").write_text(json.dumps(profile), encoding="utf-8")
         self.write_csv("data_quality_summary.csv", [{"metric": "rows.loan", "value": "2"}])
         self.write_csv("missing_value_profile.csv", [
             {"table": "loan", "column": "status", "row_count": "2", "missing_rows": "0", "missing_pct": "0"},
+            *[
+                {"table": "other", "column": f"column_{i}", "row_count": "1", "missing_rows": "0", "missing_pct": "0"}
+                for i in range(7)
+            ],
         ])
         self.write_csv("relationship_integrity.csv", [
             {"child_table": "loan", "child_column": "account_id", "parent_table": "account", "parent_column": "account_id", "orphan_rows": "0"},
@@ -68,6 +74,18 @@ class ExportValidatorTests(unittest.TestCase):
         failed = {item["check"] for item in report["errors"]}
         self.assertIn("target_leakage_guard", failed)
         self.assertIn("prior_transaction_date_boundary", failed)
+        self.assertIn("feature_row_count", failed)
+
+    def test_invalid_feature_date_fails_cleanly(self):
+        rows = read_rows = [{
+            "loan_id": "1", "account_id": "100", "loan_date": "not-a-date",
+            "transaction_type": "credit", "prior_transaction_count": "2",
+            "first_prior_transaction_date": "1994-01-01",
+            "latest_prior_transaction_date": "1994-01-09",
+        }]
+        self.write_csv("loan_prior_features.csv", rows)
+        report = validate_exports(self.directory)
+        self.assertIn("feature_date_format", {item["check"] for item in report["errors"]})
 
     def test_missing_required_export_fails(self):
         (self.directory / "loan_prior_features.csv").unlink()

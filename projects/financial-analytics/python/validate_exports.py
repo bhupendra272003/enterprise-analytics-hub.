@@ -63,8 +63,12 @@ def validate_exports(directory: Path) -> dict:
         return report
 
     record("artifact_readability", True, "JSON and CSV exports are readable.")
-    record("source_inventory", len(profile.get("inventory", [])) == 8,
-           f"Profiler reports {len(profile.get('inventory', []))} of 8 expected source tables.")
+    inventory = profile.get("inventory", [])
+    record("source_inventory", len(inventory) == 8,
+           f"Profiler reports {len(inventory)} of 8 expected source tables.")
+    expected_column_count = sum(int(item.get("columns", 0)) for item in inventory)
+    record("missing_profile_coverage", len(missing_rows) == expected_column_count,
+           f"Missing-value profile contains {len(missing_rows)} rows for {expected_column_count} source columns.")
     record("data_quality_metrics", bool(quality_rows) and
            {"metric", "value"} <= set(quality_rows[0]),
            f"{len(quality_rows)} metric rows found.")
@@ -74,6 +78,9 @@ def validate_exports(directory: Path) -> dict:
     record("relationship_integrity", bool(relationship_rows) and
            {"child_table", "child_column", "parent_table", "parent_column", "orphan_rows"} <= set(relationship_rows[0]),
            f"{len(relationship_rows)} relationship checks represented.")
+    record("relationship_profile_reconciliation",
+           len(relationship_rows) == len(profile.get("relationship_integrity", [])),
+           f"CSV has {len(relationship_rows)} relationship checks; JSON has {len(profile.get('relationship_integrity', []))}.")
 
     loan_ids = [row.get("loan_id", "").strip() for row in loans]
     nonblank_ids = [value for value in loan_ids if value]
@@ -109,6 +116,13 @@ def validate_exports(directory: Path) -> dict:
     record("outcome_reconciliation",
            outcome_total == len(loans) and outcome_map == source_status_map,
            f"Outcome summary totals {outcome_total} rows against {len(loans)} loan rows.")
+    profile_status_map = {
+        ("" if status == "<NULL>" else status): int(count)
+        for status, count in profile.get("status_distribution", {}).items()
+    }
+    record("profile_status_reconciliation", profile_status_map == source_status_map,
+           "JSON status distribution matches the loan CSV." if profile_status_map == source_status_map else
+           "JSON and CSV status distributions differ.")
 
     try:
         shares = [float(row.get("share_pct", "0") or 0) for row in outcomes]
@@ -125,13 +139,17 @@ def validate_exports(directory: Path) -> dict:
     feature_columns = set(features[0]) if features else set()
     record("feature_schema", bool(features) and required_feature_columns <= feature_columns,
            f"{len(features)} feature rows; required columns present: {required_feature_columns <= feature_columns}.")
+    record("feature_row_count", len(features) == int(profile.get("feature_rows_exported", -1)),
+           f"CSV has {len(features)} feature rows; profile records {profile.get('feature_rows_exported')}.")
     record("target_leakage_guard",
            "loan_status" not in feature_columns and "status" not in feature_columns,
            "Target status is excluded from the as-of feature CSV.")
 
     loan_id_set = set(nonblank_ids)
-    feature_ids = {row.get("loan_id", "").strip() for row in features}
-    unknown_feature_ids = sorted(value for value in feature_ids if value and value not in loan_id_set)
+    feature_ids = [row.get("loan_id", "").strip() for row in features]
+    unknown_feature_ids = sorted(value for value in set(feature_ids) if value and value not in loan_id_set)
+    record("feature_loan_id_completeness", all(feature_ids),
+           f"{sum(not value for value in feature_ids)} feature rows have a blank loan_id.")
     record("feature_loan_references", not unknown_feature_ids,
            f"{len(unknown_feature_ids)} feature loan IDs do not exist in the loan extract.")
 
@@ -141,7 +159,7 @@ def validate_exports(directory: Path) -> dict:
     record("feature_grain", duplicate_feature_keys == 0,
            f"{duplicate_feature_keys} duplicate loan_id/transaction_type groups found.")
 
-    temporal_violations, invalid_counts = [], []
+    temporal_violations, invalid_dates, invalid_counts = [], [], []
     for index, row in enumerate(features, start=2):
         try:
             count = int(float(row.get("prior_transaction_count", "0") or 0))
@@ -149,12 +167,25 @@ def validate_exports(directory: Path) -> dict:
                 invalid_counts.append(index)
         except ValueError:
             invalid_counts.append(index)
-        loan_date = parse_date(row.get("loan_date"))
-        latest_prior = parse_date(row.get("latest_prior_transaction_date"))
-        if latest_prior and (not loan_date or latest_prior >= loan_date):
+        try:
+            loan_date = parse_date(row.get("loan_date"))
+            first_prior = parse_date(row.get("first_prior_transaction_date"))
+            latest_prior = parse_date(row.get("latest_prior_transaction_date"))
+        except ValueError:
+            invalid_dates.append(index)
+            continue
+        if (first_prior and (not loan_date or first_prior >= loan_date)) or (
+            latest_prior and (not loan_date or latest_prior >= loan_date)
+        ) or (first_prior and latest_prior and first_prior > latest_prior):
             temporal_violations.append(index)
+        if count == 0 and (first_prior or latest_prior):
+            temporal_violations.append(index)
+        if count > 0 and not latest_prior:
+            temporal_violations.append(index)
+    record("feature_date_format", not invalid_dates,
+           f"{len(invalid_dates)} feature rows contain invalid ISO dates.")
     record("prior_transaction_date_boundary", not temporal_violations,
-           f"{len(temporal_violations)} feature rows contain a same-day/post-loan or uncheckable latest date.")
+           f"{len(temporal_violations)} feature rows have inconsistent or non-prior transaction dates.")
     record("prior_transaction_count_domain", not invalid_counts,
            f"{len(invalid_counts)} feature rows contain invalid transaction counts.")
 
