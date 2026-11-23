@@ -161,6 +161,12 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
   for(const run of runs)for(const [k,v] of Object.entries(run.issueCounts))issueBreakdown[k]=(issueBreakdown[k]||0)+Number(v||0);
   return json({summary:{totalRuns:runs.length,passedRuns:passed,failedRuns:runs.length-passed,passRate:runs.length?Number((passed/runs.length*100).toFixed(1)):0,averageScore:scored.length?Number((scored.reduce((s:number,r:any)=>s+r.score,0)/scored.length).toFixed(1)):null,totalIssues:runs.reduce((s:number,r:any)=>s+r.issueCount,0)},issueBreakdown,trend:runs.slice().reverse()});
  }
+ if(sub==="download"&&req.method==="GET"){
+  const source=await readStored(env,dataset.storage_path);
+  if(!source)return json({error:"Stored dataset file is missing."},500);
+  const safeName=(dataset.original_filename||dataset.name||"dataset.csv").replace(/[\\r\\n"]/g,"_").replace(/[\\/\\\\]/g,"_");
+  return new Response(await source.arrayBuffer(),{status:200,headers:{"content-type":"text/csv; charset=utf-8","content-disposition":'attachment; filename="'+safeName+'"',"cache-control":"private, no-store","x-content-type-options":"nosniff"}});
+ }
  if(sub==="preview"&&req.method==="GET")return json({dataset:{id:dataset.id,name:dataset.name,columns:JSON.parse(dataset.columns_json),preview:JSON.parse(dataset.preview_json)}});
  if(sub==="anomalies"&&req.method==="POST"){
   if(!allowed(m.role))return json({error:"Insufficient organization permissions."},403);
