@@ -91,3 +91,102 @@ If the report filters to completed target classes A/B, create an explicitly name
 - [ ] Same-day and post-loan transaction counts documented.
 - [ ] No target label or post-loan fields included in predictors.
 - [ ] Power BI relationship view reviewed for ambiguous paths.
+
+## Power BI implementation contract
+
+### Import only artifacts that exist in the current profiler output
+
+For the current CSV export workflow, begin with these tables:
+
+- `loan_analysis_extract.csv` — one row per source loan; keep `loan_id` as the unique row key.
+- `loan_prior_features.csv` — one row per loan and observed transaction type; the key is the composite `loan_id` + `transaction_type`. A blank transaction type can represent a loan with no matching prior transactions.
+- `loan_outcome_summary.csv` — pre-aggregated status summary for reconciliation only; do not relate it as another loan fact table.
+- `data_quality_summary.csv`, `missing_value_profile.csv`, and `relationship_integrity.csv` — quality/audit tables for the quality page.
+
+The current profiler does not export every raw source table as a CSV. Do not create Power BI relationships to account, client, disp, card, orders, trans or district until those tables have been explicitly exported or connected through an approved read-only source.
+
+### Relationships and filter direction
+
+Create one active relationship:
+
+- `loan_analysis_extract[loan_id]` (one) → `loan_prior_features[loan_id]` (many), single-direction from loan to features.
+
+Before activating it, confirm that `loan_analysis_extract[loan_id]` is unique and the feature table has no duplicate `loan_id` + `transaction_type` pairs. Do not relate `loan_outcome_summary` to the loan table; it is a reconciliation aggregate. Keep quality tables disconnected unless a deliberate dimension table is introduced.
+
+### Starter DAX measures
+
+Use these measures with the exact imported table and column names:
+
+```DAX
+Loan Rows = COUNTROWS(loan_analysis_extract)
+
+Distinct Loan Accounts =
+    DISTINCTCOUNT(loan_analysis_extract[account_id])
+
+Average Loan Amount =
+    AVERAGE(loan_analysis_extract[amount])
+
+Average Loan Duration (Months) =
+    AVERAGE(loan_analysis_extract[duration])
+
+Successful Finished Loans =
+    CALCULATE(
+        [Loan Rows],
+        loan_analysis_extract[status] = "A"
+    )
+
+Not Successful Finished Loans =
+    CALCULATE(
+        [Loan Rows],
+        loan_analysis_extract[status] = "B"
+    )
+
+Finished A-B Loans =
+    CALCULATE(
+        [Loan Rows],
+        loan_analysis_extract[status] IN {"A", "B"}
+    )
+
+Prior Transactions =
+    SUM(loan_prior_features[prior_transaction_count])
+
+Prior Transaction Amount =
+    SUM(loan_prior_features[prior_transaction_amount_sum])
+
+Loans With Prior Activity =
+    CALCULATE(
+        DISTINCTCOUNT(loan_prior_features[loan_id]),
+        loan_prior_features[prior_transaction_count] > 0
+    )
+
+Relationship Orphan Rows =
+    SUM(relationship_integrity[orphan_rows])
+
+Missing Source Values =
+    SUM(missing_value_profile[missing_rows])
+```
+
+A/B are the finished-loan classes described by the source task. Keep C/D visible as separate observed statuses; do not relabel them as defaults or bad loans. These starter measures are descriptive, not a validated credit-risk model.
+
+### Refresh and reconciliation procedure
+
+1. Preserve the complete `output/` folder from one profiler run; do not mix CSVs from different runs.
+2. Import the six CSV artifacts listed above using **Get Data → Text/CSV**.
+3. Set `loan_id` and `account_id` to whole number (or a consistent text key if the source connector exports them as text); set dates to Date and amount/balance fields to Decimal Number.
+4. Disable automatic relationship detection and create only the documented loan-to-features relationship after checking uniqueness.
+5. Compare `[Loan Rows]` with the loan row count in `source_profile.json` and the sum of `loan_outcome_summary[loan_count]`.
+6. Compare `[Prior Transactions]` with the sum of `prior_transaction_count` in the exported feature file. A feature row with zero prior transactions is valid and should not be removed.
+7. Review `Relationship Orphan Rows`, `Missing Source Values`, the validation report and all temporal checks before interpreting charts.
+8. Record the profiler run timestamp, source query/version and validator result alongside the PBIX. Refresh only after replacing the complete output set with a single new run.
+
+### Report acceptance checks
+
+- Loan rows reconcile to the source profile and outcome summary.
+- The loan key is unique; feature composite grain is unique.
+- Relationship cardinality is one-to-many and filter direction is single.
+- C/D are not presented as failed/default loans.
+- Prior transaction measures use only the pre-loan extract.
+- Target status is not present in the prior-feature table.
+- Missingness and orphan counts are visible rather than silently filtered away.
+- Report labels state that this is a historical dataset analysis, not current bank performance.
+
