@@ -62,21 +62,21 @@ export function runDatasetQuery(sql: string, sourceRows: QueryRow[], sourceColum
   const statement = sql.replace(/--[^\n\r]*/g, "").trim().replace(/;\s*$/, "").trim();
   if (statement.includes(";") || !/^SELECT\b/i.test(statement)) throw new Error("Only one read-only SELECT statement is allowed.");
   if (/\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|REPLACE|ATTACH|DETACH|PRAGMA|VACUUM|INTO|UNION|WITH|RECURSIVE)\b/i.test(statement)) throw new Error("This SQL Studio supports read-only SELECT queries only.");
-  const match = statement.match(/^SELECT\s+([\s\S]+?)\s+FROM\s+([\w-]+)(?:\s+(?:AS\s+)?([\w-]+))?(?:\s+WHERE\s+([\s\S]+?))?(?:\s+ORDER\s+BY\s+([\w."`\[\]-]+)(?:\s+(ASC|DESC))?)?(?:\s+LIMIT\s+(\d+))?$/i);
+  const match = statement.match(/^SELECT\s+([\s\S]+?)\s+FROM\s+([\w-]+)(?:\s+WHERE\s+([\s\S]+?))?(?:\s+ORDER\s+BY\s+([\w."\x60\[\]-]+)(?:\s+(ASC|DESC))?)?(?:\s+LIMIT\s+(\d+))?$/i);
   if (!match) throw new Error("Use SELECT columns FROM data with optional WHERE, ORDER BY and LIMIT clauses.");
   const projections = parseProjection(match[1], sourceColumns);
-  const where = match[4] ? splitAnd(match[4]).map(v => parseCondition(v, sourceColumns)) : [];
-  const limit = match[7] ? Number(match[7]) : 100;
+  const where = match[3] ? splitAnd(match[3]).map(v => parseCondition(v, sourceColumns)) : [];
+  const limit = match[6] ? Number(match[6]) : 100;
   if (!Number.isInteger(limit) || limit < 1 || limit > 500) throw new Error("LIMIT must be between 1 and 500.");
   let rows = sourceRows.filter(row => where.every(condition => compareCondition(row, condition)));
   const filteredCount = rows.length;
-  const orderBy = match[5] ? cleanIdentifier(match[5]) : "";
+  const orderBy = match[4] ? cleanIdentifier(match[4]) : "";
   if (orderBy && !sourceColumns.includes(orderBy)) throw new Error("Unknown ORDER BY column: " + orderBy);
   if (orderBy) rows = rows.slice().sort((a,b) => {
     const av = a[orderBy] ?? "", bv = b[orderBy] ?? "";
     const an = Number(av), bn = Number(bv);
     const cmp = String(av).trim() !== "" && String(bv).trim() !== "" && Number.isFinite(an) && Number.isFinite(bn) ? an-bn : String(av).localeCompare(String(bv));
-    return (match[6]?.toUpperCase() === "DESC" ? -1 : 1) * cmp;
+    return (match[5]?.toUpperCase() === "DESC" ? -1 : 1) * cmp;
   });
   const aggregates = projections.some(p => p.kind === "aggregate");
   if (aggregates && projections.some(p => p.kind === "column" || p.kind === "all")) throw new Error("Mixing aggregate and regular columns requires GROUP BY, which is not enabled yet.");
