@@ -129,9 +129,15 @@ export default function FinancialAnalyticsPage() {
     setError('');
     try {
       const parsed = JSON.parse(await file.text()) as SourceManifest;
-      const tables = parsed.tables;
-      if (parsed.dataset !== 'financial' || parsed.read_only !== true || !tables || typeof tables !== 'object') {
+      const tables = parsed?.tables;
+      if (!parsed || parsed.dataset !== 'financial' || parsed.read_only !== true ||
+          !tables || typeof tables !== 'object' || Array.isArray(tables)) {
         throw new Error('Expected a read-only Financial source_tables/manifest.json export manifest.');
+      }
+      if (!Number.isInteger(parsed.batch_size) || parsed.batch_size < 1 ||
+          typeof parsed.generated_at_utc !== 'string' ||
+          Number.isNaN(Date.parse(parsed.generated_at_utc))) {
+        throw new Error('Manifest generation timestamp or batch size is invalid.');
       }
       const names = Object.keys(tables).sort();
       if (names.join('|') !== [...EXPECTED_SOURCE_TABLES].sort().join('|')) {
@@ -139,8 +145,11 @@ export default function FinancialAnalyticsPage() {
       }
       for (const table of EXPECTED_SOURCE_TABLES) {
         const item = tables[table];
-        if (!item || item.file !== table + '.csv' || !Array.isArray(item.columns) ||
-            item.columns.length < 1 || item.column_count !== item.columns.length ||
+        if (!item || typeof item !== 'object' || item.file !== table + '.csv' ||
+            !Array.isArray(item.columns) || item.columns.length < 1 ||
+            item.columns.some(column => typeof column !== 'string' || !column.trim()) ||
+            new Set(item.columns).size !== item.columns.length ||
+            item.column_count !== item.columns.length ||
             !Number.isInteger(item.row_count) || item.row_count < 0) {
           throw new Error('Manifest metadata is invalid for source table: ' + table + '.');
         }
