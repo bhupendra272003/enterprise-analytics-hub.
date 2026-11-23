@@ -97,9 +97,23 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
   if(!["none","zero","mean","median","mode"].includes(fillMissing))return json({error:"Unsupported missing-value strategy."},400);
   const source=await readStored(env,dataset.storage_path);if(!source)return json({error:"Stored dataset file is missing."},500);
   let parsed;try{parsed=parseCsv(await source.arrayBuffer());}catch{return json({error:"The stored CSV is invalid."},400);}
-  const columns: string[]=parsed.columns,rows:Record<string,string>[]=parsed.records.map((r:Record<string,unknown>)=>Object.fromEntries(columns.map(k=>[k,String(r[k]??"")])));
+  let columns: string[]=parsed.columns.slice();const rows:Record<string,string>[]=parsed.records.map((r:Record<string,unknown>)=>Object.fromEntries(columns.map(k=>[k,String(r[k]??"")])));
   const before=quality(rows,columns);
+  const normalizeHeaders=body.normalizeHeaders===true,dropEmptyRows=body.dropEmptyRows===true;
+  const requestedNumeric:string[]=Array.isArray(body.numericColumns)?body.numericColumns.filter((v:unknown):v is string=>typeof v==="string"):[];
+  if(requestedNumeric.some(k=>!columns.includes(k)))return json({error:"Choose numeric columns from the current dataset."},400);
   if(trimWhitespace)for(const row of rows)for(const k of columns)row[k]=row[k].trim();
+  let normalizedHeaders:Record<string,string>={};
+  if(normalizeHeaders){
+   const used=new Set<string>(),next=columns.map(old=>{const base=old.trim().toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"")||"column";let name=base,n=2;while(used.has(name))name=base+"_"+n++;used.add(name);normalizedHeaders[old]=name;return name;});
+   for(const row of rows){const renamed:Record<string,string>={};for(const old of columns)renamed[normalizedHeaders[old]]=row[old];for(const key of Object.keys(row))delete row[key];Object.assign(row,renamed);}
+   columns=next;
+  }
+  const numericTargets=requestedNumeric.map(k=>normalizeHeaders?normalizedHeaders[k]:k);
+  let removedEmptyRows=0;
+  if(dropEmptyRows){for(let i=rows.length-1;i>=0;i--)if(columns.every(k=>!String(rows[i][k]??"").trim())){rows.splice(i,1);removedEmptyRows++;}}
+  let convertedNumericColumns:string[]=[];
+  for(const column of numericTargets){const invalid=rows.some(row=>row[column].trim()!==""&&!isNum(row[column]));if(invalid)return json({error:"Column "+column+" contains non-numeric values; it was not converted."},400);for(const row of rows)if(row[column].trim()!=="")row[column]=String(Number(row[column]));convertedNumericColumns.push(column);}
   let removedDuplicates=0;
   if(removeDuplicates){const seen=new Set<string>();for(let i=rows.length-1;i>=0;i--){const sig=JSON.stringify(columns.map(k=>rows[i][k]));if(seen.has(sig)){rows.splice(i,1);removedDuplicates++;}else seen.add(sig);}rows.reverse();}
   let filledCells=0;
@@ -116,7 +130,7 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
   for(const k of columns){const nonempty=rows.map(r=>r[k]).filter(v=>v.trim()),nums=nonempty.filter(isNum).map(Number);if(nums.length>=4&&nums.length/Math.max(1,nonempty.length)>=.9){const s=nums.slice().sort((a,b)=>a-b),median=(a:number[])=>{const n=Math.floor(a.length/2);return a.length%2?a[n]:(a[n-1]+a[n])/2;},q1=median(s.slice(0,Math.ceil(s.length/2))),q3=median(s.slice(Math.floor(s.length/2))),iqr=q3-q1,count=nums.filter(v=>v<q1-1.5*iqr||v>q3+1.5*iqr).length;if(count)outliersByColumn[k]=count;}}
   const latest=await env.DB.prepare("SELECT COALESCE(MAX(version_number),0) AS v FROM dataset_versions WHERE dataset_id=?").bind(datasetId).first<{v:number}>(),version=Number(latest?.v||0)+1,key=dataset.organization_id+"/"+datasetId+"/v"+version+"-cleaned.csv",output=csvEncode(rows,columns),bytes=new TextEncoder().encode(output);
   await env.DATASETS.put(key,bytes);
-  const report={before,after,removedDuplicates,filledCells,fillStrategy:fillMissing,outliersByColumn,columns,preview:rows.slice(0,10)};
+  const report={before,after,removedDuplicates,removedEmptyRows,filledCells,fillStrategy:fillMissing,normalizedHeaders,convertedNumericColumns,outliersByColumn,columns,preview:rows.slice(0,10)};
   try{await env.DB.batch([
    env.DB.prepare("INSERT INTO dataset_versions (id,dataset_id,version_number,storage_path,file_size,row_count,column_count,columns_json,preview_json,uploaded_by,change_note) VALUES (?,?,?,?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(),datasetId,version,key,bytes.length,rows.length,columns.length,JSON.stringify(columns),JSON.stringify(report.preview),user.id,"Cloudflare cleaning · quality score "+before.qualityScore+" → "+after.qualityScore),
    env.DB.prepare("UPDATE datasets SET storage_path=?,file_size=?,row_count=?,column_count=?,columns_json=?,preview_json=?,uploaded_by=? WHERE id=?").bind(key,bytes.length,rows.length,columns.length,JSON.stringify(columns),JSON.stringify(report.preview),user.id,datasetId)
