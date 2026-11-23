@@ -40,7 +40,7 @@ jobs:
               db.executescript(migration.read_text())
               print(f"Applied {migration.name}")
           tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-          expected = {"users", "organizations", "memberships", "invitations", "audit_logs", "organization_access_requests", "projects", "tasks", "datasets", "dataset_versions", "dataset_validation_runs", "dataset_anomaly_runs", "reports", "notifications", "auth_tokens", "sessions", "auth_attempts", "dataset_jobs", "teams", "team_members", "task_assignment_history", "work_events", "performance_corrections", "generator_settings", "generation_jobs"}
+          expected = {"users", "organizations", "memberships", "invitations", "audit_logs", "organization_access_requests", "projects", "tasks", "datasets", "dataset_versions", "dataset_validation_runs", "dataset_anomaly_runs", "reports", "notifications", "auth_tokens", "sessions", "auth_attempts", "dataset_jobs", "teams", "team_members", "task_assignment_history", "work_events", "performance_corrections", "generator_settings", "generation_jobs", "analytics_dashboards"}
           missing = expected - tables
           assert not missing, f"Missing D1 tables: {sorted(missing)}"
           task_columns = {row[1] for row in db.execute("PRAGMA table_info(tasks)")}
