@@ -76,7 +76,7 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
  const m=await membership(env,dataset.organization_id,user.id);if(!m)return json({error:"Insufficient organization permissions."},403);
  if(["clean","profile","validate","anomalies","quality-dashboard","compare"].includes(sub)&&Number(dataset.file_size)>MAX_SYNC_CSV_BYTES)return syncLimitError();
  if(sub==="clean"&&req.method==="POST"){
-  if(!ownerOnly(m.role))return ownerRequired();
+  if(!allowed(m.role))return json({error:"Only OWNER, LEADER and ANALYST roles can create cleaned dataset versions."},403);
   let body:any={};try{body=await req.json();}catch{return json({error:"Invalid cleaning options."},400);}
   const trimWhitespace=body.trimWhitespace!==false,removeDuplicates=body.removeDuplicates!==false,fillMissing=body.fillMissing??"none";
   if(!["none","zero","mean","median","mode"].includes(fillMissing))return json({error:"Unsupported missing-value strategy."},400);
