@@ -37,18 +37,32 @@ def validate_raw_source_exports(directory: Path) -> tuple[bool, str]:
         checked = []
         for table in sorted(SOURCE_TABLES):
             item = tables[table]
-            path = export_dir / item["file"]
+            # Only the expected basename is accepted; a manifest must never
+            # redirect validation outside the source_tables directory.
+            expected_filename = f"{table}.csv"
+            if item.get("file") != expected_filename:
+                return False, f"{table}: manifest filename must be {expected_filename!r}."
+            path = export_dir / expected_filename
             expected_columns = item["columns"]
+            try:
+                expected_row_count = int(item["row_count"])
+                expected_column_count = int(item["column_count"])
+            except (TypeError, ValueError):
+                return False, f"{table}: manifest row/column counts must be integers."
+            if expected_row_count < 0 or expected_column_count < 1:
+                return False, f"{table}: manifest row/column counts are out of range."
             if not path.is_file() or not expected_columns:
                 return False, f"{table}: missing CSV or empty column definition."
+            if len(expected_columns) != expected_column_count:
+                return False, f"{table}: manifest column_count does not match columns."
             with path.open("r", encoding="utf-8-sig", newline="") as handle:
                 reader = csv.reader(handle)
                 header = next(reader, None)
                 if header != expected_columns or len(header) != int(item["column_count"]):
                     return False, f"{table}: CSV header does not match manifest."
                 row_count = sum(1 for _ in reader)
-            if row_count != int(item["row_count"]):
-                return False, f"{table}: CSV has {row_count} rows; manifest says {item['row_count']}."
+            if row_count != expected_row_count:
+                return False, f"{table}: CSV has {row_count} rows; manifest says {expected_row_count}."
             checked.append(f"{table}={row_count}")
     except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError, csv.Error, StopIteration) as exc:
         return False, f"Raw source export validation error: {exc}"
