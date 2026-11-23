@@ -24,8 +24,8 @@ export default function DataPage(){
  function downloadQualityReport(){
   if(!qualityDashboard||!selected)return;
   const rows=[['Run date','Version','Status','Quality score','Rows checked','Columns checked','Issues'],...qualityDashboard.trend.map((run:any)=>[new Date(run.createdAt).toISOString(),run.versionNumber,run.status,run.score??'N/A',run.rowCount,run.checkedColumns,run.issueCount])];
-  const csv=rows.map((row:unknown[])=>row.map((value:unknown)=>'"'+String(value??'').replace(/"/g,'""')+'"').join(',')).join('\\r\\n');
-  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=selected.name.replace(/[^a-z0-9-_]+/gi,'_')+'_quality_report.csv';document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url);
+  const csv=rows.map((row:unknown[])=>row.map((value:unknown)=>'"'+String(value??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=selected.name.replace(/[^a-z0-9-_]+/gi,'_')+'_quality_report.csv';document.body.appendChild(link);link.click();link.remove();window.setTimeout(()=>URL.revokeObjectURL(url),1000);
  }
  async function runAnomalyScan(){
   if(!selected||versions.length<2||!compareFrom||!compareTo||compareFrom===compareTo)return;
