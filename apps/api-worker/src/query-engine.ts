@@ -1,7 +1,29 @@
 export type QueryRow = Record<string, string | number | null>;
 type Condition = { column: string; operator: string; value?: string | number };
 const cleanIdentifier = (value: string) => value.replace(/^[`"\[]|[`"\]]$/g, "");
-const splitAnd = (value: string) => value.split(/\s+AND\s+/i).map(v => v.trim()).filter(Boolean);
+const splitAnd = (value: string) => {
+  const parts: string[] = [];
+  let start = 0, quote = "", i = 0;
+  while (i < value.length) {
+    const char = value[i];
+    if (quote) {
+      if (char === quote) {
+        if (value[i + 1] === quote) { i += 2; continue; }
+        quote = "";
+      }
+      i++;
+      continue;
+    }
+    if (char === "'" || char === '"') { quote = char; i++; continue; }
+    if (/^AND\b/i.test(value.slice(i)) && (i === 0 || /\s/.test(value[i - 1])) && (i + 3 === value.length || /\s/.test(value[i + 3]))) {
+      parts.push(value.slice(start, i).trim());
+      i += 3; start = i; continue;
+    }
+    i++;
+  }
+  parts.push(value.slice(start).trim());
+  return parts.filter(Boolean);
+};
 function parseCondition(source: string, columns: string[]): Condition {
   const nullMatch = source.match(/^([\w\s."`\[\]-]+?)\s+IS\s+(NOT\s+)?NULL$/i);
   if (nullMatch) {
@@ -63,8 +85,8 @@ function aggregateValue(fn: string, column: string, rows: QueryRow[]) {
   if (fn === "COUNT") return values.length;
   if (fn === "SUM") return nums.reduce((a,b)=>a+b,0);
   if (fn === "AVG") return nums.length ? nums.reduce((a,b)=>a+b,0)/nums.length : null;
-  if (fn === "MIN") return nums.length ? Math.min(...nums) : null;
-  if (fn === "MAX") return nums.length ? Math.max(...nums) : null;
+  if (fn === "MIN") return nums.length ? nums.reduce((a,b)=>Math.min(a,b),Infinity) : null;
+  if (fn === "MAX") return nums.length ? nums.reduce((a,b)=>Math.max(a,b),-Infinity) : null;
   return null;
 }
 export function runDatasetQuery(sql: string, sourceRows: QueryRow[], sourceColumns: string[]) {
