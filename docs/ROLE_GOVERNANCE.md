@@ -5,16 +5,17 @@ Vyron uses exactly four organization roles:
 
 | Role | Main responsibility | Allowed actions |
 |---|---|---|
-| **OWNER** | Workspace owner and final approver | Full workspace control; configure industries and generation limits; manually start, pause and cancel synthetic-data jobs; grant/revoke elevated permissions; manage members, teams, roles and settings; view all reports, audit and performance |
+| **OWNER** | Workspace owner and final approver | Full workspace control; configure industries and generation limits; manually start, pause and cancel synthetic-data jobs; grant/revoke elevated permissions; manage members, teams, roles and settings; upload/replace source datasets; clean data, validate, query and analyze; view all reports, audit and performance |
 | **MANAGER** | Program/workspace oversight | View organization reports, team performance, workload and progress; review delivery health; request an Owner approval for restricted actions. No generator controls, role escalation, sensitive settings or member administration unless explicitly authorized by Owner |
-| **LEADER** | Team/project delivery lead | Create and assign project tasks to Analysts in their team; set priorities and due dates; track task progress; review submissions and report team progress. Cannot generate data or grant access |
-| **ANALYST** | Individual contributor | Work on assigned datasets/tasks; update own task status; document analysis, cleaning, validation and dashboard deliverables; submit work for review |
+| **LEADER** | Team/project delivery lead | Create and assign project tasks to Analysts in their team; set priorities and due dates; track task progress; clean assigned datasets into new versions, validate, query and analyze; review submissions and report team progress. Cannot replace original source uploads, generate data or grant access |
+| **ANALYST** | Individual contributor | Work on assigned datasets/tasks; update own task status; clean assigned datasets into new versions, validate, query and analyze; document data-quality and BI deliverables; submit work for review |
 
 No ADMIN or VIEWER role exists in the target role model. Trainer/Mentor is not a fifth role: a trainer can be invited as MANAGER or LEADER only if the Owner and trainer agree on the scope. Default recommendation is MANAGER with reporting/review visibility, not elevated settings access.
 
 ## Permission boundaries
 - Only OWNER can change organization-wide settings, choose enabled industries, set generation caps, start/stop generation, manage role assignments and approve restricted actions.
 - MANAGER has read-only access to reports, team performance and progress. If another action is needed, the UI must show “Request Owner approval”; the API must reject the action until the Owner approves it.
+- OWNER, LEADER and ANALYST may run governed data cleaning, validation and analysis. Cleaning writes a new immutable dataset version and preserves prior versions; only OWNER may upload or replace original source datasets. MANAGER remains read-only.
 - LEADER can assign tasks only to active ANALYST members belonging to that Leader's own team/project scope. A Leader cannot assign to another Leader or Manager.
 - ANALYST can update only their own assigned task status and submit deliverables; they cannot reassign work.
 - Every privileged action is checked server-side. Hiding a button is not authorization.
@@ -58,6 +59,6 @@ Record actor, timestamp, organization, team/project, action, target and safe met
 6. Owner manually enables and starts generation for selected approved industries.
 
 ## Implementation status (Cloudflare D1/Worker branch)
-The Cloudflare D1 migration and Worker API now enforce exactly OWNER, MANAGER, LEADER and ANALYST organization roles. Legacy ADMIN and VIEWER memberships are mapped to read-only MANAGER during migration. Team APIs enforce one designated Leader per team, one Analyst team per organization, Owner-managed roster changes, Leader-scoped task assignment/reassignment and Analyst-only assigned-task progress updates. Owner and Manager have organization-wide performance visibility; Leader and Analyst views are scoped.
+The Cloudflare D1 migration and Worker API now enforce exactly OWNER, MANAGER, LEADER and ANALYST organization roles. The dataset cleaning endpoint is authorized for OWNER, LEADER and ANALYST; it writes a new version and preserves the previous version. Source upload/replacement remains Owner-only. Legacy ADMIN and VIEWER memberships are mapped to read-only MANAGER during migration. Team APIs enforce one designated Leader per team, one Analyst team per organization, Owner-managed roster changes, Leader-scoped task assignment/reassignment and Analyst-only assigned-task progress updates. Owner and Manager have organization-wide performance visibility; Leader and Analyst views are scoped.
 The Owner-only generator settings, preview, confirmation endpoint and queued batch worker are implemented with active project/team/participant checks, row caps, cancellation and audit history. The current generator is limited to one synthetic CSV template per organization's industry, 100,000 rows and 10 MiB per file; no schedule or automatic run exists.
 This branch has passed recent D1 migration validation and Worker type-check. Full production deployment, live D1 migration, queue provisioning verification, end-to-end authorization tests, load tests and security review are still pending. The Express/MySQL application path remains legacy and must not be assumed to enforce the same policy.
