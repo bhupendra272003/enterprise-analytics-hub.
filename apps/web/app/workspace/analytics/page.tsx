@@ -76,9 +76,13 @@ export default function AnalyticsStudio(){
  useEffect(()=>{if(tab!=='bi'||!active?.id||!biX||!biY)return;let cancelled=false;setBiBusy(true);setBiSummary(null);const params=new URLSearchParams({category:biX,measure:biY,filter:biFilter});api('/api/datasets/'+active.id+'/insights?'+params.toString()).then(d=>{if(!cancelled)setBiSummary(d);}).catch(e=>{if(!cancelled)setNotice(e instanceof Error?e.message:'Full-dataset insights could not be calculated.');}).finally(()=>{if(!cancelled)setBiBusy(false);});return()=>{cancelled=true;};},[tab,active?.id,biX,biY,biFilter]);
  const biRows=useMemo(()=>((biSummary?.chartRows||[]).map((r:any)=>[r.label,r.value] as [string,number])),[biSummary]);
  const biInsights:string[]=biSummary?.insights||[];
+ function csvCell(value:unknown){
+  const raw=String(value??''),safe=/^[\\t\\r\\n ]*[=+\\-@]/.test(raw)?"'"+raw:raw;
+  return '"'+safe.replace(/"/g,'""')+'"';
+ }
  function exportBiSummary(){
   if(!active||!biRows.length)return;
-  const rows=[[biX,biY],...biRows],csv=rows.map((row:(string|number)[])=>row.map((v:string|number)=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\\r\\n');
+  const rows=[[biX,biY],...biRows],csv=rows.map((row:(string|number)[])=>row.map(csvCell).join(',')).join('\\r\\n');
   const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})),link=document.createElement('a');link.href=url;link.download=active.name.replace(/[^a-z0-9-_]+/gi,'_')+'_chart_data.csv';document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url);
  }
 
@@ -95,7 +99,7 @@ export default function AnalyticsStudio(){
  }
  function exportQueryResult(){
   if(!queryResult?.columns?.length||!queryResult?.rows?.length)return;
-  const csv=[queryResult.columns,...queryResult.rows.map((row:Record<string,unknown>)=>queryResult.columns.map((column:string)=>row[column]??''))].map((row:(string|number)[])=>row.map(value=>'"'+String(value).replace(/"/g,'""')+'"').join(',')).join('\\r\\n');
+  const csv=[queryResult.columns,...queryResult.rows.map((row:Record<string,unknown>)=>queryResult.columns.map((column:string)=>row[column]??''))].map((row:(string|number)[])=>row.map(csvCell).join(',')).join('\\r\\n');
   downloadReportFile((active?.name||'dataset').replace(/[^a-z0-9-_]+/gi,'_')+'_sql_results.csv',csv,'text/csv;charset=utf-8');
   setNotice('SQL result rows exported. The export contains the rows returned by this query.');
  }
