@@ -127,6 +127,7 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
    else if(numeric&&fillMissing==="median"){const sorted=values.map(Number).sort((a,b)=>a-b),mid=Math.floor(sorted.length/2);replacement=String(Number((sorted.length%2?sorted[mid]:(sorted[mid-1]+sorted[mid])/2).toFixed(6)));}
    if(replacement!=="")for(const row of rows)if(row[k]===""){row[k]=replacement;filledCells++;}
   }
+  if(!rows.length)return json({error:"These transformations would remove every data row. No version was saved."},400);
   const after=quality(rows,columns),outliersByColumn:Record<string,number>={};
   for(const k of columns){const nonempty=rows.map(r=>r[k]).filter(v=>v.trim()),nums=nonempty.filter(isNum).map(Number);if(nums.length>=4&&nums.length/Math.max(1,nonempty.length)>=.9){const s=nums.slice().sort((a,b)=>a-b),median=(a:number[])=>{const n=Math.floor(a.length/2);return a.length%2?a[n]:(a[n-1]+a[n])/2;},q1=median(s.slice(0,Math.ceil(s.length/2))),q3=median(s.slice(Math.floor(s.length/2))),iqr=q3-q1,count=nums.filter(v=>v<q1-1.5*iqr||v>q3+1.5*iqr).length;if(count)outliersByColumn[k]=count;}}
   const latest=await env.DB.prepare("SELECT COALESCE(MAX(version_number),0) AS v FROM dataset_versions WHERE dataset_id=?").bind(datasetId).first<{v:number}>(),version=Number(latest?.v||0)+1,key=dataset.organization_id+"/"+datasetId+"/v"+version+"-cleaned.csv",output=csvEncode(rows,columns),bytes=new TextEncoder().encode(output);
