@@ -206,7 +206,7 @@ async function handleAuth(request: Request, env: Env, path: string): Promise<Res
     const row = await env.DB.prepare("SELECT id,user_id FROM auth_tokens WHERE token_hash=? AND purpose='EMAIL_VERIFY' AND used_at IS NULL AND expires_at > CURRENT_TIMESTAMP LIMIT 1").bind(hash).first<{id:string;user_id:string}>();
     if (!row) return json({ error: "Verification link is invalid or expired." }, 400);
     await env.DB.batch([
-      env.DB.prepare("UPDATE users SET email_verified_at=COALESCE(email_verified_at,CURRENT_TIMESTAMP),updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(row.user_id),
+      env.DB.prepare("UPDATE users SET email_verified_at=COALESCE(email_verified_at,CURRENT_TIMESTAMP),account_status=CASE WHEN account_status='PENDING' AND EXISTS (SELECT 1 FROM platform_admins WHERE user_id=users.id AND role='SUPER_ADMIN') THEN 'ACTIVE' ELSE account_status END,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(row.user_id),
       env.DB.prepare("UPDATE auth_tokens SET used_at=CURRENT_TIMESTAMP WHERE id=? AND used_at IS NULL").bind(row.id)
     ]);
     await createAudit(env, row.user_id, "EMAIL_VERIFIED", ip);
