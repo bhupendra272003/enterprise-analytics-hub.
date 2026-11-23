@@ -1,7 +1,12 @@
 """Offline contract tests for the read-only CTU Financial project pack."""
 from pathlib import Path
+import csv
+import json
 import re
+import tempfile
 import unittest
+
+import validate_exports
 
 ROOT = Path(__file__).resolve().parents[1]
 SQL_DIR = ROOT / "sql"
@@ -83,6 +88,72 @@ class FinancialProjectAssetTests(unittest.TestCase):
         self.assertIn("SOURCE_TABLES", script)
         self.assertIn("row_count", script)
         self.assertIn("raw_source_table_exports", script)
+
+    def _write_raw_export_fixture(self, directory: Path) -> dict:
+        export_dir = directory / "source_tables"
+        export_dir.mkdir(parents=True)
+        manifest = {
+            "dataset": "financial",
+            "read_only": True,
+            "tables": {},
+        }
+        for table in sorted(validate_exports.SOURCE_TABLES):
+            columns = ["id", "value"]
+            rows = [[1, "sample"], [2, "example"]]
+            with (export_dir / f"{table}.csv").open(
+                "w", encoding="utf-8-sig", newline=""
+            ) as handle:
+                writer = csv.writer(handle)
+                writer.writerow(columns)
+                writer.writerows(rows)
+            manifest["tables"][table] = {
+                "file": f"{table}.csv",
+                "row_count": len(rows),
+                "column_count": len(columns),
+                "columns": columns,
+            }
+        (export_dir / "manifest.json").write_text(
+            json.dumps(manifest), encoding="utf-8"
+        )
+        return manifest
+
+    def test_raw_export_manifest_accepts_all_eight_valid_csvs(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            self._write_raw_export_fixture(directory)
+            passed, detail = validate_exports.validate_raw_source_exports(directory)
+            self.assertTrue(passed, detail)
+            self.assertIn("All eight raw CSVs", detail)
+
+    def test_raw_export_manifest_rejects_row_count_mismatch(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            manifest = self._write_raw_export_fixture(directory)
+            manifest["tables"]["loan"]["row_count"] = 99
+            (directory / "source_tables" / "manifest.json").write_text(
+                json.dumps(manifest), encoding="utf-8"
+            )
+            passed, detail = validate_exports.validate_raw_source_exports(directory)
+            self.assertFalse(passed)
+            self.assertIn("loan: CSV has 2 rows", detail)
+
+    def test_raw_export_manifest_rejects_path_traversal(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            manifest = self._write_raw_export_fixture(directory)
+            manifest["tables"]["loan"]["file"] = "../outside.csv"
+            (directory / "source_tables" / "manifest.json").write_text(
+                json.dumps(manifest), encoding="utf-8"
+            )
+            passed, detail = validate_exports.validate_raw_source_exports(directory)
+            self.assertFalse(passed)
+            self.assertIn("filename must be", detail)
+
+    def test_raw_export_validator_allows_manifest_to_be_optional(self):
+        with tempfile.TemporaryDirectory() as temp:
+            passed, detail = validate_exports.validate_raw_source_exports(Path(temp))
+            self.assertTrue(passed)
+            self.assertIn("Optional raw source-table export not present", detail)
 
 
 if __name__ == "__main__":
