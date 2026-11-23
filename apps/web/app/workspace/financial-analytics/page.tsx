@@ -81,14 +81,16 @@ export default function FinancialAnalyticsPage() {
 
   const summary = useMemo(() => {
     const statuses = new Map<string, number>();
-    let amountTotal = 0, amountCount = 0, durationTotal = 0, durationCount = 0, missingIds = 0;
+    let amountTotal = 0, amountCount = 0, durationTotal = 0, durationCount = 0, missingIds = 0, invalidAmounts = 0, invalidDurations = 0;
     const accounts = new Set<string>();
+    const loanIdCounts = new Map<string, number>();
     for (const loan of loans) {
       const status = loan.status || '<BLANK>';
+      if (loan.loan_id) loanIdCounts.set(loan.loan_id, (loanIdCounts.get(loan.loan_id) || 0) + 1);
       statuses.set(status, (statuses.get(status) || 0) + 1);
       const amount = numeric(loan.amount), duration = numeric(loan.duration);
-      if (amount !== null) { amountTotal += amount; amountCount += 1; }
-      if (duration !== null) { durationTotal += duration; durationCount += 1; }
+      if (amount !== null) { amountTotal += amount; amountCount += 1; if (amount <= 0) invalidAmounts += 1; }
+      if (duration !== null) { durationTotal += duration; durationCount += 1; if (duration <= 0) invalidDurations += 1; }
       if (loan.account_id) accounts.add(loan.account_id);
       if (!loan.loan_id) missingIds += 1;
     }
@@ -98,6 +100,9 @@ export default function FinancialAnalyticsPage() {
       averageDuration: durationCount ? durationTotal / durationCount : null,
       distinctAccounts: accounts.size,
       missingIds,
+      duplicateLoanIdGroups: [...loanIdCounts.values()].filter(count => count > 1).length,
+      invalidAmounts,
+      invalidDurations,
     };
   }, [loans]);
 
@@ -132,7 +137,7 @@ export default function FinancialAnalyticsPage() {
         {error&&<div className="financial-alert" role="alert">{error}</div>}
         <div className="financial-notice" role="status">✳ {notice}</div>
         {profile&&<section className="financial-panel financial-results"><div className="financial-panel-head"><div><small>PROFILE SNAPSHOT · {profileName}</small><h2>Source inventory</h2></div><span className="financial-chip">Profiler output</span></div><div className="financial-kpis"><article><small>TABLES PROFILED</small><b>{profile.inventory?.length ?? 0}</b></article><article><small>LOAN ROWS</small><b>{(profile.loan_rows_exported ?? 0).toLocaleString()}</b></article><article><small>GENERATED UTC</small><b className="financial-date">{profile.generated_at_utc ? new Date(profile.generated_at_utc).toLocaleString() : 'Not recorded'}</b></article></div><div className="financial-table-wrap"><table className="financial-table"><thead><tr><th>Source table</th><th>Rows</th><th>Columns</th></tr></thead><tbody>{profile.inventory?.map(item=><tr key={item.table}><td>{item.table}</td><td>{item.rows.toLocaleString()}</td><td>{item.columns}</td></tr>)}</tbody></table></div><h3>Loan data-quality checks</h3><div className="financial-quality">{Object.entries(profile.loan_checks || {}).map(([key,value])=><div key={key}><span>{key.replaceAll('_',' ')}</span><b>{value.toLocaleString()}</b></div>)}</div><h3>Key integrity exceptions</h3><div className="financial-table-wrap"><table className="financial-table"><thead><tr><th>Table / key</th><th>Missing keys</th><th>Duplicate groups</th></tr></thead><tbody>{profile.key_integrity?.map(item=><tr key={item.table}><td>{item.table}.{item.key}</td><td>{item.missing_key.toLocaleString()}</td><td>{item.duplicate_key_groups.toLocaleString()}</td></tr>)}</tbody></table></div></section>}
-        {loans.length>0&&<section className="financial-panel financial-results"><div className="financial-panel-head"><div><small>LOCAL CSV ANALYSIS · {fileName}</small><h2>Loan extract overview</h2></div><span className="financial-chip">Browser-only</span></div><div className="financial-kpis"><article><small>LOAN RECORDS</small><b>{loans.length.toLocaleString()}</b></article><article><small>DISTINCT ACCOUNTS</small><b>{summary.distinctAccounts.toLocaleString()}</b></article><article><small>AVERAGE AMOUNT</small><b>{summary.averageAmount===null?'—':summary.averageAmount.toLocaleString(undefined,{maximumFractionDigits:2})}</b></article><article><small>AVG. DURATION · MONTHS</small><b>{summary.averageDuration===null?'—':summary.averageDuration.toFixed(2)}</b></article></div><h3>Observed loan status distribution</h3><div className="financial-quality">{summary.statuses.map(([status,count])=><div key={status}><span>{status}</span><b>{count.toLocaleString()} · {(count/loans.length*100).toFixed(1)}%</b></div>)}</div><p className="financial-footnote">Grain checks: {summary.missingIds.toLocaleString()} rows without loan_id in this file. Status labels are shown as observed; C/D are not automatically classified as bad loans.</p></section>}
+        {loans.length>0&&<section className="financial-panel financial-results"><div className="financial-panel-head"><div><small>LOCAL CSV ANALYSIS · {fileName}</small><h2>Loan extract overview</h2></div><span className="financial-chip">Browser-only</span></div><div className="financial-kpis"><article><small>LOAN RECORDS</small><b>{loans.length.toLocaleString()}</b></article><article><small>DISTINCT ACCOUNTS</small><b>{summary.distinctAccounts.toLocaleString()}</b></article><article><small>AVERAGE AMOUNT</small><b>{summary.averageAmount===null?'—':summary.averageAmount.toLocaleString(undefined,{maximumFractionDigits:2})}</b></article><article><small>AVG. DURATION · MONTHS</small><b>{summary.averageDuration===null?'—':summary.averageDuration.toFixed(2)}</b></article></div><h3>Observed loan status distribution</h3><div className="financial-quality">{summary.statuses.map(([status,count])=><div key={status}><span>{status}</span><b>{count.toLocaleString()} · {(count/loans.length*100).toFixed(1)}%</b></div>)}</div><h3>Extract integrity checks</h3><div className="financial-quality"><div><span>Missing loan IDs</span><b>{summary.missingIds.toLocaleString()}</b></div><div><span>Duplicate loan ID groups</span><b>{summary.duplicateLoanIdGroups.toLocaleString()}</b></div><div><span>Non-positive amounts</span><b>{summary.invalidAmounts.toLocaleString()}</b></div><div><span>Non-positive durations</span><b>{summary.invalidDurations.toLocaleString()}</b></div></div><p className="financial-footnote">These checks describe the uploaded extract only. Status labels are shown as observed; C/D are not automatically classified as bad loans. Duplicate groups are counted by distinct loan_id values appearing more than once.</p></section>}
         <section className="financial-panel financial-next"><small>REPRODUCIBLE PROJECT ASSETS</small><h2>SQL → Python → Power BI</h2><div className="financial-links"><a href="https://github.com/bhupendra272003/enterprise-analytics-hub./tree/main/projects/financial-analytics/sql" target="_blank" rel="noreferrer">Read-only SQL scripts ↗</a><a href="https://github.com/bhupendra272003/enterprise-analytics-hub./tree/main/projects/financial-analytics/python" target="_blank" rel="noreferrer">Python profiler & tests ↗</a><a href="https://github.com/bhupendra272003/enterprise-analytics-hub./blob/main/projects/financial-analytics/POWER_BI_MODEL.md" target="_blank" rel="noreferrer">Power BI model guide ↗</a></div><p>Keep the source database read-only. Use loan_id as the loan grain and exclude same-day or post-loan transactions from as-of predictors. Live MariaDB queries and Power BI refresh are not run by this page.</p></section>
       </div>
       <footer className="team-footer">© 2026 BHUPENDRA'S VYRON <span>TRUST THE DATA · VERIFY THE GRAIN</span></footer>
