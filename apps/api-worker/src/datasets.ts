@@ -139,7 +139,21 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
    for(const row of rows){const renamed:Record<string,string>={};for(const old of columns)renamed[normalizedHeaders[old]]=row[old];for(const key of Object.keys(row))delete row[key];Object.assign(row,renamed);}
    columns=next;
   }
-  const numericTargets=requestedNumeric.map(k=>normalizeHeaders?normalizedHeaders[k]:k);
+  const renameInput=body.renameColumns&&typeof body.renameColumns==="object"&&!Array.isArray(body.renameColumns)?body.renameColumns:{};
+  const renameEntries=Object.entries(renameInput) as [string,unknown][];
+  if(renameEntries.length>200||renameEntries.some(([oldName,newName])=>!columns.includes(oldName)||typeof newName!=="string"||!newName.trim()||newName.trim().length>200))return json({error:"Column rename instructions are invalid. Use existing column names and new names up to 200 characters."},400);
+  const renameMap:Record<string,string>={};
+  for(const [oldName,newName] of renameEntries)renameMap[oldName]=(newName as string).trim();
+  const renamedColumns=columns.map(name=>renameMap[name]||name);
+  if(new Set(renamedColumns).size!==renamedColumns.length)return json({error:"Renamed columns must remain unique."},400);
+  if(renameEntries.length){for(const row of rows){const renamed:Record<string,string>={};for(const oldName of columns)renamed[renameMap[oldName]||oldName]=row[oldName];for(const key of Object.keys(row))delete row[key];Object.assign(row,renamed);}columns=renamedColumns;}
+  const dropInput=Array.isArray(body.dropColumns)?body.dropColumns:[];
+  if(dropInput.length>200||dropInput.some((name:unknown)=>typeof name!=="string"||!columns.includes(name)))return json({error:"Choose columns that exist in the current dataset to remove."},400);
+  const dropColumns=[...new Set(dropInput as string[])];
+  if(dropColumns.length>=columns.length)return json({error:"At least one column must remain after transformation."},400);
+  if(dropColumns.length){columns=columns.filter(name=>!dropColumns.includes(name));for(const row of rows)for(const name of dropColumns)delete row[name];}
+  const numericTargets=requestedNumeric.map(k=>{const normalized=normalizeHeaders?normalizedHeaders[k]:k;return renameMap[normalized]||normalized;}).filter(k=>columns.includes(k));
+
   let removedEmptyRows=0;
   if(dropEmptyRows){for(let i=rows.length-1;i>=0;i--)if(columns.every(k=>!String(rows[i][k]??"").trim())){rows.splice(i,1);removedEmptyRows++;}}
   let convertedNumericColumns:string[]=[];
