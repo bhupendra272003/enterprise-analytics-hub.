@@ -75,7 +75,7 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
  const dataset=await env.DB.prepare("SELECT id,organization_id,name,original_filename,storage_path,file_size,row_count,column_count,columns_json,preview_json FROM datasets WHERE id=?").bind(datasetId).first<any>();
  if(!dataset)return json({error:"Dataset not found."},404);
  const m=await membership(env,dataset.organization_id,user.id);if(!m)return json({error:"Insufficient organization permissions."},403);
- if(["clean","profile","validate","anomalies","quality-dashboard","compare"].includes(sub)&&Number(dataset.file_size)>MAX_SYNC_CSV_BYTES)return syncLimitError();
+ if(["clean","profile","validate","anomalies","quality-dashboard","compare","insights","query"].includes(sub)&&Number(dataset.file_size)>MAX_SYNC_CSV_BYTES)return syncLimitError();
  if(sub==="dashboards"&&req.method==="GET"){
   const {results}=await env.DB.prepare("SELECT id,title,config_json AS configJson,created_by AS createdBy,created_at AS createdAt,updated_at AS updatedAt FROM analytics_dashboards WHERE organization_id=? AND dataset_id=? ORDER BY updated_at DESC").bind(dataset.organization_id,datasetId).all();
   return json({dashboards:(results||[]).map((item:any)=>({...item,canDelete:m.role==="OWNER"||item.createdBy===user.id,config:JSON.parse(String(item.configJson||"{}"))}))});
@@ -222,6 +222,7 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
    }
   }
   const chartRows=[...counts.entries()].sort((a,b)=>b[1]-a[1]).slice(0,20).map(([label,value])=>({label,value:Number(value.toFixed(3))}));
+  await audit(env,dataset.organization_id,user.id,"DATASET_INSIGHTS_VIEWED",datasetId,{scope:"FULL_DATASET",rowCount,category:category||null,measure:measure||null,filterApplied:!!filter});
   const insights=[rowCount.toLocaleString()+" records analysed across the full dataset",missingCells.toLocaleString()+" missing cells ("+Number((missingCells/(Math.max(1,rowCount*columnCount))*100).toFixed(2))+"% of all cells)",duplicateRows.toLocaleString()+" duplicate rows detected",numericStats.length+" numeric columns detected"];
   if(numericStats.length){const top=numericStats.slice().sort((a,b)=>b.sum-a.sum)[0];insights.push(top.column+" has the largest numeric total ("+top.sum.toLocaleString()+")");}
   if(chartRows.length)insights.push("Top "+chartRows.length+" category groups by "+measure+": "+chartRows[0].label+" leads with "+chartRows[0].value.toLocaleString());
