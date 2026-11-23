@@ -540,3 +540,9 @@ body{background-image:radial-gradient(ellipse at 15% 48%,rgba(103,151,70,.08),tr
 .transform-option{display:inline-flex;align-items:center;gap:6px;color:#c7b38f;font-size:10px;white-space:nowrap}
 .transform-option input{accent-color:#c7a56b}
 @media(max-width:620px){.bi-bar-row{grid-template-columns:minmax(70px,1fr) minmax(70px,1.5fr) minmax(60px,.8fr);gap:7px;font-size:10px}.bi-chart{padding:12px}}
+
+.saved-dashboard-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-top:1px solid rgba(190,155,101,.14)}
+.saved-dashboard-row>div:first-child{display:flex;flex-direction:column;gap:4px;min-width:0}
+.saved-dashboard-row b{font-size:12px;color:#e6dccb}
+.saved-dashboard-row small{font-size:10px;color:#8996a4}
+@media(max-width:620px){.saved-dashboard-row{align-items:flex-start;flex-direction:column}.saved-dashboard-row .project-actions{width:100%}}
