@@ -103,7 +103,20 @@ For the current CSV export workflow, begin with these tables:
 - `loan_outcome_summary.csv` — pre-aggregated status summary for reconciliation only; do not relate it as another loan fact table.
 - `data_quality_summary.csv`, `missing_value_profile.csv`, and `relationship_integrity.csv` — quality/audit tables for the quality page.
 
-The current profiler does not export every raw source table as a CSV. Do not create Power BI relationships to account, client, disp, card, orders, trans or district until those tables have been explicitly exported or connected through an approved read-only source.
+The profiler creates the quality and loan-focused extracts. Run `python python/export_source_tables.py` to create full raw CSV extracts for all eight source tables under `output/source_tables/`. Import these raw extracts only when needed for the wider relational report; preserve the exact source column names and validate row counts against `source_profile.json` before modelling.
+
+### Optional full relational model from raw source exports
+
+When the eight `output/source_tables/*.csv` files have been generated and validated, the following source relationships may be created after checking parent-key uniqueness and orphan counts:
+
+- `district[A1]` → `account[ district_id ]` and `client[district_id]` (one-to-many where district key is unique).
+- `account[account_id]` → `disp[account_id]`, `loan[account_id]`, `orders[account_id]`, and `trans[account_id]` (one-to-many where account key is unique).
+- `client[client_id]` → `disp[client_id]` (one-to-many where client key is unique).
+- `disp[disp_id]` → `card[disp_id]` (one-to-many where disposition key is unique).
+
+Use single-direction filtering from dimensions toward facts. Keep `loan` and `trans` as facts; avoid joining raw transaction rows directly to loans in Power Query because that can multiply loan rows. Use the pre-aggregated `loan_prior_features` extract for loan-as-of analysis.
+
+Do not activate a relationship merely because the columns have similar names. First confirm unique parent keys, matching data types, and zero or explicitly reviewed orphan references using the quality exports. These suggested edges are source-schema relationships, not a claim that every current extract has passed live validation.
 
 ### Relationships and filter direction
 
