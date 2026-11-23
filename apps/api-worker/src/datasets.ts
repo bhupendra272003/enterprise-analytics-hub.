@@ -1,4 +1,5 @@
-import { parse } from "csv-parse/sync";\nimport { runDatasetQuery } from "./query-engine";
+import { parse } from "csv-parse/sync";
+import { runDatasetQuery } from "./query-engine";
 type Env={DB:D1Database;DATASETS:KVNamespace};
 const readStored=async(env:Env,key:string):Promise<{arrayBuffer:()=>Promise<ArrayBuffer>}|null>=>{const bytes=await env.DATASETS.get(key,"arrayBuffer");return bytes?{arrayBuffer:async()=>bytes}:null;};
 const MAX_SYNC_CSV_BYTES=256*1024;
