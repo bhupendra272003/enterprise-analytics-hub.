@@ -57,6 +57,7 @@ jobs:
           cd apps/api-worker
           npm install
           npm run typecheck
+          node --test test/*.test.mjs
       - name: Build web application
         run: |
           cd apps/web
