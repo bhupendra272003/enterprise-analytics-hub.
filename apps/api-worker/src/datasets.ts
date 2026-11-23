@@ -76,6 +76,35 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
  if(!dataset)return json({error:"Dataset not found."},404);
  const m=await membership(env,dataset.organization_id,user.id);if(!m)return json({error:"Insufficient organization permissions."},403);
  if(["clean","profile","validate","anomalies","quality-dashboard","compare"].includes(sub)&&Number(dataset.file_size)>MAX_SYNC_CSV_BYTES)return syncLimitError();
+ if(sub==="dashboards"&&req.method==="GET"){
+  const {results}=await env.DB.prepare("SELECT id,title,config_json AS configJson,created_by AS createdBy,created_at AS createdAt,updated_at AS updatedAt FROM analytics_dashboards WHERE organization_id=? AND dataset_id=? ORDER BY updated_at DESC").bind(dataset.organization_id,datasetId).all();
+  return json({dashboards:(results||[]).map((item:any)=>({...item,config:JSON.parse(String(item.configJson||"{}"))}))});
+ }
+ if(sub==="dashboards"&&req.method==="POST"){
+  if(!allowed(m.role))return json({error:"Only OWNER, LEADER and ANALYST can save dashboards."},403);
+  let body:any;try{body=await req.json();}catch{return json({error:"Send a dashboard title and configuration."},400);}
+  const title=typeof body.title==="string"?body.title.trim():"",config=body.config;
+  if(title.length<2||title.length>100)return json({error:"Dashboard title must be 2–100 characters."},400);
+  if(!config||typeof config!=="object"||Array.isArray(config))return json({error:"Dashboard configuration is invalid."},400);
+  const columns:string[]=JSON.parse(dataset.columns_json||"[]");
+  const categoryColumn=typeof config.categoryColumn==="string"?config.categoryColumn:"",measureColumn=typeof config.measureColumn==="string"?config.measureColumn:"";
+  const filter=typeof config.filter==="string"?config.filter.slice(0,120):"";
+  if(!columns.includes(categoryColumn)||!columns.includes(measureColumn))return json({error:"Choose valid dataset columns for the dashboard."},400);
+  const safeConfig={categoryColumn,measureColumn,filter};
+  const id=crypto.randomUUID();
+  await env.DB.prepare("INSERT INTO analytics_dashboards (id,organization_id,dataset_id,title,config_json,created_by) VALUES (?,?,?,?,?,?)").bind(id,dataset.organization_id,datasetId,title,JSON.stringify(safeConfig),user.id).run();
+  await audit(env,dataset.organization_id,user.id,"ANALYTICS_DASHBOARD_SAVED",id,{datasetId,title});
+  return json({dashboard:{id,title,config:safeConfig,createdBy:user.id}},201);
+ }
+ const dashboardDelete=sub.match(/^dashboards\/([^/]+)$/);
+ if(dashboardDelete&&req.method==="DELETE"){
+  const dashboard=await env.DB.prepare("SELECT id,created_by FROM analytics_dashboards WHERE id=? AND dataset_id=? AND organization_id=?").bind(dashboardDelete[1],datasetId,dataset.organization_id).first<{id:string;created_by:string}>();
+  if(!dashboard)return json({error:"Saved dashboard not found."},404);
+  if(m.role!=="OWNER"&&(!allowed(m.role)||dashboard.created_by!==user.id))return json({error:"Only the owner or dashboard creator can delete this dashboard."},403);
+  await env.DB.prepare("DELETE FROM analytics_dashboards WHERE id=?").bind(dashboard.id).run();
+  await audit(env,dataset.organization_id,user.id,"ANALYTICS_DASHBOARD_DELETED",dashboard.id,{datasetId});
+  return json({deleted:true});
+ }
  if(sub==="query"&&req.method==="POST"){
   if(!allowed(m.role))return json({error:"SQL analysis is available to OWNER, LEADER and ANALYST roles. MANAGER is read-only."},403);
   if(Number(dataset.file_size)>MAX_SYNC_CSV_BYTES)return syncLimitError();
