@@ -59,5 +59,20 @@ class FinancialProjectAssetTests(unittest.TestCase):
         self.assertIn("data_quality_summary.csv", script)
 
 
+    def test_raw_source_exporter_is_chunked_and_read_only(self):
+        script = (ROOT / "python" / "export_source_tables.py").read_text(encoding="utf-8")
+        self.assertIn("fetchmany(batch_size)", script)
+        self.assertIn("BATCH_SIZE = 10_000", script)
+        self.assertIn("getpass.getpass", script)
+        self.assertIn("SELECT", script.upper())
+        self.assertIn("source_tables", script)
+        self.assertNotRegex(script, r"(?i)\\b(INSERT|UPDATE|DELETE|DROP|ALTER|TRUNCATE|REPLACE)\\b")
+
+    def test_readme_does_not_commit_dataset_password(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        self.assertNotIn("ctu-relational", readme)
+        self.assertIn("export_source_tables.py", readme)
+
+
 if __name__ == "__main__":
     unittest.main()
