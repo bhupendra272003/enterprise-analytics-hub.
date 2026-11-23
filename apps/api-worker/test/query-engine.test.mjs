@@ -44,3 +44,27 @@ test("rejects writes, multiple statements and unknown columns", () => {
   assert.throws(() => runDatasetQuery("SELECT * FROM data; DELETE FROM data", rows, columns), /one read-only SELECT/);
   assert.throws(() => runDatasetQuery("SELECT password FROM data", rows, columns), /Unknown column/);
 });
+
+
+test("keeps AND inside quoted string values intact", () => {
+  const result = runDatasetQuery("SELECT id FROM data WHERE region = 'North AND South' OR region = 'North' LIMIT 10", rows, columns);
+  assert.deepEqual(result.rows, [{ id: "1" }, { id: "3" }]);
+});
+
+test("supports LIKE and NULL predicates", () => {
+  const sample = [
+    { id: "1", region: "North", sales: "100" },
+    { id: "2", region: "South-East", sales: "" },
+    { id: "3", region: null, sales: "175" }
+  ];
+  assert.equal(runDatasetQuery("SELECT COUNT(*) AS total FROM data WHERE region LIKE 'South%' ", sample, columns).rows[0].total, 1);
+  assert.equal(runDatasetQuery("SELECT COUNT(*) AS total FROM data WHERE sales IS NULL", sample, columns).rows[0].total, 1);
+});
+
+test("supports grouped COUNT and numeric MIN/MAX", () => {
+  const result = runDatasetQuery("SELECT region, COUNT(*) AS n, MIN(sales) AS low, MAX(sales) AS high FROM data GROUP BY region ORDER BY n DESC", rows, columns);
+  assert.equal(result.rows[0].region, "North");
+  assert.equal(result.rows[0].n, 2);
+  assert.equal(result.rows[0].low, 100);
+  assert.equal(result.rows[0].high, 175);
+});
