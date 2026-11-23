@@ -1,4 +1,4 @@
-import { parse } from "csv-parse/sync";
+import { parse } from "csv-parse/sync";\nimport { runDatasetQuery } from "./query-engine";
 type Env={DB:D1Database;DATASETS:KVNamespace};
 const readStored=async(env:Env,key:string):Promise<{arrayBuffer:()=>Promise<ArrayBuffer>}|null>=>{const bytes=await env.DATASETS.get(key,"arrayBuffer");return bytes?{arrayBuffer:async()=>bytes}:null;};
 const MAX_SYNC_CSV_BYTES=256*1024;
@@ -75,6 +75,21 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
  if(!dataset)return json({error:"Dataset not found."},404);
  const m=await membership(env,dataset.organization_id,user.id);if(!m)return json({error:"Insufficient organization permissions."},403);
  if(["clean","profile","validate","anomalies","quality-dashboard","compare"].includes(sub)&&Number(dataset.file_size)>MAX_SYNC_CSV_BYTES)return syncLimitError();
+ if(sub==="query"&&req.method==="POST"){
+  if(!allowed(m.role))return json({error:"SQL analysis is available to OWNER, LEADER and ANALYST roles. MANAGER is read-only."},403);
+  if(Number(dataset.file_size)>MAX_SYNC_CSV_BYTES)return syncLimitError();
+  let body:any;try{body=await req.json();}catch{return json({error:"Send a valid SQL query."},400);}
+  if(typeof body.sql!=="string"||body.sql.length>12000)return json({error:"SQL query must be a string up to 12,000 characters."},400);
+  const source=await readStored(env,dataset.storage_path);if(!source)return json({error:"Stored dataset file is missing."},500);
+  let parsed;try{parsed=parseCsv(await source.arrayBuffer());}catch{return json({error:"The stored CSV could not be parsed."},400);}
+  const rows=parsed.records.map((row:Record<string,unknown>)=>Object.fromEntries(parsed.columns.map((column:string)=>[column,String(row[column]??"")])));
+  try{
+   const result=runDatasetQuery(body.sql,rows,parsed.columns);
+   await audit(env,dataset.organization_id,user.id,"DATASET_SQL_QUERY",datasetId,{returnedRows:result.rowCount,matchedRows:result.matchedRows});
+   return json({result,dataset:{id:dataset.id,name:dataset.name}});
+  }catch(error){return json({error:error instanceof Error?error.message:"SQL query could not be executed."},400);}
+ }
+
  if(sub==="clean"&&req.method==="POST"){
   if(!allowed(m.role))return json({error:"Only OWNER, LEADER and ANALYST roles can create cleaned dataset versions."},403);
   let body:any={};try{body=await req.json();}catch{return json({error:"Invalid cleaning options."},400);}
