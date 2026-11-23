@@ -18,6 +18,43 @@ REQUIRED_FILES = (
 )
 ALLOWED_STATUSES = {"A", "B", "C", "D"}
 
+SOURCE_TABLES = {"account", "client", "disp", "card", "loan", "orders", "trans", "district"}
+
+
+def validate_raw_source_exports(directory: Path) -> tuple[bool, str]:
+    """Validate optional chunked raw-table CSVs against their completion manifest."""
+    export_dir = directory / "source_tables"
+    manifest_path = export_dir / "manifest.json"
+    if not manifest_path.is_file():
+        return True, "Optional raw source-table export not present; profiler-only validation continues."
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        tables = manifest.get("tables", {})
+        if manifest.get("dataset") != "financial" or manifest.get("read_only") is not True:
+            return False, "Manifest dataset/read_only metadata is invalid."
+        if set(tables) != SOURCE_TABLES:
+            return False, f"Manifest table set differs from expected eight: {sorted(tables)}."
+        checked = []
+        for table in sorted(SOURCE_TABLES):
+            item = tables[table]
+            path = export_dir / item["file"]
+            expected_columns = item["columns"]
+            if not path.is_file() or not expected_columns:
+                return False, f"{table}: missing CSV or empty column definition."
+            with path.open("r", encoding="utf-8-sig", newline="") as handle:
+                reader = csv.reader(handle)
+                header = next(reader, None)
+                if header != expected_columns or len(header) != int(item["column_count"]):
+                    return False, f"{table}: CSV header does not match manifest."
+                row_count = sum(1 for _ in reader)
+            if row_count != int(item["row_count"]):
+                return False, f"{table}: CSV has {row_count} rows; manifest says {item['row_count']}."
+            checked.append(f"{table}={row_count}")
+    except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError, csv.Error, StopIteration) as exc:
+        return False, f"Raw source export validation error: {exc}"
+    return True, "All eight raw CSVs match manifest row counts and headers (" + ", ".join(checked) + ")."
+
+
 
 def read_csv(path: Path) -> list[dict[str, str]]:
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
@@ -63,6 +100,8 @@ def validate_exports(directory: Path) -> dict:
         return report
 
     record("artifact_readability", True, "JSON and CSV exports are readable.")
+    raw_ok, raw_detail = validate_raw_source_exports(directory)
+    record("raw_source_table_exports", raw_ok, raw_detail)
     inventory = profile.get("inventory", [])
     record("source_inventory", len(inventory) == 8,
            f"Profiler reports {len(inventory)} of 8 expected source tables.")
