@@ -66,6 +66,10 @@ export default function ShowcasePage() {
         <li>Prepare a Power BI model and export a summary CSV from the live Vyron page.</li>
       </ol>
       <a href="https://relational.fel.cvut.cz/dataset/Financial" target="_blank" rel="noreferrer" style={{ color: '#b7f36b', fontSize: 12 }}>Open dataset documentation ↗</a>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginTop: 18 }}>
+        <a href="https://github.com/bhupendra272003/enterprise-analytics-hub./blob/main/projects/demo-data/logistics_orders_demo.csv" target="_blank" rel="noreferrer" style={{ color: '#b7f36b', fontSize: 12 }}>Try synthetic logistics CSV ↗</a>
+        <a href="https://github.com/bhupendra272003/enterprise-analytics-hub./blob/main/projects/demo-data/README.md" target="_blank" rel="noreferrer" style={{ color: '#b7f36b', fontSize: 12 }}>5-minute live demo guide ↗</a>
+      </div>
     </section>
 
     <section style={{ ...panel, marginBottom: 18 }}>
