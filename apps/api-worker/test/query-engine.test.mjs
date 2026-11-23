@@ -34,6 +34,11 @@ test("supports safe aggregate queries", () => {
   assert.equal(result.rows[0].average_sales, 175);
 });
 
+test("groups rows and orders aggregate output", () => {
+  const result = runDatasetQuery("SELECT region, SUM(sales) AS total_sales FROM data GROUP BY region ORDER BY total_sales DESC LIMIT 10", rows, columns);
+  assert.deepEqual(result.rows, [{ region: "North", total_sales: 275 }, { region: "South", total_sales: 250 }]);
+});
+
 test("rejects writes, multiple statements and unknown columns", () => {
   assert.throws(() => runDatasetQuery("DELETE FROM data", rows, columns), /SELECT/);
   assert.throws(() => runDatasetQuery("SELECT * FROM data; DELETE FROM data", rows, columns), /one read-only SELECT/);
