@@ -74,10 +74,9 @@ class ExportValidatorTests(unittest.TestCase):
         failed = {item["check"] for item in report["errors"]}
         self.assertIn("target_leakage_guard", failed)
         self.assertIn("prior_transaction_date_boundary", failed)
-        self.assertIn("feature_row_count", failed)
 
     def test_invalid_feature_date_fails_cleanly(self):
-        rows = read_rows = [{
+        rows = [{
             "loan_id": "1", "account_id": "100", "loan_date": "not-a-date",
             "transaction_type": "credit", "prior_transaction_count": "2",
             "first_prior_transaction_date": "1994-01-01",
@@ -86,6 +85,14 @@ class ExportValidatorTests(unittest.TestCase):
         self.write_csv("loan_prior_features.csv", rows)
         report = validate_exports(self.directory)
         self.assertIn("feature_date_format", {item["check"] for item in report["errors"]})
+
+    def test_feature_row_count_mismatch_fails(self):
+        profile_path = self.directory / "source_profile.json"
+        profile = json.loads(profile_path.read_text(encoding="utf-8"))
+        profile["feature_rows_exported"] = 2
+        profile_path.write_text(json.dumps(profile), encoding="utf-8")
+        report = validate_exports(self.directory)
+        self.assertIn("feature_row_count", {item["check"] for item in report["errors"]})
 
     def test_missing_required_export_fails(self):
         (self.directory / "loan_prior_features.csv").unlink()
