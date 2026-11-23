@@ -281,7 +281,7 @@ export default {
       return new Response(null, { status: 204, headers: {
         "access-control-allow-origin": allowedOrigin,
         "access-control-allow-credentials": "true",
-        "access-control-allow-methods": "GET,POST,PATCH,OPTIONS",
+        "access-control-allow-methods": "GET,POST,PUT,PATCH,OPTIONS",
         "access-control-allow-headers": "Content-Type, X-Hub-Request",
         "access-control-max-age": "86400",
         "vary": "Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
