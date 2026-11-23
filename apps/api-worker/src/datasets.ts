@@ -129,6 +129,16 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
   let parsed;try{parsed=parseCsv(await source.arrayBuffer());}catch{return json({error:"The stored CSV is invalid."},400);}
   let columns: string[]=parsed.columns.slice();const rows:Record<string,string>[]=parsed.records.map((r:Record<string,unknown>)=>Object.fromEntries(columns.map(k=>[k,String(r[k]??"")])));
   const before=quality(rows,columns);
+  const filterSpec=body.rowFilter&&typeof body.rowFilter==="object"?body.rowFilter:null;
+  let filteredRows=0;
+  if(filterSpec){
+   const column=typeof filterSpec.column==="string"?filterSpec.column:"",operator=typeof filterSpec.operator==="string"?filterSpec.operator:"",value=filterSpec.value===undefined?"":String(filterSpec.value);
+   if(!columns.includes(column)||!["equals","not_equals","contains","greater_than","less_than","is_empty","not_empty"].includes(operator)||value.length>500)return json({error:"Row filter is invalid. Choose a current column and a supported operator."},400);
+   const beforeFilter=rows.length;
+   const keep=(raw:string)=>{const current=String(raw??"");if(operator==="is_empty")return !current.trim();if(operator==="not_empty")return !!current.trim();if(operator==="equals")return current===value;if(operator==="not_equals")return current!==value;if(operator==="contains")return current.toLocaleLowerCase().includes(value.toLocaleLowerCase());if(!isNum(current)||!isNum(value))return false;return operator==="greater_than"?Number(current)>Number(value):Number(current)<Number(value);};
+   for(let i=rows.length-1;i>=0;i--)if(!keep(rows[i][column]))rows.splice(i,1);
+   filteredRows=beforeFilter-rows.length;
+  }
   const normalizeHeaders=body.normalizeHeaders===true,dropEmptyRows=body.dropEmptyRows===true;
   const requestedNumeric:string[]=Array.isArray(body.numericColumns)?body.numericColumns.filter((v:unknown):v is string=>typeof v==="string"):[];
   if(requestedNumeric.some(k=>!columns.includes(k)))return json({error:"Choose numeric columns from the current dataset."},400);
@@ -158,16 +168,6 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
   if(dropEmptyRows){for(let i=rows.length-1;i>=0;i--)if(columns.every(k=>!String(rows[i][k]??"").trim())){rows.splice(i,1);removedEmptyRows++;}}
   let convertedNumericColumns:string[]=[];
   for(const column of numericTargets){const invalid=rows.some(row=>row[column].trim()!==""&&!isNum(row[column]));if(invalid)return json({error:"Column "+column+" contains non-numeric values; it was not converted."},400);for(const row of rows)if(row[column].trim()!=="")row[column]=String(Number(row[column]));convertedNumericColumns.push(column);}
-  const filterSpec=body.rowFilter&&typeof body.rowFilter==="object"?body.rowFilter:null;
-  let filteredRows=0;
-  if(filterSpec){
-   const column=typeof filterSpec.column==="string"?filterSpec.column:"",operator=typeof filterSpec.operator==="string"?filterSpec.operator:"",value=filterSpec.value===undefined?"":String(filterSpec.value);
-   if(!columns.includes(column)||!["equals","not_equals","contains","greater_than","less_than","is_empty","not_empty"].includes(operator)||value.length>500)return json({error:"Row filter is invalid. Choose a current column and a supported operator."},400);
-   const beforeFilter=rows.length;
-   const keep=(raw:string)=>{const current=String(raw??"");if(operator==="is_empty")return !current.trim();if(operator==="not_empty")return !!current.trim();if(operator==="equals")return current===value;if(operator==="not_equals")return current!==value;if(operator==="contains")return current.toLocaleLowerCase().includes(value.toLocaleLowerCase());if(!isNum(current)||!isNum(value))return false;return operator==="greater_than"?Number(current)>Number(value):Number(current)<Number(value);};
-   for(let i=rows.length-1;i>=0;i--)if(!keep(rows[i][column]))rows.splice(i,1);
-   filteredRows=beforeFilter-rows.length;
-  }
   let removedDuplicates=0;
   if(removeDuplicates){const seen=new Set<string>();for(let i=rows.length-1;i>=0;i--){const sig=JSON.stringify(columns.map(k=>rows[i][k]));if(seen.has(sig)){rows.splice(i,1);removedDuplicates++;}else seen.add(sig);}rows.reverse();}
   let filledCells=0;
