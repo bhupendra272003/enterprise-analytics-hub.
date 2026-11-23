@@ -127,7 +127,7 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
   if(!["none","zero","mean","median","mode"].includes(fillMissing))return json({error:"Unsupported missing-value strategy."},400);
   const source=await readStored(env,dataset.storage_path);if(!source)return json({error:"Stored dataset file is missing."},500);
   let parsed;try{parsed=parseCsv(await source.arrayBuffer());}catch{return json({error:"The stored CSV is invalid."},400);}
-  let columns: string[]=parsed.columns.slice();const sourceColumns=columns.slice();const rows:Record<string,string>[]=parsed.records.map((r:Record<string,unknown>)=>Object.fromEntries(columns.map(k=>[k,String(r[k]??"")]));
+  let columns: string[]=parsed.columns.slice();const sourceColumns=columns.slice();const rows:Record<string,string>[]=parsed.records.map((r:Record<string,unknown>)=>Object.fromEntries(columns.map(k=>[k,String(r[k]??"")])));
   const before=quality(rows,columns);
   const filterSpec=body.rowFilter&&typeof body.rowFilter==="object"?body.rowFilter:null;
   let filteredRows=0;
