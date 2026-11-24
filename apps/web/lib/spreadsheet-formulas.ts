@@ -26,7 +26,7 @@ function columnIndex(letters: string): number {
 }
 
 function readRange(reference: string, rows: SpreadsheetRow[], columns: string[]): unknown[] {
-  const match = reference.trim().toUpperCase().match(/^$?([A-Z]{1,3})$?(d+)(?::$?([A-Z]{1,3})$?(d+))?$/);
+  const match = reference.trim().toUpperCase().match(/^\$?([A-Z]{1,3})\$?(\d+)(?::\$?([A-Z]{1,3})\$?(\d+))?$/);
   if (!match) throw new Error("Use a cell or range such as A2:A51.");
   const firstCol = columnIndex(match[1]), lastCol = match[3] ? columnIndex(match[3]) : firstCol;
   const firstRow = Number(match[2]) - 2, lastRow = match[4] ? Number(match[4]) - 2 : firstRow;
