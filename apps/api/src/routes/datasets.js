@@ -578,7 +578,7 @@ router.patch('/datasets/:datasetId/handoffs/:handoffId', async (req,res,next) =>
     const role = members[0].role;
     let isReviewer = ['OWNER','MANAGER'].includes(role);
     if (role === 'LEADER') {
-      const [team] = await pool.execute('SELECT id FROM teams WHERE organization_id=? AND leader_user_id=? LIMIT 1',[handoff.organization_id,req.user.id]);
+      const [team] = await pool.execute('SELECT t.id FROM teams t JOIN team_members tm ON tm.team_id=t.id WHERE t.organization_id=? AND t.leader_user_id=? AND tm.user_id=? LIMIT 1',[handoff.organization_id,req.user.id,handoff.assigned_to]);
       isReviewer = team.length > 0;
     }
     if (input.status === 'IN_PROGRESS' || input.status === 'SUBMITTED') {
