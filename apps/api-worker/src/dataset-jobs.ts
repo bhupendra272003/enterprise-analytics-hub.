@@ -68,7 +68,7 @@ async function runProfile(msg:Msg,env:Env){
   let missingCells=0,duplicateRows=0;const seen=new Set<string>();
   for(const item of profile)missingCells+=item.missing;
   for(const row of rows){const key=JSON.stringify(columns.map(column=>String(row[column]??"")));if(seen.has(key))duplicateRows++;else seen.add(key);}
-  const numericStats=profile.filter(item=>item.type==="NUMERIC").map(({name,count,sum,min,max,mean})=>({column:name,count,sum,mean,min,max}));
+  const numericStats=profile.filter(item=>item.type==="NUMERIC").map((item:any)=>({column:item.name,count:Number(item.count||0),sum:Number(item.sum||0),mean:Number(item.mean||0),min:Number(item.min||0),max:Number(item.max||0)}));
   const payload=JSON.parse(job.payload_json||"{}"),analysis=payload.analysis||{},categoryColumn=columns.includes(analysis.categoryColumn)?analysis.categoryColumn:"",measureColumn=columns.includes(analysis.measureColumn)?analysis.measureColumn:"",filter=typeof analysis.filter==="string"?analysis.filter.trim().toLocaleLowerCase():"";
   const groups=new Map<string,number>();
   if(categoryColumn&&measureColumn){for(const row of rows){const label=String(row[categoryColumn]??"").trim()||"(blank)";if(filter&&!label.toLocaleLowerCase().includes(filter))continue;const raw=String(row[measureColumn]??"").trim(),value=Number(raw);if(!raw||!Number.isFinite(value))continue;groups.set(label,(groups.get(label)||0)+value);}}
