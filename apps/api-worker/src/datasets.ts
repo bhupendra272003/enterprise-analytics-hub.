@@ -111,7 +111,7 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
   if(Number(dataset.file_size)>MAX_SYNC_CSV_BYTES)return syncLimitError();
   let body:any;try{body=await req.json();}catch{return json({error:"Send a valid SQL query."},400);}
   if(typeof body.sql!=="string"||body.sql.length>12000)return json({error:"SQL query must be a string up to 12,000 characters."},400);
-  const joinToken=body.sql.match(/\\bJOIN\\s+dataset_([a-f0-9]{32})\\b/i)?.[1]?.toLowerCase();
+  const joinToken=body.sql.match(/\bJOIN\s+dataset_([a-f0-9]{32})\b/i)?.[1]?.toLowerCase();
   let rightRows:Record<string,string>[]|null=null,rightColumns:string[]=[];
   if(joinToken){
    const right=await env.DB.prepare("SELECT id,storage_path,file_size FROM datasets WHERE replace(id,'-','')=? AND organization_id=?").bind(joinToken,dataset.organization_id).first<any>();
@@ -120,19 +120,20 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
    if(Number(right.file_size)>MAX_SYNC_CSV_BYTES)return syncLimitError();
    const rightSource=await readStored(env,right.storage_path);if(!rightSource)return json({error:"Joined dataset file is missing."},500);
    let rightParsed;try{rightParsed=parseCsv(await rightSource.arrayBuffer());}catch{return json({error:"The joined CSV could not be parsed."},400);}
-   rightColumns=rightParsed.columns;rightRows=rightParsed.records.map((row:Record<string,unknown>)=>Object.fromEntries(rightColumns.map((column:string)=>[column,String(row[column]??""))]));
+   rightColumns=rightParsed.columns;
+   rightRows=rightParsed.records.map((row:Record<string,unknown>)=>Object.fromEntries(rightColumns.map((column:string)=>[column,String(row[column]??"")])));
   }
   const source=await readStored(env,dataset.storage_path);if(!source)return json({error:"Stored dataset file is missing."},500);
   let parsed;try{parsed=parseCsv(await source.arrayBuffer());}catch{return json({error:"The stored CSV could not be parsed."},400);}
-  const rows=parsed.records.map((row:Record<string,unknown>)=>Object.fromEntries(parsed.columns.map((column:string)=>[column,String(row[column]??""))]));
+  const rows=parsed.records.map((row:Record<string,unknown>)=>Object.fromEntries(parsed.columns.map((column:string)=>[column,String(row[column]??"")])));
   try{
    const result=joinToken&&rightRows?runDatasetJoinQuery(body.sql,rows,parsed.columns,rightRows,rightColumns):runDatasetQuery(body.sql,rows,parsed.columns);
-   await audit(env,dataset.organization_id,user.id,"DATASET_SQL_QUERY",datasetId,{returnedRows:result.rowCount,matchedRows:result.matchedRows});
+   await audit(env,dataset.organization_id,user.id,"DATASET_SQL_QUERY",datasetId,{returnedRows:result.rowCount,matchedRows:result.matchedRows,join:!!joinToken});
    return json({result,dataset:{id:dataset.id,name:dataset.name}});
   }catch(error){return json({error:error instanceof Error?error.message:"SQL query could not be executed."},400);}
  }
 
- if(sub==="clean"&&req.method==="POST"){
+if(sub==="clean"&&req.method==="POST"){
   if(!allowed(m.role))return json({error:"Only OWNER, LEADER and ANALYST roles can create cleaned dataset versions."},403);
   let body:any={};try{body=await req.json();}catch{return json({error:"Invalid cleaning options."},400);}
   const trimWhitespace=body.trimWhitespace!==false,removeDuplicates=body.removeDuplicates!==false,fillMissing=body.fillMissing??"none";
