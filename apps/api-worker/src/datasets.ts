@@ -328,7 +328,7 @@ if(sub==="clean"&&req.method==="POST"){
   let scope="h.assigned_to=?";
   const params:unknown[]=[datasetId,user.id];
   if(m.role==="OWNER"||m.role==="MANAGER"){scope="1=1";params.splice(1,1);}
-  else if(m.role==="LEADER"){scope="EXISTS (SELECT 1 FROM team_members tm JOIN teams t ON t.id=tm.team_id WHERE t.organization_id=h.organization_id AND t.leader_user_id=? AND tm.user_id=h.assigned_to)";}
+  else if(m.role==="LEADER"){scope="EXISTS (SELECT 1 FROM team_members tm JOIN teams t ON t.id=tm.team_id WHERE h.status<>'REVOKED' AND t.organization_id=h.organization_id AND t.leader_user_id=? AND tm.user_id=h.assigned_to)";}
   else if(m.role==="ANALYST")scope="(h.status<>'REVOKED' AND (h.assigned_to=? OR (h.status='APPROVED' AND h.stage IN ('SQL_REVIEW','RECONCILIATION'))))";
   else return json({error:"Insufficient permissions."},403);
   const sql="SELECT h.id,h.stage,h.status,h.assigned_to AS assignedTo,h.assigned_by AS assignedBy,h.input_version AS inputVersion,h.output_version AS outputVersion,h.handoff_note AS handoffNote,h.review_note AS reviewNote,h.result_json AS resultJson,h.created_at AS createdAt,h.updated_at AS updatedAt,u.full_name AS assigneeName,a.full_name AS assignedByName FROM dataset_handoffs h JOIN users u ON u.id=h.assigned_to JOIN users a ON a.id=h.assigned_by WHERE h.dataset_id=? AND "+scope+" ORDER BY h.created_at DESC";
