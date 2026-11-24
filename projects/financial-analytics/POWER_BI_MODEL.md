@@ -228,3 +228,8 @@ The offline validation report includes `client_account_bridge_reconciliation` wh
 ### District loan outcome summary
 
 Import `loan_district_outcome_summary.csv` when the account raw export is available. Use district and observed loan status as grouping dimensions; loan counts, distinct accounts, average amount and share are descriptive. The builder keeps loans with missing account mappings in `<UNMAPPED>` and conflicting account-to-district assignments in `<AMBIGUOUS_ACCOUNT_DISTRICT>` rather than silently assigning them. Confirm the district key against the source schema before joining district names from `district.csv`.
+
+
+### Scheduled installment analysis
+
+Import `loan_scheduled_repayment_summary.csv` as a descriptive aggregate, not as a loan-level fact or model feature table. It is grouped by duration and observed status and includes average monthly installment, arithmetic scheduled total (`payments × duration`), and scheduled-total-to-principal ratio, alongside valid metric row counts. These values are not actual repayment history, interest rates, delinquency, defaults, or predictive risk scores. Use the validation report's `scheduled_repayment_reconciliation` check before interpreting the page.
