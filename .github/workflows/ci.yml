@@ -63,6 +63,23 @@ jobs:
           npm run test:unit
           npm run build
           npm run cf:build
+      - name: Validate Cloudflare deployment bindings and queue configuration
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          api = json.loads(Path("apps/api-worker/wrangler.jsonc").read_text())
+          web = json.loads(Path("apps/web/wrangler.jsonc").read_text())
+          queues = {item["queue"] for item in api.get("queues", {}).get("producers", [])}
+          required = {"nexus-dataset-jobs", "vyron-generation-jobs"}
+          assert required <= queues, f"Missing queue producers: {sorted(required - queues)}"
+          assert any(item.get("binding") == "DATASETS" for item in api.get("kv_namespaces", [])), "Private dataset KV binding missing"
+          assert any(item.get("binding") == "API" and item.get("service") == api["name"] for item in web.get("services", [])), "Frontend API service binding does not match API Worker name"
+          deploy = Path(".github/workflows/cloudflare-deploy.yml").read_text()
+          assert "workflow_dispatch:" in deploy and "push:" not in deploy, "Production deployment must remain manual"
+          assert all(queue in deploy for queue in required), "Deploy workflow must provision both queues"
+          print("Cloudflare bindings, both queue producers, and manual-only deployment verified.")
+          PY
       - name: Validate PKDD Financial project assets
         run: |
           python -m py_compile projects/financial-analytics/python/profile_financial.py projects/financial-analytics/python/export_source_tables.py projects/financial-analytics/python/build_analytics.py projects/financial-analytics/python/validate_exports.py
