@@ -134,6 +134,7 @@ def build_analytics(directory: Path) -> dict:
 
     duration_rows = summarize_loans(loans, "duration_months")
     vintage_rows = summarize_loans(loans, "loan_month")
+    account_activity = build_account_activity(directory)
     directory.mkdir(parents=True, exist_ok=True)
     _write_csv(directory / "loan_duration_outcome_summary.csv", SUMMARY_COLUMNS, duration_rows)
     _write_csv(directory / "loan_vintage_outcome_summary.csv", VINTAGE_COLUMNS, vintage_rows)
@@ -147,9 +148,84 @@ def build_analytics(directory: Path) -> dict:
             "loan_vintage_outcome_summary.csv",
         ],
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+        "account_activity": account_activity,
         "descriptive_only": True,
     }
 
+
+
+def build_account_activity(directory: Path) -> dict:
+    """Build account-level and observed transaction-category summaries.
+
+    Uses optional raw source CSVs. Transaction categories retain source labels;
+    this function does not infer income/expense semantics.
+    """
+    source_dir = directory / "source_tables"
+    account_path, transaction_path = source_dir / "account.csv", source_dir / "trans.csv"
+    if not account_path.is_file() or not transaction_path.is_file():
+        return {"available": False, "reason": "Both source_tables/account.csv and trans.csv are required."}
+
+    def load(path: Path) -> tuple[list[str], list[dict[str, str]]]:
+        with path.open("r", encoding="utf-8-sig", newline="") as handle:
+            reader = csv.DictReader(handle)
+            return list(reader.fieldnames or []), list(reader)
+
+    account_columns, accounts = load(account_path)
+    transaction_columns, transactions = load(transaction_path)
+    if "account_id" not in account_columns or "account_id" not in transaction_columns:
+        raise ValueError("account.csv and trans.csv must both contain account_id.")
+    if not {"amount", "type"} <= set(transaction_columns):
+        raise ValueError("trans.csv must contain amount and type columns.")
+
+    account_ids = {row.get("account_id", "").strip() for row in accounts if row.get("account_id", "").strip()}
+    grouped: dict[tuple[str, str], list[dict[str, str]]] = defaultdict(list)
+    for row in transactions:
+        account_id = row.get("account_id", "").strip()
+        if account_id:
+            grouped[(account_id, _status(row.get("type")))].append(row)
+
+    activity = []
+    for (account_id, transaction_type), group in sorted(grouped.items()):
+        amounts = [v for v in (_decimal(row.get("amount")) for row in group) if v is not None]
+        activity.append({
+            "account_id": account_id,
+            "transaction_type": transaction_type,
+            "transaction_count": str(len(group)),
+            "valid_amount_count": str(len(amounts)),
+            "amount_sum": format(sum(amounts, Decimal("0")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP), "f"),
+            "average_amount": format((sum(amounts, Decimal("0")) / len(amounts)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP), "f") if amounts else "",
+        })
+
+    district_rows = []
+    if "district_id" in account_columns:
+        districts: dict[str, set[str]] = defaultdict(set)
+        for row in accounts:
+            district = row.get("district_id", "").strip() or "<MISSING>"
+            account_id = row.get("account_id", "").strip()
+            if account_id:
+                districts[district].add(account_id)
+        district_rows = [
+            {"district_id": district, "distinct_accounts": str(len(ids))}
+            for district, ids in sorted(districts.items())
+        ]
+
+    _write_csv(source_dir / "account_transaction_activity.csv",
+               ("account_id", "transaction_type", "transaction_count", "valid_amount_count", "amount_sum", "average_amount"),
+               activity)
+    if district_rows:
+        _write_csv(source_dir / "district_account_summary.csv",
+                   ("district_id", "distinct_accounts"), district_rows)
+    return {
+        "available": True,
+        "account_rows": len(accounts),
+        "transaction_rows": len(transactions),
+        "accounts_with_transactions": len({row["account_id"] for row in activity}),
+        "activity_groups": len(activity),
+        "district_groups": len(district_rows),
+        "unmatched_transaction_accounts": len({row.get("account_id", "").strip() for row in transactions if row.get("account_id", "").strip()} - account_ids),
+        "outputs": ["source_tables/account_transaction_activity.csv"] + (["source_tables/district_account_summary.csv"] if district_rows else []),
+        "transaction_types_are_unclassified": True,
+    }
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
