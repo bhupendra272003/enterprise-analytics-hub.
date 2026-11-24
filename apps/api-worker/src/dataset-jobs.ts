@@ -36,6 +36,7 @@ export async function handleDatasetJobs(req:Request,env:Env,path:string):Promise
     const joined=await env.DB.prepare("SELECT id,file_size FROM datasets WHERE replace(id,'-','')=? AND organization_id=?").bind(joinToken,ds.organization_id).first<{id:string;file_size:number}>();
     if(!joined)return json({error:"The JOIN dataset must exist in the same organization."},404);
     if(joined.id===ds.id)return json({error:"JOIN requires a second dataset."},400);
+     if(!await hasDatasetAccess(env,joined.id,ds.organization_id,user.id,m.role))return json({error:"You do not have access to the joined dataset."},403);
     if(joined.file_size>10*1024*1024)return json({error:"The joined dataset exceeds the 10 MiB background SQL safety limit."},413);
     joinDatasetId=joined.id;
    }
@@ -63,7 +64,7 @@ export async function handleDatasetJobs(req:Request,env:Env,path:string):Promise
   if(!ds)return json({error:"Dataset not found."},404);
   const m=await env.DB.prepare("SELECT role FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE'").bind(ds.organization_id,user.id).first();
   if(!m)return json({error:"Insufficient organization permissions."},403);
-  if(!await hasDatasetAccess(env,job.dataset_id,job.organization_id,user.id,m.role))return json({error:"This dataset has not been assigned to your workspace role."},403);
+  if(!await hasDatasetAccess(env,list[1],ds.organization_id,user.id,m.role as Role))return json({error:"This dataset has not been assigned to your workspace role."},403);
   const {results}=await env.DB.prepare("SELECT * FROM dataset_jobs WHERE dataset_id=? ORDER BY created_at DESC LIMIT 50").bind(list[1]).all();
   return json({jobs:results.map(view)});
  }
