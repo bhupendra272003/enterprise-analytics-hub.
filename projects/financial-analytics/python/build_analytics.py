@@ -137,7 +137,7 @@ def summarize_scheduled_repayments(rows: list[dict[str, str]]) -> list[dict[str,
         grouped[(normalize_duration(row.get("duration")), _status(row.get("status")))].append(row)
     output = []
     for (duration, status), group in sorted(grouped.items()):
-        schedules, ratios = [], []
+        schedules, ratios, installments = [], [], []
         for row in group:
             payment, months, principal = (
                 _decimal(row.get("payments")), _decimal(row.get("duration")),
@@ -145,6 +145,7 @@ def summarize_scheduled_repayments(rows: list[dict[str, str]]) -> list[dict[str,
             )
             if payment is not None and months is not None and payment >= 0 and months > 0:
                 schedules.append(payment * months)
+                installments.append(payment)
                 if principal is not None and principal > 0:
                     ratios.append((payment * months) / principal)
         def average(values: list[Decimal]) -> str:
@@ -154,15 +155,7 @@ def summarize_scheduled_repayments(rows: list[dict[str, str]]) -> list[dict[str,
             "duration_months": duration, "status": status,
             "loan_count": str(len(group)), "valid_schedule_rows": str(len(schedules)),
             "valid_ratio_rows": str(len(ratios)),
-            "average_monthly_installment": average([
-                value / _decimal(group[index].get("duration"))
-                for index, value in enumerate(schedules)
-            ]) if False else average([
-                payment for row in group
-                if (payment := _decimal(row.get("payments"))) is not None
-                and (months := _decimal(row.get("duration"))) is not None
-                and payment >= 0 and months > 0
-            ]),
+            "average_monthly_installment": average(installments),
             "average_scheduled_total": average(schedules),
             "average_scheduled_to_principal_ratio": average(ratios),
         })
