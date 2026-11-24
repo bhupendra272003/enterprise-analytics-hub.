@@ -71,6 +71,14 @@ export function evaluateSpreadsheetFormula(formula: string, rows: SpreadsheetRow
   if (!match) throw new Error("Supported formulas: SUM, AVERAGE, COUNT, COUNTA, MIN, MAX, SUMIF, COUNTIF and AVERAGEIF.");
   const name = match[1].toUpperCase(), args = splitArgs(match[2]);
   const range = (arg: string) => readRange(arg, rows, columns);
+  const scalar = (arg: string): unknown => {
+    const value = arg.trim();
+    if (/^".*"$/.test(value)) return value.slice(1, -1).replace(/""/g, '"');
+    if (/^(TRUE|FALSE)$/i.test(value)) return value.toUpperCase() === "TRUE";
+    if (/^-?\\d+(?:\\.\\d+)?$/.test(value)) return Number(value);
+    if (/^\\$?[A-Z]{1,3}\\$?\\d+$/i.test(value)) return range(value)[0] ?? "";
+    throw new Error("Use a quoted text, number, boolean or single cell reference for this argument.");
+  };
   if (["SUM","AVERAGE","COUNT","COUNTA","MIN","MAX"].includes(name)) {
     if (args.length !== 1) throw new Error(name + " expects one cell range.");
     const values = range(args[0]), nums = numeric(values);
@@ -92,6 +100,31 @@ export function evaluateSpreadsheetFormula(formula: string, rows: SpreadsheetRow
     const nums = numeric(selected);
     if (name === "SUMIF") return String(nums.reduce((a,b)=>a+b,0));
     return nums.length ? String(nums.reduce((a,b)=>a+b,0)/nums.length) : "0";
+  }
+  if (name === "IF") {
+    if (args.length !== 3) throw new Error("IF expects a condition, true value and false value.");
+    const condition = args[0].trim().match(/^(.*?)\\s*(>=|<=|<>|>|<|=)\\s*(.*?)$/);
+    let passed: boolean;
+    if (condition) passed = criterionMatches(scalar(condition[1]), condition[2] + String(scalar(condition[3])));
+    else { const value = scalar(args[0]); passed = value === true || (typeof value === "number" && value !== 0) || (typeof value === "string" && value.length > 0); }
+    return String(scalar(passed ? args[1] : args[2]) ?? "");
+  }
+  if (name === "CONCAT") return args.flatMap(arg => arg.includes(":") ? range(arg) : [scalar(arg)]).map(v => String(v ?? "")).join("");
+  if (["LEFT","RIGHT","LEN","TRIM"].includes(name)) {
+    if ((name === "LEN" || name === "TRIM") ? args.length !== 1 : args.length < 1 || args.length > 2) throw new Error(name + " has an invalid number of arguments.");
+    const value = String(scalar(args[0]) ?? "");
+    const count = args[1] ? Number(scalar(args[1])) : 1;
+    if (!Number.isInteger(count) || count < 0 || count > 10000) throw new Error("Text length must be a whole number from 0 to 10000.");
+    if (name === "LEN") return String(value.length);
+    if (name === "TRIM") return value.trim().replace(/\\s+/g, " ");
+    return name === "LEFT" ? value.slice(0, count) : count === 0 ? "" : value.slice(-count);
+  }
+  if (name === "ROUND") {
+    if (args.length < 1 || args.length > 2) throw new Error("ROUND expects a number and optional decimal places.");
+    const value = Number(scalar(args[0])), places = args[1] ? Number(scalar(args[1])) : 0;
+    if (!Number.isFinite(value) || !Number.isInteger(places) || Math.abs(places) > 10) throw new Error("ROUND requires a finite number and decimal places between -10 and 10.");
+    const factor = 10 ** places;
+    return String(Math.round((value + Number.EPSILON) * factor) / factor);
   }
   throw new Error("This formula is not supported yet.");
 }
