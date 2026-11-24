@@ -78,3 +78,6 @@ The project pack and browser-local review workflow are implemented in the reposi
 
 
 The offline validator also reconciles the three derived client-account bridge CSVs against every raw disposition row when all three source exports are present. It checks the distinct client/account coverage counts and the full source-row disposition-type counts; incomplete optional raw exports are reported as skipped rather than treated as a pass of live source integrity.
+
+
+When `output/source_tables/account.csv` is available, the offline builder also creates `loan_district_outcome_summary.csv`, grouping loan counts, distinct accounts, average amount, and share by district and observed status. Accounts with conflicting district assignments are isolated as `<AMBIGUOUS_ACCOUNT_DISTRICT>`; missing account mappings remain `<UNMAPPED>`. The validator reconciles the grouped output back to the loan extract and unique account-to-district mappings.
