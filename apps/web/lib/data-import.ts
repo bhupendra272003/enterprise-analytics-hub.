@@ -33,12 +33,13 @@ export async function normalizeTabularFile(file: File): Promise<File> {
   if (extension === "json") {
     let parsed: unknown;
     try { parsed = JSON.parse(source); } catch { throw new Error("The JSON file is invalid."); }
-    const records = Array.isArray(parsed) ? parsed : parsed && typeof parsed === "object" && Array.isArray((parsed as any).rows) ? (parsed as any).rows : null;
-    if (!records?.length || records.some((r: unknown) => !r || typeof r !== "object" || Array.isArray(r))) {
+    const candidate: unknown = Array.isArray(parsed) ? parsed : parsed && typeof parsed === "object" && Array.isArray((parsed as any).rows) ? (parsed as any).rows : null;
+    if (!Array.isArray(candidate) || !candidate.length || candidate.some((r: unknown) => !r || typeof r !== "object" || Array.isArray(r))) {
       throw new Error("JSON import expects an array of row objects, or an object containing a rows array.");
     }
-    columns = [...new Set(records.flatMap((r: Record<string, unknown>) => Object.keys(r)))];
-    rows = records.map((record: Record<string, unknown>) => columns.map(col => record[col]));
+    const records = candidate as Record<string, unknown>[];
+    columns = [...new Set(records.flatMap(record => Object.keys(record)))];
+    rows = records.map(record => columns.map(col => record[col]));
   } else {
     const parsed = parseTsv(source);
     if (parsed.length < 2) throw new Error("The TSV file must contain a header and at least one data row.");
