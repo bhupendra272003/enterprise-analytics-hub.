@@ -12,13 +12,14 @@ from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 
-from build_analytics import summarize_loans
+from build_analytics import summarize_loans, summarize_scheduled_repayments
 
 REQUIRED_FILES = (
     "source_profile.json", "data_quality_summary.csv", "missing_value_profile.csv",
     "relationship_integrity.csv", "loan_analysis_extract.csv",
     "loan_outcome_summary.csv", "loan_prior_features.csv",
     "loan_duration_outcome_summary.csv", "loan_vintage_outcome_summary.csv",
+    "loan_scheduled_repayment_summary.csv",
 )
 ALLOWED_STATUSES = {"A", "B", "C", "D"}
 
@@ -283,6 +284,7 @@ def validate_exports(directory: Path) -> dict:
         features = read_csv(directory / "loan_prior_features.csv")
         duration_summary = read_csv(directory / "loan_duration_outcome_summary.csv")
         vintage_summary = read_csv(directory / "loan_vintage_outcome_summary.csv")
+        repayment_summary = read_csv(directory / "loan_scheduled_repayment_summary.csv")
     except (OSError, json.JSONDecodeError, csv.Error) as exc:
         record("artifact_readability", False, str(exc))
         return report
@@ -413,6 +415,28 @@ def validate_exports(directory: Path) -> dict:
     reconcile_analytics_summary(
         "vintage_outcome_summary_reconciliation", "loan_month", vintage_summary
     )
+
+    expected_repayments = summarize_scheduled_repayments(loans)
+    repayment_columns = {
+        "duration_months", "status", "loan_count", "valid_schedule_rows",
+        "valid_ratio_rows", "average_monthly_installment",
+        "average_scheduled_total", "average_scheduled_to_principal_ratio",
+    }
+    expected_repayment_map = {
+        (row["duration_months"], row["status"]): {key: row[key] for key in repayment_columns}
+        for row in expected_repayments
+    }
+    actual_repayment_map = {}
+    for row in repayment_summary:
+        key = (row.get("duration_months", ""), row.get("status", ""))
+        if key in actual_repayment_map:
+            actual_repayment_map[key] = None
+        else:
+            actual_repayment_map[key] = {key_name: row.get(key_name, "") for key_name in repayment_columns}
+    record("scheduled_repayment_reconciliation",
+           actual_repayment_map == expected_repayment_map,
+           f"{len(repayment_summary)} scheduled repayment groups reconciled to {len(loans)} loan rows.")
+
 
     loan_id_set = set(nonblank_ids)
     feature_ids = [row.get("loan_id", "").strip() for row in features]
