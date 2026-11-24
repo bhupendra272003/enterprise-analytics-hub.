@@ -271,6 +271,7 @@ CREATE TABLE IF NOT EXISTS dataset_handoffs (
   output_version INT UNSIGNED NULL,
   handoff_note VARCHAR(1000) NULL,
   review_note VARCHAR(1000) NULL,
+  result_json JSON NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   KEY idx_handoffs_assignee_status (assigned_to,status,updated_at),
