@@ -173,15 +173,23 @@ class BuildAnalyticsTests(unittest.TestCase):
         ]
         result = summarize_scheduled_repayments(rows)
         a = next(row for row in result if row["status"] == "A")
-        b = next(row for row in result if row["status"] == "B")
+        b_valid_schedule = next(
+            row for row in result if row["status"] == "B" and row["duration_months"] == "10"
+        )
+        b_invalid_duration = next(
+            row for row in result if row["status"] == "B" and row["duration_months"] == "0"
+        )
         self.assertEqual(a["loan_count"], "2")
         self.assertEqual(a["valid_schedule_rows"], "2")
         self.assertEqual(a["average_monthly_installment"], "150.00")
         self.assertEqual(a["average_scheduled_total"], "1500.00")
         self.assertEqual(a["average_scheduled_to_principal_ratio"], "1.05")
-        self.assertEqual(b["loan_count"], "2")
-        self.assertEqual(b["valid_schedule_rows"], "0")
-        self.assertEqual(b["valid_ratio_rows"], "0")
+        self.assertEqual(b_valid_schedule["loan_count"], "1")
+        self.assertEqual(b_valid_schedule["valid_schedule_rows"], "1")
+        self.assertEqual(b_valid_schedule["valid_ratio_rows"], "0")
+        self.assertEqual(b_invalid_duration["loan_count"], "1")
+        self.assertEqual(b_invalid_duration["valid_schedule_rows"], "0")
+        self.assertEqual(b_invalid_duration["valid_ratio_rows"], "0")
 
 
 if __name__ == "__main__":
