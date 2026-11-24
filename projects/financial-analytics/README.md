@@ -75,3 +75,6 @@ Transaction types are retained as observed categories. Do not label them income/
 ## Important limitations
 
 The project pack and browser-local review workflow are implemented in the repository, but this does not mean the CTU MariaDB connection has been run from this automation or from Vyron. The user must run the profiler from a machine with database access and Python dependencies installed. The current Vyron page processes uploaded CSV/JSON locally in the browser; it does not send them to the server. Direct server-side MariaDB integration, secure credential storage, automated Power BI refresh and secure report embedding remain separate platform engineering work.
+
+
+The offline validator also reconciles the three derived client-account bridge CSVs against every raw disposition row when all three source exports are present. It checks the distinct client/account coverage counts and the full source-row disposition-type counts; incomplete optional raw exports are reported as skipped rather than treated as a pass of live source integrity.
