@@ -2,23 +2,17 @@ export type QueryRow = Record<string, string | number | null>;
 export function extractJoinDatasetToken(sql:string):string|null { return sql.match(/\bJOIN\s+dataset_([a-f0-9]{32})\b/i)?.[1]?.toLowerCase()||null; }
 type Condition = { column: string; operator: string; value?: string | number };
 const cleanIdentifier = (value: string) => value.replace(/^[`"\[]|[`"\]]$/g, "");
-const splitAnd = (value: string) => {
+const splitLogical = (value: string, operator: "AND" | "OR") => {
   const parts: string[] = [];
-  let start = 0, quote = "", i = 0;
-  while (i < value.length) {
-    const char = value[i];
-    if (quote) {
-      if (char === quote) {
-        if (value[i + 1] === quote) { i += 2; continue; }
-        quote = "";
-      }
-      i++;
-      continue;
-    }
-    if (char === "'" || char === '"') { quote = char; i++; continue; }
-    if (/^AND\b/i.test(value.slice(i)) && (i === 0 || /\s/.test(value[i - 1])) && (i + 3 === value.length || /\s/.test(value[i + 3]))) {
-      parts.push(value.slice(start, i).trim());
-      i += 3; start = i; continue;
+  let start=0,quote="",depth=0,i=0;
+  while(i<value.length){
+    const char=value[i];
+    if(quote){if(char===quote){if(value[i+1]===quote){i+=2;continue;}quote="";}i++;continue;}
+    if(char==="'"||char==='"'){quote=char;i++;continue;}
+    if(char==="("){depth++;i++;continue;}
+    if(char===")"){depth=Math.max(0,depth-1);i++;continue;}
+    if(depth===0&&value.slice(i,i+operator.length).toUpperCase()===operator&&(i===0||/\\s/.test(value[i-1]))&&(i+operator.length===value.length||/\\s/.test(value[i+operator.length]))){
+      parts.push(value.slice(start,i).trim());i+=operator.length;start=i;continue;
     }
     i++;
   }
@@ -98,13 +92,15 @@ export function runDatasetQuery(sql: string, sourceRows: QueryRow[], sourceColum
   const match = statement.match(/^SELECT\s+([\s\S]+?)\s+FROM\s+([\w-]+)(?:\s+WHERE\s+([\s\S]+?))?(?:\s+GROUP\s+BY\s+([\w."`\[\]-]+(?:\s*,\s*[\w."`\[\]-]+)*))?(?:\s+ORDER\s+BY\s+([\w."`\[\]-]+)(?:\s+(ASC|DESC))?)?(?:\s+LIMIT\s+(\d+))?$/i);
   if (!match) throw new Error("Use SELECT columns FROM data with optional WHERE, GROUP BY, ORDER BY and LIMIT clauses.");
   if (!["data","dataset","records"].includes(match[2].toLowerCase())) throw new Error("FROM must reference the selected dataset as data.");
-  const projections = parseProjection(match[1], sourceColumns);
-  const where = match[3] ? splitAnd(match[3]).map(v => parseCondition(v, sourceColumns)) : [];
+  const selectClause=match[1].trim(),distinct=/^DISTINCT\\b/i.test(selectClause);
+  const projections = parseProjection(distinct?selectClause.replace(/^DISTINCT\\s+/i,""):selectClause, sourceColumns);
+  if(distinct&&projections.some(p=>p.kind==="aggregate"))throw new Error("DISTINCT aggregate expressions are not supported; use a grouped query.");
+  const where = match[3] ? splitLogical(match[3],"OR").map(group=>splitLogical(group,"AND").map(v=>parseCondition(v, sourceColumns))) : [];
   const groupColumns = match[4] ? match[4].split(",").map(v=>cleanIdentifier(v.trim())) : [];
   if (groupColumns.some(c=>!sourceColumns.includes(c))) throw new Error("GROUP BY contains an unknown column.");
   const limit = match[7] ? Number(match[7]) : 100;
   if (!Number.isInteger(limit) || limit < 1 || limit > 500) throw new Error("LIMIT must be between 1 and 500.");
-  const filteredRows = sourceRows.filter(row => where.every(condition => compareCondition(row, condition)));
+  const filteredRows = sourceRows.filter(row => !where.length || where.some(group => group.every(condition => compareCondition(row, condition))));
   const matchedRows = filteredRows.length;
   const hasAggregates = projections.some(p => p.kind === "aggregate");
   if (groupColumns.length && !hasAggregates) throw new Error("GROUP BY requires at least one aggregate function.");
@@ -138,6 +134,10 @@ export function runDatasetQuery(sql: string, sourceRows: QueryRow[], sourceColum
   } else {
     resultColumns = projections.map(p => p.kind === "column" ? p.alias : "");
     result = filteredRows.map(row => Object.fromEntries(projections.filter(p=>p.kind==="column").map(p=>[p.alias,row[p.column]??""])));
+  }
+  if(distinct){
+    const seen=new Set<string>();
+    result=result.filter(row=>{const key=JSON.stringify(resultColumns.map(column=>row[column]??null));if(seen.has(key))return false;seen.add(key);return true;});
   }
   const orderBy = match[5] ? cleanIdentifier(match[5]) : "";
   if (orderBy) {
