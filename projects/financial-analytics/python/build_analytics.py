@@ -136,6 +136,7 @@ def build_analytics(directory: Path) -> dict:
     vintage_rows = summarize_loans(loans, "loan_month")
     account_activity = build_account_activity(directory)
     relationship_analysis = build_client_account_relationships(directory)
+    district_loan_analysis = build_district_loan_outcomes(directory, loans)
     directory.mkdir(parents=True, exist_ok=True)
     _write_csv(directory / "loan_duration_outcome_summary.csv", SUMMARY_COLUMNS, duration_rows)
     _write_csv(directory / "loan_vintage_outcome_summary.csv", VINTAGE_COLUMNS, vintage_rows)
@@ -151,6 +152,7 @@ def build_analytics(directory: Path) -> dict:
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
         "account_activity": account_activity,
         "client_account_relationships": relationship_analysis,
+        "district_loan_outcomes": district_loan_analysis,
         "descriptive_only": True,
     }
 
@@ -287,6 +289,74 @@ def build_client_account_relationships(directory: Path) -> dict:
         "outputs": ["source_tables/client_account_coverage.csv", "source_tables/account_client_coverage.csv", "source_tables/disposition_type_summary.csv"],
         "disposition_types_are_unclassified": True,
     }
+
+
+def build_district_loan_outcomes(directory: Path, loans: list[dict[str, str]]) -> dict:
+    """Summarize loan outcomes by account district without multiplying loan rows."""
+    account_path = directory / "source_tables" / "account.csv"
+    if not account_path.is_file():
+        return {"available": False, "reason": "source_tables/account.csv is required."}
+    with account_path.open("r", encoding="utf-8-sig", newline="") as handle:
+        reader = csv.DictReader(handle)
+        columns = set(reader.fieldnames or [])
+        if not {"account_id", "district_id"} <= columns:
+            raise ValueError("account.csv must contain account_id and district_id.")
+        accounts = list(reader)
+
+    district_values: dict[str, set[str]] = defaultdict(set)
+    for row in accounts:
+        account_id = row.get("account_id", "").strip()
+        if account_id:
+            district_values[account_id].add(row.get("district_id", "").strip() or "<MISSING>")
+    ambiguous_ids = {key for key, values in district_values.items() if len(values) > 1}
+    account_district = {
+        key: next(iter(values)) for key, values in district_values.items()
+        if len(values) == 1 and key not in ambiguous_ids
+    }
+
+    grouped: dict[tuple[str, str], list[dict[str, str]]] = defaultdict(list)
+    mapped_rows = 0
+    ambiguous_loan_rows = 0
+    for loan in loans:
+        account_id = loan.get("account_id", "").strip()
+        if account_id in ambiguous_ids:
+            district = "<AMBIGUOUS_ACCOUNT_DISTRICT>"
+            ambiguous_loan_rows += 1
+        elif account_id in account_district:
+            district = account_district[account_id]
+            mapped_rows += 1
+        else:
+            district = "<UNMAPPED>"
+        grouped[(district, _status(loan.get("status")))].append(loan)
+
+    total = len(loans)
+    output = []
+    for (district, status), rows in sorted(grouped.items()):
+        accounts_in_group = {row.get("account_id", "").strip() for row in rows}
+        accounts_in_group.discard("")
+        amounts = [value for value in (_decimal(row.get("amount")) for row in rows) if value is not None]
+        average = ((sum(amounts, Decimal("0")) / len(amounts)).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP) if amounts else None)
+        share = (Decimal(len(rows)) * Decimal("100") / Decimal(total)).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP) if total else Decimal("0.00")
+        output.append({
+            "district_id": district, "status": status, "loan_count": str(len(rows)),
+            "distinct_accounts": str(len(accounts_in_group)),
+            "average_loan_amount": format(average, "f") if average is not None else "",
+            "share_pct": format(share, "f"),
+        })
+    _write_csv(directory / "loan_district_outcome_summary.csv",
+               ("district_id", "status", "loan_count", "distinct_accounts", "average_loan_amount", "share_pct"),
+               output)
+    return {
+        "available": True, "loan_rows": total, "mapped_loan_rows": mapped_rows,
+        "unmapped_loan_rows": total - mapped_rows - ambiguous_loan_rows,
+        "ambiguous_account_district_loan_rows": ambiguous_loan_rows,
+        "duplicate_account_ids": sum(1 for key in district_values if len(district_values[key]) > 1),
+        "district_status_groups": len(output),
+        "outputs": ["loan_district_outcome_summary.csv"],
+    }
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
