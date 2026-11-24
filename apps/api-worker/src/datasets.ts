@@ -49,8 +49,8 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
   const orgId=orgList[1],m=await membership(env,orgId,user.id);if(!m)return json({error:"Insufficient organization permissions."},403);
   let sql="SELECT d.id,d.name,d.original_filename AS originalFilename,d.file_size AS fileSize,d.row_count AS rowCount,d.column_count AS columnCount,d.created_at AS createdAt,u.full_name AS uploadedBy FROM datasets d JOIN users u ON u.id=d.uploaded_by WHERE d.organization_id=?";
   const params:unknown[]=[orgId];
-  if(m.role==="ANALYST"){sql+=" AND EXISTS (SELECT 1 FROM dataset_handoffs h WHERE h.dataset_id=d.id AND h.assigned_to=?)";params.push(user.id);}
-  else if(m.role==="LEADER"){sql+=" AND EXISTS (SELECT 1 FROM dataset_handoffs h JOIN team_members tm ON tm.user_id=h.assigned_to JOIN teams t ON t.id=tm.team_id WHERE h.dataset_id=d.id AND t.organization_id=d.organization_id AND t.leader_user_id=?)";params.push(user.id);}
+  if(m.role==="ANALYST"){sql+=" AND EXISTS (SELECT 1 FROM dataset_handoffs h WHERE h.dataset_id=d.id AND h.assigned_to=? AND h.status<>'REVOKED')";params.push(user.id);}
+  else if(m.role==="LEADER"){sql+=" AND EXISTS (SELECT 1 FROM dataset_handoffs h JOIN team_members tm ON tm.user_id=h.assigned_to JOIN teams t ON t.id=tm.team_id WHERE h.dataset_id=d.id AND h.status<>'REVOKED' AND t.organization_id=d.organization_id AND t.leader_user_id=?)";params.push(user.id);}
   sql+=" ORDER BY d.created_at DESC";
   const {results}=await env.DB.prepare(sql).bind(...params).all();
   return json({datasets:results});
@@ -83,10 +83,10 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
  if(!dataset)return json({error:"Dataset not found."},404);
  const m=await membership(env,dataset.organization_id,user.id);if(!m)return json({error:"Insufficient organization permissions."},403);
  if(m.role==="ANALYST"){
-  const grant=await env.DB.prepare("SELECT id FROM dataset_handoffs WHERE dataset_id=? AND assigned_to=? LIMIT 1").bind(datasetId,user.id).first();
+  const grant=await env.DB.prepare("SELECT id FROM dataset_handoffs WHERE dataset_id=? AND assigned_to=? AND status<>'REVOKED' LIMIT 1").bind(datasetId,user.id).first();
   if(!grant)return json({error:"This dataset has not been assigned to you. Ask the Owner or your Team Leader for access."},403);
  }else if(m.role==="LEADER"){
-  const grant=await env.DB.prepare("SELECT h.id FROM dataset_handoffs h JOIN team_members tm ON tm.user_id=h.assigned_to JOIN teams t ON t.id=tm.team_id WHERE h.dataset_id=? AND t.organization_id=? AND t.leader_user_id=? LIMIT 1").bind(datasetId,dataset.organization_id,user.id).first();
+  const grant=await env.DB.prepare("SELECT h.id FROM dataset_handoffs h JOIN team_members tm ON tm.user_id=h.assigned_to JOIN teams t ON t.id=tm.team_id WHERE h.dataset_id=? AND h.status<>'REVOKED' AND t.organization_id=? AND t.leader_user_id=? LIMIT 1").bind(datasetId,dataset.organization_id,user.id).first();
   if(!grant)return json({error:"This dataset is outside your assigned team scope."},403);
  }
  if(["clean","profile","validate","anomalies","quality-dashboard","compare","insights","query"].includes(sub)&&Number(dataset.file_size)>MAX_SYNC_CSV_BYTES)return syncLimitError();
@@ -329,11 +329,11 @@ if(sub==="clean"&&req.method==="POST"){
   const params:unknown[]=[datasetId,user.id];
   if(m.role==="OWNER"||m.role==="MANAGER"){scope="1=1";params.splice(1,1);}
   else if(m.role==="LEADER"){scope="EXISTS (SELECT 1 FROM team_members tm JOIN teams t ON t.id=tm.team_id WHERE t.organization_id=h.organization_id AND t.leader_user_id=? AND tm.user_id=h.assigned_to)";}
-  else if(m.role==="ANALYST")scope="(h.assigned_to=? OR (h.status='APPROVED' AND h.stage IN ('SQL_REVIEW','RECONCILIATION')))";
+  else if(m.role==="ANALYST")scope="(h.status<>'REVOKED' AND (h.assigned_to=? OR (h.status='APPROVED' AND h.stage IN ('SQL_REVIEW','RECONCILIATION'))))";
   else return json({error:"Insufficient permissions."},403);
   const sql="SELECT h.id,h.stage,h.status,h.assigned_to AS assignedTo,h.assigned_by AS assignedBy,h.input_version AS inputVersion,h.output_version AS outputVersion,h.handoff_note AS handoffNote,h.review_note AS reviewNote,h.result_json AS resultJson,h.created_at AS createdAt,h.updated_at AS updatedAt,u.full_name AS assigneeName,a.full_name AS assignedByName FROM dataset_handoffs h JOIN users u ON u.id=h.assigned_to JOIN users a ON a.id=h.assigned_by WHERE h.dataset_id=? AND "+scope+" ORDER BY h.created_at DESC";
   const {results}=await env.DB.prepare(sql).bind(...params).all<any>();
-  return json({handoffs:results.map((h:any)=>({...h,result:h.resultJson?JSON.parse(String(h.resultJson)):null,canUpdate:h.assignedTo===user.id,canReview:m.role==="OWNER"||m.role==="LEADER"}))});
+  return json({handoffs:results.map((h:any)=>({...h,result:h.resultJson?JSON.parse(String(h.resultJson)):null,canUpdate:h.assignedTo===user.id,canReview:m.role==="OWNER"||m.role==="LEADER",canRevoke:m.role==="OWNER"||m.role==="LEADER"}))});
  }
  if(sub==="handoffs"&&req.method==="POST"){
   if(m.role!=="OWNER"&&m.role!=="LEADER")return json({error:"Only the Owner or the assigned Team Leader can create handoffs."},403);
@@ -361,10 +361,17 @@ if(sub==="clean"&&req.method==="POST"){
   const status=String(body.status||""),outputVersion=Number(body.outputVersion||0),reviewNote=typeof body.reviewNote==="string"?body.reviewNote.trim():"";
   let resultJson:string|null=null;
   if(body.result!==undefined){if(!body.result||typeof body.result!=="object"||Array.isArray(body.result))return json({error:"The shared result must be a JSON object."},400);resultJson=JSON.stringify(body.result);if(resultJson.length>50000)return json({error:"Shared query results are limited to 50 KB. Reduce rows or columns."},413);const columns=body.result.columns,rows=body.result.rows;if(!Array.isArray(columns)||columns.length>50||!Array.isArray(rows)||rows.length>100||columns.some((v:any)=>typeof v!=="string"||v.length>200))return json({error:"Shared results may contain up to 50 columns and 100 rows."},400);}
-  if(!["IN_PROGRESS","SUBMITTED","APPROVED","RETURNED"].includes(status)||reviewNote.length>1000)return json({error:"Choose a valid status and review note."},400);
+  if(!["IN_PROGRESS","SUBMITTED","APPROVED","RETURNED","REVOKED"].includes(status)||reviewNote.length>1000)return json({error:"Choose a valid status and review note."},400);
   const handoff=await env.DB.prepare("SELECT * FROM dataset_handoffs WHERE id=? AND dataset_id=?").bind(handoffMatch[1],datasetId).first<any>();
   if(!handoff)return json({error:"Handoff not found."},404);
-  if(status==="IN_PROGRESS"||status==="SUBMITTED"){
+  if(status==="REVOKED"){
+   let canRevoke=m.role==="OWNER";
+   if(m.role==="LEADER"){
+    const team=await env.DB.prepare("SELECT t.id FROM teams t JOIN team_members tm ON tm.team_id=t.id WHERE t.organization_id=? AND t.leader_user_id=? AND tm.user_id=? LIMIT 1").bind(dataset.organization_id,user.id,handoff.assigned_to).first();
+    canRevoke=!!team;
+   }
+   if(!canRevoke||handoff.status==="REVOKED")return json({error:"Only the Owner or the assigned Team Leader can revoke this handoff."},403);
+  }else if(status==="IN_PROGRESS"||status==="SUBMITTED"){
    if(handoff.assigned_to!==user.id||!["ASSIGNED","IN_PROGRESS","RETURNED"].includes(handoff.status))return json({error:"Only the assigned Analyst can start or submit this handoff."},403);
    if(status==="SUBMITTED"){
     if((handoff.stage==="SQL_REVIEW"||handoff.stage==="RECONCILIATION")&&!resultJson)return json({error:"Attach the internal SQL/QA result JSON before submitting this stage."},400);
