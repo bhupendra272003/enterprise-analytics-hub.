@@ -324,6 +324,42 @@ if(sub==="clean"&&req.method==="POST"){
   const totalRows=rows.length,totalPages=Math.max(1,Math.ceil(totalRows/pageSize)),safePage=Math.min(page,totalPages),start=(safePage-1)*pageSize;
   return json({datasetId:datasetId,page:safePage,pageSize,totalRows,totalPages,columns:parsed.columns,rows:rows.slice(start,start+pageSize)});
  }
+ if(sub==="results"&&req.method==="POST"){
+  if(!allowed(m.role))return json({error:"Only OWNER, LEADER and assigned ANALYST roles can save internal result datasets."},403);
+  let body:any;try{body=await req.json();}catch{return json({error:"Send result dataset details."},400);}
+  const name=typeof body.name==="string"?body.name.trim():"";
+  const columns=Array.isArray(body.columns)?body.columns:[];
+  const rows=Array.isArray(body.rows)?body.rows:[];
+  const sourceHandoffId=typeof body.sourceHandoffId==="string"?body.sourceHandoffId:"";
+  const note=typeof body.changeNote==="string"?body.changeNote.trim():"Saved from an internal Vyron analysis";
+  if(name.length<2||name.length>120||!columns.length||columns.length>200||columns.some((c:any)=>typeof c!=="string"||!c.trim()||c.length>200)||new Set(columns).size!==columns.length)return json({error:"Give the result a name and 1–200 unique valid columns."},400);
+  if(!rows.length||rows.length>100000||rows.some((row:any)=>!row||typeof row!=="object"||Array.isArray(row)))return json({error:"Internal result datasets must contain 1–100,000 rows."},400);
+  if(rows.some((row:any)=>columns.some((column:string)=>row[column]!==undefined&&row[column]!==null&&typeof row[column]==="object")))return json({error:"Nested result values are not supported in CSV datasets."},400);
+  let assignedBy=user.id,stage:"CLEANING"|"SQL_REVIEW"|"DASHBOARD"|"RECONCILIATION"="RECONCILIATION",handoffNote="Internal result created by "+user.id;
+  if(sourceHandoffId){
+   const sourceHandoff=await env.DB.prepare("SELECT id,assigned_to,assigned_by,stage,status FROM dataset_handoffs WHERE id=? AND dataset_id=?").bind(sourceHandoffId,datasetId).first<any>();
+   if(!sourceHandoff||sourceHandoff.assigned_to!==user.id||!["IN_PROGRESS","RETURNED","ASSIGNED"].includes(sourceHandoff.status))return json({error:"The selected work handoff is not assigned to you or is no longer editable."},403);
+   assignedBy=sourceHandoff.assigned_by;stage=sourceHandoff.stage;handoffNote="Internal output from "+dataset.name+" · "+note;
+  }
+  const normalizedRows=rows.map((row:any)=>Object.fromEntries(columns.map((column:string)=>[column,String(row[column]??"")])));
+  const csv=csvEncode(normalizedRows,columns),bytes=new TextEncoder().encode(csv);
+  if(bytes.byteLength>MAX_UPLOAD_CSV_BYTES)return json({error:"This internal result is larger than the current 10 MiB workspace storage limit."},413);
+  let parsed:any;try{parsed=parseCsv(bytes.buffer,MAX_UPLOAD_CSV_BYTES);}catch{return json({error:"The result could not be converted into a valid internal CSV dataset."},400);}
+  const resultId=crypto.randomUUID(),key=dataset.organization_id+"/"+resultId+"/v1.csv";
+  const preview=parsed.preview;
+  const fileName=name.replace(/[^a-z0-9-_]+/gi,"_").slice(0,180)+".csv";
+  await env.DATASETS.put(key,bytes);
+  try{
+   const statements=[
+    env.DB.prepare("INSERT INTO datasets (id,organization_id,name,original_filename,storage_path,file_size,row_count,column_count,columns_json,preview_json,uploaded_by) VALUES (?,?,?,?,?,?,?,?,?,?,?)").bind(resultId,dataset.organization_id,name,fileName,key,bytes.byteLength,parsed.records.length,parsed.columns.length,JSON.stringify(parsed.columns),JSON.stringify(preview),user.id),
+    env.DB.prepare("INSERT INTO dataset_versions (id,dataset_id,version_number,storage_path,file_size,row_count,column_count,columns_json,preview_json,uploaded_by,change_note) VALUES (?,?,1,?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(),resultId,key,bytes.byteLength,parsed.records.length,parsed.columns.length,JSON.stringify(parsed.columns),JSON.stringify(preview),user.id,note.slice(0,500))
+   ];
+   if(m.role==="ANALYST")statements.push(env.DB.prepare("INSERT INTO dataset_handoffs (id,organization_id,dataset_id,stage,status,assigned_to,assigned_by,input_version,handoff_note,result_json) VALUES (?,?,?,?,'SUBMITTED',?,?,1,?,?)").bind(crypto.randomUUID(),dataset.organization_id,resultId,stage,user.id,assignedBy,handoffNote.slice(0,1000),JSON.stringify({sourceDatasetId:datasetId,sourceHandoffId:sourceHandoffId||null,internalResult:true})));
+   await env.DB.batch(statements);
+  }catch(error){await env.DATASETS.delete(key);return json({error:"Internal result dataset could not be registered. No downloadable file was created."},500);}
+  await audit(env,dataset.organization_id,user.id,"DATASET_INTERNAL_RESULT_SAVED",resultId,{sourceDatasetId:datasetId,sourceHandoffId:sourceHandoffId||null,rowCount:parsed.records.length,columnCount:parsed.columns.length,storage:"private-workspace"});
+  return json({dataset:{id:resultId,name,originalFilename:fileName,rowCount:parsed.records.length,columnCount:parsed.columns.length,columns:parsed.columns,preview,storage:"private-workspace",handoffStatus:sourceHandoffId?"SUBMITTED":"INTERNAL"}},201);
+ }
  if(sub==="handoffs"&&req.method==="GET"){
   let scope="h.assigned_to=?";
   const params:unknown[]=[datasetId,user.id];
