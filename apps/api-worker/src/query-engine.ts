@@ -61,11 +61,13 @@ function parseProjection(source: string, columns: string[]) {
   return source.split(",").map(part => {
     const item = part.trim();
     if (item === "*") return { kind: "all" as const };
-    const agg = item.match(/^(COUNT|SUM|AVG|MIN|MAX)\s*\(\s*(\*|[\w."`\[\]-]+)\s*\)(?:\s+AS\s+([\w-]+))?$/i);
+    const agg = item.match(/^(COUNT|SUM|AVG|MIN|MAX)\s*\(\s*(DISTINCT\s+)?(\*|[\w."`\[\]-]+)\s*\)(?:\s+AS\s+([\w-]+))?$/i);
     if (agg) {
-      const fn = agg[1].toUpperCase(), column = cleanIdentifier(agg[2]);
+      const fn = agg[1].toUpperCase(), distinct = !!agg[2], column = cleanIdentifier(agg[3]);
+      if (distinct && (fn !== "COUNT" || column === "*")) throw new Error("DISTINCT is supported only with COUNT(column).");
       if (column !== "*" && !columns.includes(column)) throw new Error("Unknown column: " + column);
-      return { kind: "aggregate" as const, fn, column, alias: agg[3] || (fn.toLowerCase() + (column === "*" ? "" : "_" + column)) };
+      const defaultAlias = fn.toLowerCase() + (distinct ? "_distinct_" : (column === "*" ? "" : "_")) + (column === "*" ? "" : column);
+      return { kind: "aggregate" as const, fn, column, distinct, alias: agg[4] || defaultAlias };
     }
     const col = item.match(/^([\w."`\[\]-]+)(?:\s+AS\s+([\w-]+))?$/i);
     if (!col) throw new Error("Unsupported SELECT expression: " + item);
@@ -80,14 +82,15 @@ function parseHavingCondition(source: string, projections: ReturnType<typeof par
   const expression = match[1].trim().replace(/\s+/g, "").toLowerCase();
   const projection = projections.find(p => p.kind === "aggregate" && (
     p.alias.toLowerCase() === expression ||
-    (p.fn + "(" + p.column + ")").toLowerCase() === expression
+    ((p.fn + "(" + (p.distinct ? "distinct " : "") + p.column + ")").replace(/\\s+/g, "").toLowerCase() === expression)
   ));
   if (!projection || projection.kind !== "aggregate") throw new Error("HAVING must reference an aggregate expression or its SELECT alias.");
   const value = match[3] !== undefined ? match[3].replace(/''/g, "'") : match[4] !== undefined ? match[4].slice(1,-1).replace(/""/g,'"') : Number(match[5]);
   return { column: projection.alias, operator: match[2], value };
 }
-function aggregateValue(fn: string, column: string, rows: QueryRow[]) {
-  const values = column === "*" ? rows.map(() => 1) : rows.map(row => row[column]).filter(v => v !== "" && v !== null && v !== undefined);
+function aggregateValue(fn: string, column: string, rows: QueryRow[], distinct=false) {
+  let values = column === "*" ? rows.map(() => 1) : rows.map(row => row[column]).filter(v => v !== "" && v !== null && v !== undefined);
+  if (distinct) values = [...new Map(values.map(value => [String(value), value])).values()];
   const nums = values.map(Number).filter(Number.isFinite);
   if (fn === "COUNT") return values.length;
   if (fn === "SUM") return nums.reduce((a,b)=>a+b,0);
@@ -132,14 +135,14 @@ export function runDatasetQuery(sql: string, sourceRows: QueryRow[], sourceColum
       const output: QueryRow = {};
       for (const p of projections) {
         if (p.kind === "column") output[p.alias] = group[0][p.column] ?? "";
-        else if (p.kind === "aggregate") output[p.alias] = aggregateValue(p.fn,p.column,group);
+        else if (p.kind === "aggregate") output[p.alias] = aggregateValue(p.fn,p.column,group,p.distinct);
       }
       return output;
     });
     resultColumns = projections.filter(p=>p.kind!=="all").map(p=>p.kind==="column"?p.alias:p.alias);
   } else if (hasAggregates) {
     const aggregate: QueryRow = {};
-    for (const p of projections) if (p.kind === "aggregate") aggregate[p.alias] = aggregateValue(p.fn,p.column,filteredRows);
+    for (const p of projections) if (p.kind === "aggregate") aggregate[p.alias] = aggregateValue(p.fn,p.column,filteredRows,p.distinct);
     result = [aggregate]; resultColumns = projections.map(p=>p.kind==="aggregate"?p.alias:"");
   } else if (projections.some(p => p.kind === "all")) {
     resultColumns = sourceColumns;
