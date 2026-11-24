@@ -2,7 +2,7 @@
 
 ## Current deployment boundary
 
-The production application is a Cloudflare Workers application. The API Worker uses Cloudflare D1 for metadata and Cloudflare KV for private dataset objects. It does not run a persistent MySQL server, a native VS Code desktop process, or a general-purpose Python process. A browser page cannot install desktop applications into a user's device or into a Cloudflare Worker.
+The production application is a Cloudflare Workers application. The API Worker uses Cloudflare D1 for metadata and Cloudflare KV for private dataset bytes; KV is not a dedicated object-storage vault. It does not run a persistent MySQL server, a native VS Code desktop process, or a general-purpose Python process. A browser page cannot install desktop applications into a user's device or into a Cloudflare Worker.
 
 ## Implemented in-app workflow
 
@@ -13,7 +13,7 @@ The production application is a Cloudflare Workers application. The API Worker u
 - Assigned analysts can start work and submit a saved version. SQL and reconciliation stages can submit a bounded JSON result (up to 50 columns, 100 rows and 50 KB).
 - Owners and the assigned Team Leader can approve or return submissions. Approved SQL/QA results are visible to other analysts who have been assigned the same dataset.
 - Assignment, submission, review and denied export attempts are written to the organization audit log.
-- Full source CSV download is Owner-only. Analytics result exports, chart-data exports, BI report JSON and print/PDF controls are Owner-only in the UI.
+- Device downloads are disabled for every organization role by the Worker download endpoint. SQL results, chart data, BI report JSON and quality reports can be stored as private internal datasets and handed off inside Vyron.
 - SQL Studio runs a restricted, read-only SELECT query engine against stored datasets and supports bounded filters, aggregates, grouping, ordering and tenant-scoped two-dataset joins. It is not a MySQL server or a complete MySQL dialect.
 - BI Studio provides native in-app summaries and charting without sending the source file to Power BI Service.
 
@@ -25,7 +25,7 @@ For genuine MySQL compatibility, provision a separate analytics MySQL instance/s
 
 ### Python
 
-The previous browser Pyodide/CDN execution path has been disabled. It fetched source data into the browser and depended on a third-party runtime download. The replacement must be a private, isolated Python execution service with no public file URLs, no outbound network, per-job CPU/memory/time/output limits, ephemeral storage, tenant-scoped inputs, and results written back to Vyron's private storage. Cloudflare Workers cannot safely spawn a local Python process. This service still needs to be provisioned and connected; until then Python code is retained in the editor but execution remains disabled.
+The previous browser Pyodide/CDN execution path has been disabled. It fetched source data into the browser and depended on a third-party runtime download. The required future replacement is a private, isolated Python execution service with no public file URLs, no outbound network, per-job CPU/memory/time/output limits, ephemeral storage, tenant-scoped inputs, and results written back to Vyron's private storage. Cloudflare Workers cannot safely spawn a local Python process. This service still needs to be provisioned and connected; until then Python code is retained in the editor but execution remains disabled.
 
 ### VS Code-like editor
 
