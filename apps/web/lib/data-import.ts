@@ -1,6 +1,6 @@
 function csvCell(value: unknown): string {
   const text = value === null || value === undefined ? "" : typeof value === "object" ? JSON.stringify(value) : String(value);
-  return /[",\r\n]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
+  return /[",\t\r\n]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
 }
 
 function parseTsv(source: string): string[][] {
