@@ -71,6 +71,29 @@ jobs:
           url=$(grep -Eo 'https://[A-Za-z0-9.-]+[.]workers[.]dev' deploy.log | tail -n1)
           test -n "$url" || { echo "::error::Could not detect the API workers.dev URL"; exit 1; }
           echo "url=$url" >> "$GITHUB_OUTPUT"
+      - name: Smoke-test deployed frontend and API
+        env:
+          FRONTEND_URL: ${{ steps.frontend.outputs.url }}
+          API_URL: ${{ steps.api.outputs.url }}
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 12); do
+            if curl --fail --silent --show-error "$API_URL/health" -o api-health.json; then break; fi
+            if [ "$attempt" -eq 12 ]; then echo "::error::API health check failed after deployment"; exit 1; fi
+            sleep 5
+          done
+          python - <<'PY'
+          import json
+          payload = json.load(open("api-health.json"))
+          assert payload.get("status") == "ok", f"Unexpected API health response: {payload}"
+          print("API health check passed:", payload.get("service"))
+          PY
+          for attempt in $(seq 1 12); do
+            if curl --fail --silent --show-error "$FRONTEND_URL/" -o /dev/null; then break; fi
+            if [ "$attempt" -eq 12 ]; then echo "::error::Frontend smoke check failed after deployment"; exit 1; fi
+            sleep 5
+          done
+          echo "Frontend root route returned HTTP success."
       - name: Publish deployment URLs
         env:
           FRONTEND_URL: ${{ steps.frontend.outputs.url }}
