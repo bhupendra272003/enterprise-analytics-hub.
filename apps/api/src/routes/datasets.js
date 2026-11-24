@@ -529,7 +529,7 @@ router.get('/datasets/:datasetId/handoffs', async (req,res,next) => {
     } else if (role !== 'ANALYST') return res.status(403).json({error:'Insufficient permissions.'});
     const sql = 'SELECT h.id,h.stage,h.status,h.assigned_to AS assignedTo,h.assigned_by AS assignedBy,h.input_version AS inputVersion,h.output_version AS outputVersion,h.handoff_note AS handoffNote,h.review_note AS reviewNote,h.created_at AS createdAt,h.updated_at AS updatedAt,u.full_name AS assigneeName,a.full_name AS assignedByName FROM dataset_handoffs h JOIN users u ON u.id=h.assigned_to JOIN users a ON a.id=h.assigned_by WHERE h.dataset_id=? AND ' + scope + ' ORDER BY h.created_at DESC';
     const [handoffs] = await pool.execute(sql,params);
-    res.json({handoffs});
+    res.json({handoffs:handoffs.map(handoff=>({...handoff,canUpdate:handoff.assignedTo===req.user.id,canReview:['OWNER','MANAGER'].includes(role)||role==='LEADER'}))});
   } catch(e) { next(e); }
 });
 
