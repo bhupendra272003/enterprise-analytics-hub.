@@ -55,7 +55,7 @@ Finally, run python python/validate_exports.py. The standard-library validator c
 
 1. **Loan outcomes** — loan count and share by status, loan amount and duration distributions, duration-by-status comparisons, and monthly loan-vintage trends. The grouped summary files are descriptive views, not model features. Clearly distinguish finished target classes A/B from unfinished C/D outcomes.
 2. **Borrower and district profile** — demographic and district attributes after checking the source data dictionary and privacy implications.
-3. **Account activity** — transaction counts and amounts by observed transaction type. Do not label transaction types as income/expense until their meanings are confirmed.
+3. **Account activity** — use `source_tables/account_transaction_activity.csv` for transaction counts and amount summaries by account and observed transaction type. Do not label transaction types as income/expense until their meanings are confirmed. Use `source_tables/district_account_summary.csv` for district-level account coverage where available.
 4. **Data quality** — missing values, duplicate-key exceptions, orphan references, loan grain audit and transaction date-boundary checks.
 5. **Pre-loan activity** — transaction counts, amount and balance aggregates by loan and observed transaction type. Keep the target label out of this table.
 
