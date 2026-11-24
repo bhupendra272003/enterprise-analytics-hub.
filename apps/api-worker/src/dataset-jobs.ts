@@ -1,4 +1,5 @@
 import { extractJoinDatasetToken, runDatasetJoinQuery, runDatasetQuery } from "./query-engine";
+import { aggregateCategoryRows, type ChartAggregation } from "./bi-aggregation";
 import { canAnalyzeDataset, canCancelDatasetJob } from "./role-policy";
 type Role="OWNER"|"MANAGER"|"LEADER"|"ANALYST";
 type Msg={jobId:string};
@@ -27,7 +28,7 @@ export async function handleDatasetJobs(req:Request,env:Env,path:string):Promise
   let body:any={};try{body=await req.json();}catch{return json({error:"Invalid job request."},400);}
   if(body.type!=="PROFILE"&&body.type!=="SQL")return json({error:"Supported background job types are PROFILE and SQL."},400);
   let jobType:"PROFILE"|"SQL"=body.type;
-  let payload:{analysis?:{categoryColumn:string;measureColumn:string;filter:string};sql?:string;joinDatasetId?:string}={};
+  let payload:{analysis?:{categoryColumn:string;measureColumn:string;filter:string;aggregation:ChartAggregation};sql?:string;joinDatasetId?:string}={};
   if(jobType==="SQL"){
    if(typeof body.sql!=="string"||!body.sql.trim()||body.sql.length>12000)return json({error:"SQL query must be a string up to 12,000 characters."},400);
    const joinToken=extractJoinDatasetToken(body.sql);
@@ -48,8 +49,10 @@ export async function handleDatasetJobs(req:Request,env:Env,path:string):Promise
    const categoryColumn=typeof body.analysis.categoryColumn==="string"?body.analysis.categoryColumn:"";
    const measureColumn=typeof body.analysis.measureColumn==="string"?body.analysis.measureColumn:"";
    const filter=typeof body.analysis.filter==="string"?body.analysis.filter.trim():"";
+   const aggregation=typeof body.analysis.aggregation==="string"?body.analysis.aggregation.toUpperCase() as ChartAggregation:"SUM";
+   if(!["SUM","AVG","COUNT","MIN","MAX"].includes(aggregation))return json({error:"Aggregation must be SUM, AVG, COUNT, MIN or MAX."},400);
    if(!columns.includes(categoryColumn)||!columns.includes(measureColumn)||filter.length>120)return json({error:"Choose valid analysis columns and a filter up to 120 characters."},400);
-   payload={analysis:{categoryColumn,measureColumn,filter}};
+   payload={analysis:{categoryColumn,measureColumn,filter,aggregation}};
   }
   const id=crypto.randomUUID();
   await env.DB.prepare("INSERT INTO dataset_jobs (id,organization_id,dataset_id,requested_by,job_type,status,progress,stage,payload_json,max_attempts) VALUES (?,?,?,?,?,'QUEUED',0,'QUEUED',?,3)").bind(id,ds.organization_id,ds.id,user.id,jobType,JSON.stringify(payload)).run();
@@ -126,15 +129,13 @@ async function runProfile(msg:Msg,env:Env){
   for(const item of profile)missingCells+=item.missing;
   for(const row of rows){const key=JSON.stringify(columns.map(column=>String(row[column]??"")));if(seen.has(key))duplicateRows++;else seen.add(key);}
   const numericStats=profile.filter(item=>item.type==="NUMERIC").map((item:any)=>({column:item.name,count:Number(item.count||0),sum:Number(item.sum||0),mean:Number(item.mean||0),min:Number(item.min||0),max:Number(item.max||0)}));
-  const payload=JSON.parse(job.payload_json||"{}"),analysis=payload.analysis||{},categoryColumn=columns.includes(analysis.categoryColumn)?analysis.categoryColumn:"",measureColumn=columns.includes(analysis.measureColumn)?analysis.measureColumn:"",filter=typeof analysis.filter==="string"?analysis.filter.trim().toLocaleLowerCase():"";
-  const groups=new Map<string,number>();
-  if(categoryColumn&&measureColumn){for(const row of rows){const label=String(row[categoryColumn]??"").trim()||"(blank)";if(filter&&!label.toLocaleLowerCase().includes(filter))continue;const raw=String(row[measureColumn]??"").trim(),value=Number(raw);if(!raw||!Number.isFinite(value))continue;groups.set(label,(groups.get(label)||0)+value);}}
-  const chartRows=[...groups.entries()].sort((a,b)=>b[1]-a[1]).slice(0,20).map(([label,value])=>({label,value:Number(value.toFixed(3))}));
+  const payload=JSON.parse(job.payload_json||"{}"),analysis=payload.analysis||{},categoryColumn=columns.includes(analysis.categoryColumn)?analysis.categoryColumn:"",measureColumn=columns.includes(analysis.measureColumn)?analysis.measureColumn:"",filter=typeof analysis.filter==="string"?analysis.filter.trim().toLocaleLowerCase():"",aggregation=(["SUM","AVG","COUNT","MIN","MAX"].includes(analysis.aggregation)?analysis.aggregation:"SUM") as ChartAggregation;
+  const {chartRows}=categoryColumn&&measureColumn?aggregateCategoryRows(rows,categoryColumn,measureColumn,filter,aggregation):{chartRows:[]};
   const summary={rowCount:rows.length,columnCount:columns.length,missingCells,duplicateRows,numericColumns:numericStats.length};
   const insights=[rows.length.toLocaleString()+" records analysed across the full dataset",missingCells.toLocaleString()+" missing cells",duplicateRows.toLocaleString()+" duplicate rows detected",numericStats.length+" numeric columns detected"];
   if(numericStats.length){const top=numericStats.slice().sort((a,b)=>b.sum-a.sum)[0];insights.push(top.column+" has the largest numeric total ("+top.sum.toLocaleString()+")");}
-  if(chartRows.length)insights.push("Top category by "+measureColumn+": "+chartRows[0].label+" ("+chartRows[0].value.toLocaleString()+")");
-  const result={datasetId:job.dataset_id,name:ds.name,rowCount:rows.length,columnCount:columns.length,columns:profile,summary,numericStats,chartRows,insights,scope:"FULL_DATASET"};
+  if(chartRows.length)insights.push("Top category by "+aggregation+" of "+measureColumn+": "+chartRows[0].label+" ("+chartRows[0].value.toLocaleString()+")");
+  const result={datasetId:job.dataset_id,name:ds.name,rowCount:rows.length,columnCount:columns.length,columns:profile,summary,numericStats,chartRows,insights,aggregation,scope:"FULL_DATASET"};
   await env.DB.prepare("UPDATE dataset_jobs SET status='COMPLETED',progress=100,stage='COMPLETED',result_json=?,completed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP,error_code=NULL,error_message=NULL WHERE id=? AND status='RUNNING'").bind(JSON.stringify(result),job.id).run();
   await env.DB.prepare("INSERT INTO notifications (id,user_id,organization_id,type,title,message,href) VALUES (?,?,?,'DATASET_JOB','Dataset profiling completed',?,?)").bind(crypto.randomUUID(),job.requested_by,job.organization_id,"Profiling for "+ds.name+" is ready.","/workspace/data").run();
  }catch(e){
