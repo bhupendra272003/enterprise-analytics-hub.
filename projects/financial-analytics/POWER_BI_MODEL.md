@@ -223,3 +223,8 @@ The JSON build report includes unmatched client/account references and repeated 
 
 
 The offline validation report includes `client_account_bridge_reconciliation` when raw client, account, and disposition exports are available. It reconciles derived coverage files to the raw bridge rows and preserves source-row counts for disposition labels.
+
+
+### District loan outcome summary
+
+Import `loan_district_outcome_summary.csv` when the account raw export is available. Use district and observed loan status as grouping dimensions; loan counts, distinct accounts, average amount and share are descriptive. The builder keeps loans with missing account mappings in `<UNMAPPED>` and conflicting account-to-district assignments in `<AMBIGUOUS_ACCOUNT_DISTRICT>` rather than silently assigning them. Confirm the district key against the source schema before joining district names from `district.csv`.
