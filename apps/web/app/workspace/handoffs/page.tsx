@@ -120,7 +120,7 @@ export default function HandoffsPage(){
             {item.handoffNote&&<p>{item.handoffNote}</p>}
             {item.reviewNote&&<p className="upload-hint">Review: {item.reviewNote}</p>}
             {item.status==='ASSIGNED'&&item.canUpdate&&<button className="manage-team-link" disabled={busy} onClick={()=>update(item,'IN_PROGRESS')}>Start work</button>}
-            {['ASSIGNED','IN_PROGRESS','RETURNED'].includes(item.status)&&item.canUpdate&&<button className="manage-team-link" disabled={busy||!latestVersion} onClick={()=>update(item,'SUBMITTED')}>Submit latest saved version</button>}
+            {['IN_PROGRESS','RETURNED'].includes(item.status)&&item.canUpdate&&<button className="manage-team-link" disabled={busy||!latestVersion} onClick={()=>update(item,'SUBMITTED')}>Submit latest saved version</button>}
             {item.status==='SUBMITTED'&&item.canReview&&<div className="form-grid"><label>REVIEW NOTE<input value={reviewNotes[item.id]||''} onChange={e=>setReviewNotes(old=>({...old,[item.id]:e.target.value}))} maxLength={1000} placeholder="Review feedback"/></label><div><button className="manage-team-link" disabled={busy} onClick={()=>update(item,'APPROVED')}>Approve</button> <button className="manage-team-link" disabled={busy} onClick={()=>update(item,'RETURNED')}>Return for changes</button></div></div>}
           </article>)}</div>}
         </div>
