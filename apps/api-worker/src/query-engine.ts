@@ -75,9 +75,9 @@ function parseProjection(source: string, columns: string[]) {
   });
 }
 function parseHavingCondition(source: string, projections: ReturnType<typeof parseProjection>): Condition {
-  const match = source.match(/^(.+?)\\s*(>=|<=|<>|!=|=|>|<)\\s*(?:'((?:''|[^'])*)'|("(?:[^"]|"")*")|(-?\\d+(?:\\.\\d+)?))$/i);
+  const match = source.match(/^(.+?)\s*(>=|<=|<>|!=|=|>|<)\s*(?:'((?:''|[^'])*)'|("(?:[^"]|"")*")|(-?\d+(?:\.\d+)?))$/i);
   if (!match) throw new Error("Unsupported HAVING condition: " + source);
-  const expression = match[1].trim().replace(/\\s+/g, "").toLowerCase();
+  const expression = match[1].trim().replace(/\s+/g, "").toLowerCase();
   const projection = projections.find(p => p.kind === "aggregate" && (
     p.alias.toLowerCase() === expression ||
     (p.fn + "(" + p.column + ")").toLowerCase() === expression
