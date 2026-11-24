@@ -80,7 +80,6 @@ test("supports tenant-scoped inner joins with qualified projections", () => {
 });
 
 test("supports left joins and enforces the result cap", () => {
-  const { runDatasetJoinQuery } = await import(moduleUrl);
   const result = runDatasetJoinQuery("SELECT c.name, o.amount FROM data c LEFT JOIN dataset_0123456789abcdef0123456789abcdef o ON c.id = o.customer_id LIMIT 10", [{id:"1",name:"A"},{id:"2",name:"B"}], ["id","name"], [{customer_id:"1",amount:"20"}], ["customer_id","amount"]);
   assert.equal(result.rowCount,2);
   assert.equal(result.rows[1].o_amount,null);
