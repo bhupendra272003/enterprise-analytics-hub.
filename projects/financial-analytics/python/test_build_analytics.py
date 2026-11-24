@@ -135,5 +135,29 @@ class BuildAnalyticsTests(unittest.TestCase):
             build_analytics(self.directory)
 
 
+    def test_eight_table_relationship_audit_detects_orphans(self):
+        from validate_exports import validate_source_relationships
+        source = self.directory / "source_tables"
+        source.mkdir()
+        fixtures = {
+            "district": "A1\n1\n",
+            "account": "account_id,district_id\n10,1\n",
+            "client": "client_id,district_id\n20,1\n",
+            "disp": "disp_id,client_id,account_id\nt1,20,10\n",
+            "card": "card_id,disp_id\nc1,t1\n",
+            "loan": "loan_id,account_id\nl1,10\n",
+            "orders": "order_id,account_id\no1,10\n",
+            "trans": "trans_id,account_id\nx1,10\n",
+        }
+        for table, content in fixtures.items():
+            (source / f"{table}.csv").write_text(content, encoding="utf-8")
+        passed, detail = validate_source_relationships(self.directory)
+        self.assertTrue(passed, detail)
+        (source / "card.csv").write_text("card_id,disp_id\nc1,missing\n", encoding="utf-8")
+        passed, detail = validate_source_relationships(self.directory)
+        self.assertFalse(passed)
+        self.assertIn("card.disp_id->disp.disp_id: 1", detail)
+
+
 if __name__ == "__main__":
     unittest.main()
