@@ -251,7 +251,10 @@ def build_client_account_relationships(directory: Path) -> dict:
 
     client_ids = {r["client_id"].strip() for r in clients if r.get("client_id", "").strip()}
     account_ids = {r["account_id"].strip() for r in accounts if r.get("account_id", "").strip()}
-    pairs: set[tuple[str, str, str]] = set()
+    client_account_pairs: set[tuple[str, str]] = set()
+    client_accounts: dict[str, set[str]] = defaultdict(set)
+    account_clients: dict[str, set[str]] = defaultdict(set)
+    type_counts: dict[str, int] = defaultdict(int)
     seen_ids: set[str] = set()
     duplicate_ids = 0
     for row in dispositions:
@@ -261,16 +264,12 @@ def build_client_account_relationships(directory: Path) -> dict:
         if disp_id:
             seen_ids.add(disp_id)
         client_id, account_id = row.get("client_id", "").strip(), row.get("account_id", "").strip()
-        if client_id and account_id:
-            pairs.add((client_id, account_id, row.get("type", "").strip() or "<MISSING>"))
-
-    client_accounts: dict[str, set[str]] = defaultdict(set)
-    account_clients: dict[str, set[str]] = defaultdict(set)
-    type_counts: dict[str, int] = defaultdict(int)
-    for client_id, account_id, observed_type in pairs:
-        client_accounts[client_id].add(account_id)
-        account_clients[account_id].add(client_id)
+        observed_type = row.get("type", "").strip() or "<MISSING>"
         type_counts[observed_type] += 1
+        if client_id and account_id:
+            client_account_pairs.add((client_id, account_id))
+            client_accounts[client_id].add(account_id)
+            account_clients[account_id].add(client_id)
     _write_csv(source_dir / "client_account_coverage.csv", ("client_id", "distinct_accounts"),
                [{"client_id": k, "distinct_accounts": str(len(v))} for k, v in sorted(client_accounts.items())])
     _write_csv(source_dir / "account_client_coverage.csv", ("account_id", "distinct_clients"),
@@ -281,7 +280,7 @@ def build_client_account_relationships(directory: Path) -> dict:
     unmatched_accounts = {r.get("account_id", "").strip() for r in dispositions if r.get("account_id", "").strip()} - account_ids
     return {
         "available": True, "client_rows": len(clients), "account_rows": len(accounts),
-        "disposition_rows": len(dispositions), "unique_client_account_pairs": len(pairs),
+        "disposition_rows": len(dispositions), "unique_client_account_pairs": len(client_account_pairs),
         "clients_with_accounts": len(client_accounts), "accounts_with_clients": len(account_clients),
         "unmatched_client_ids": len(unmatched_clients), "unmatched_account_ids": len(unmatched_accounts),
         "duplicate_disposition_ids": duplicate_ids,
