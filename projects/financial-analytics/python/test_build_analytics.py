@@ -29,6 +29,10 @@ class BuildAnalyticsTests(unittest.TestCase):
         self.assertEqual(result["loan_rows"], 3)
         self.assertEqual(result["duration_groups"], 3)
         self.assertEqual(result["vintage_groups"], 3)
+        self.assertEqual(result["scheduled_repayment_groups"], 3)
+        with (self.directory / "loan_scheduled_repayment_summary.csv").open(encoding="utf-8-sig", newline="") as handle:
+            repayment = list(csv.DictReader(handle))
+        self.assertEqual(sum(int(row["loan_count"]) for row in repayment), 3)
         with (self.directory / "loan_duration_outcome_summary.csv").open(encoding="utf-8-sig", newline="") as handle:
             duration = list(csv.DictReader(handle))
         self.assertEqual(sum(int(row["loan_count"]) for row in duration), 3)
