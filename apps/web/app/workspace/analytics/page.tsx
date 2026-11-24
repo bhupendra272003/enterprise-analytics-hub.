@@ -62,7 +62,7 @@ export default function AnalyticsStudio(){
   setSqlBusy(true);
   try{
    const saved=await api('/api/datasets/'+active.id+'/results',{method:'POST',body:JSON.stringify({name:active.name+' · SQL result',columns:queryResult.columns,rows:queryResult.rows,sourceHandoffId:selectedSqlHandoff,changeNote:'Read-only SQL output · '+String(queryResult.engine||'Vyron SQL Studio')})});
-   const shared={columns:(saved.dataset.columns||[]).slice(0,50),rows:(saved.dataset.preview||[]).slice(0,10),rowCount:Number(saved.dataset.rowCount||0),matchedRows:Number(queryResult.matchedRows||0),truncated:!!queryResult.truncated,engine:String(queryResult.engine||'Vyron SQL Studio'),datasetId:saved.dataset.id,datasetName:saved.dataset.name,internalStorage:true};
+   const shared={columns:(saved.dataset.columns||[]).slice(0,20),rows:(saved.dataset.preview||[]).slice(0,10).map((row:Record<string,string>)=>Object.fromEntries(Object.entries(row).slice(0,20).map(([key,value])=>[key,String(value??'').slice(0,120)]))),rowCount:Number(saved.dataset.rowCount||0),matchedRows:Number(queryResult.matchedRows||0),truncated:!!queryResult.truncated,previewLimited:true,engine:String(queryResult.engine||'Vyron SQL Studio'),datasetId:saved.dataset.id,datasetName:saved.dataset.name,internalStorage:true};
    await api('/api/datasets/'+active.id+'/handoffs/'+selectedSqlHandoff,{method:'PATCH',body:JSON.stringify({status:'SUBMITTED',result:shared})});
    const updated=await api('/api/datasets/'+active.id+'/handoffs');
    setSqlHandoffs((updated.handoffs||[]).filter((h:any)=>h.canUpdate&&['SQL_REVIEW','RECONCILIATION'].includes(h.stage)&&['ASSIGNED','IN_PROGRESS','RETURNED'].includes(h.status)));
