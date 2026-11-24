@@ -1,6 +1,7 @@
 import { parse } from "csv-parse/sync";
 import { runDatasetJoinQuery, runDatasetQuery } from "./query-engine";
 import { applyDatasetCellEdits } from "./dataset-edits";
+import { aggregateCategoryRows, type ChartAggregation } from "./bi-aggregation";
 type Env={DB:D1Database;DATASETS:KVNamespace};
 const readStored=async(env:Env,key:string):Promise<{arrayBuffer:()=>Promise<ArrayBuffer>}|null>=>{const bytes=await env.DATASETS.get(key,"arrayBuffer");return bytes?{arrayBuffer:async()=>bytes}:null;};
 const MAX_SYNC_CSV_BYTES=256*1024;
@@ -104,8 +105,10 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
   const columns:string[]=JSON.parse(dataset.columns_json||"[]");
   const categoryColumn=typeof config.categoryColumn==="string"?config.categoryColumn:"",measureColumn=typeof config.measureColumn==="string"?config.measureColumn:"";
   const filter=typeof config.filter==="string"?config.filter.slice(0,120):"";
+  const aggregation=typeof config.aggregation==="string"?config.aggregation.toUpperCase():"SUM";
+  if(!["SUM","AVG","COUNT","MIN","MAX"].includes(aggregation))return json({error:"Choose SUM, AVG, COUNT, MIN or MAX for the dashboard aggregation."},400);
   if(!columns.includes(categoryColumn)||!columns.includes(measureColumn))return json({error:"Choose valid dataset columns for the dashboard."},400);
-  const safeConfig={categoryColumn,measureColumn,filter};
+  const safeConfig={categoryColumn,measureColumn,filter,aggregation};
   const id=crypto.randomUUID();
   await env.DB.prepare("INSERT INTO analytics_dashboards (id,organization_id,dataset_id,title,config_json,created_by) VALUES (?,?,?,?,?,?)").bind(id,dataset.organization_id,datasetId,title,JSON.stringify(safeConfig),user.id).run();
   await audit(env,dataset.organization_id,user.id,"ANALYTICS_DASHBOARD_SAVED",id,{datasetId,title});
@@ -245,7 +248,8 @@ if(sub==="clean"&&req.method==="POST"){
   if(Number(dataset.file_size)>MAX_SYNC_CSV_BYTES)return syncLimitError();
   const source=await readStored(env,dataset.storage_path);if(!source)return json({error:"Stored dataset file is missing."},500);
   let parsed;try{parsed=parseCsv(await source.arrayBuffer());}catch{return json({error:"The stored CSV could not be parsed for full-dataset insights."},400);}
-  const category=url.searchParams.get("category")||"",measure=url.searchParams.get("measure")||"",filter=(url.searchParams.get("filter")||"").trim().slice(0,120).toLocaleLowerCase();
+  const category=url.searchParams.get("category")||"",measure=url.searchParams.get("measure")||"",filter=(url.searchParams.get("filter")||"").trim().slice(0,120).toLocaleLowerCase(),aggregation=(url.searchParams.get("aggregation")||"SUM").toUpperCase() as ChartAggregation;
+  if(!["SUM","AVG","COUNT","MIN","MAX"].includes(aggregation))return json({error:"Aggregation must be SUM, AVG, COUNT, MIN or MAX."},400);
   if(category&&!parsed.columns.includes(category))return json({error:"Choose a valid category column."},400);
   if(measure&&!parsed.columns.includes(measure))return json({error:"Choose a valid measure column."},400);
   const rows=parsed.records as Record<string,unknown>[],rowCount=rows.length,columnCount=parsed.columns.length;
@@ -260,21 +264,14 @@ if(sub==="clean"&&req.method==="POST"){
    }
   }
   for(const row of rows){const key=JSON.stringify(parsed.columns.map(c=>String(row[c]??"")));if(seen.has(key))duplicateRows++;else seen.add(key);}
-  const counts=new Map<string,number>();let numericCount=0,numericSum=0,numericMin=Infinity,numericMax=-Infinity;
-  if(category&&measure){
-   for(const row of rows){
-    const label=String(row[category]??"").trim()||"(blank)";
-    if(filter&&!label.toLocaleLowerCase().includes(filter))continue;
-    const value=Number(String(row[measure]??"").trim());if(!Number.isFinite(value)||String(row[measure]??"").trim()==="")continue;
-    counts.set(label,(counts.get(label)||0)+value);numericCount++;numericSum+=value;numericMin=Math.min(numericMin,value);numericMax=Math.max(numericMax,value);
-   }
-  }
-  const chartRows=[...counts.entries()].sort((a,b)=>b[1]-a[1]).slice(0,20).map(([label,value])=>({label,value:Number(value.toFixed(3))}));
-  await audit(env,dataset.organization_id,user.id,"DATASET_INSIGHTS_VIEWED",datasetId,{scope:"FULL_DATASET",rowCount,category:category||null,measure:measure||null,filterApplied:!!filter});
+  let numericCount=0,numericSum=0,numericMin=Infinity,numericMax=-Infinity;
+  if(category&&measure){for(const row of rows){const label=String(row[category]??"").trim()||"(blank)";if(filter&&!label.toLocaleLowerCase().includes(filter))continue;const raw=String(row[measure]??"").trim(),value=Number(raw);if(raw!==""&&Number.isFinite(value)){numericCount++;numericSum+=value;numericMin=Math.min(numericMin,value);numericMax=Math.max(numericMax,value);}}}
+  const {chartRows}=category&&measure?aggregateCategoryRows(rows,category,measure,filter,aggregation):{chartRows:[]};
+  await audit(env,dataset.organization_id,user.id,"DATASET_INSIGHTS_VIEWED",datasetId,{scope:"FULL_DATASET",rowCount,category:category||null,measure:measure||null,aggregation,filterApplied:!!filter});
   const insights=[rowCount.toLocaleString()+" records analysed across the full dataset",missingCells.toLocaleString()+" missing cells ("+Number((missingCells/(Math.max(1,rowCount*columnCount))*100).toFixed(2))+"% of all cells)",duplicateRows.toLocaleString()+" duplicate rows detected",numericStats.length+" numeric columns detected"];
   if(numericStats.length){const top=numericStats.slice().sort((a,b)=>b.sum-a.sum)[0];insights.push(top.column+" has the largest numeric total ("+top.sum.toLocaleString()+")");}
-  if(chartRows.length)insights.push("Top "+chartRows.length+" category groups by "+measure+": "+chartRows[0].label+" leads with "+chartRows[0].value.toLocaleString());
-  return json({summary:{rowCount,columnCount,missingCells,duplicateRows,numericColumns:numericStats.length,chartValueCount:numericCount,chartTotal:Number(numericSum.toFixed(3)),chartMin:numericCount?numericMin:null,chartMax:numericCount?numericMax:null},numericStats,chartRows,insights,scope:"FULL_DATASET"});
+  if(chartRows.length)insights.push("Top "+chartRows.length+" category groups by "+aggregation+" of "+measure+": "+chartRows[0].label+" leads with "+chartRows[0].value.toLocaleString());
+  return json({summary:{rowCount,columnCount,missingCells,duplicateRows,numericColumns:numericStats.length,chartValueCount:numericCount,chartTotal:Number(numericSum.toFixed(3)),chartMin:numericCount?numericMin:null,chartMax:numericCount?numericMax:null},numericStats,chartRows,insights,aggregation,scope:"FULL_DATASET"});
  }
  if(sub==="profile"&&req.method==="GET"){
   const source=await readStored(env,dataset.storage_path);if(!source)return json({error:"Stored dataset file is missing."},500);
