@@ -9,6 +9,7 @@ import argparse
 import csv
 import json
 from datetime import date, datetime, timezone
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 
 from build_analytics import summarize_loans
@@ -160,13 +161,16 @@ def validate_district_loan_outputs(directory: Path) -> tuple[bool, str]:
             amounts = []
             for item in rows:
                 try:
-                    value = float(item.get("amount", ""))
-                    if value == value and abs(value) != float("inf"):
+                    value = Decimal(item.get("amount", "").strip())
+                    if value.is_finite():
                         amounts.append(value)
-                except (TypeError, ValueError):
+                except (InvalidOperation, TypeError, AttributeError):
                     pass
-            average = f"{sum(amounts) / len(amounts):.2f}" if amounts else ""
-            share = f"{len(rows) * 100 / len(loans):.2f}" if loans else "0.00"
+            average = (format((sum(amounts, Decimal("0")) / len(amounts)).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP), "f") if amounts else "")
+            share_value = (Decimal(len(rows)) * Decimal("100") / Decimal(len(loans))).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP) if loans else Decimal("0.00")
+            share = format(share_value, "f")
             passed = (row.get("loan_count") == str(len(rows))
                       and row.get("distinct_accounts") == str(len(accounts_in_group))
                       and row.get("average_loan_amount") == average
