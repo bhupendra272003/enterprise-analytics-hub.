@@ -2,9 +2,9 @@
 
 ## Spreadsheet Lab
 
-The current Spreadsheet Lab is a governed data inspector, not a complete Excel-compatible spreadsheet. It provides a server-paginated grid, search, sorting, CSV upload, column profiling, cleaning transformations, validation rules, immutable dataset versions, version comparison and record-level diffs. The current ingestion format is CSV (maximum 10 MiB). Synchronous analysis is limited to 256 KiB for operations that do not have a background job; background profiling supports the documented 10 MiB safety limit.
+The current Spreadsheet Lab is a governed data inspector, not a complete Excel-compatible spreadsheet. It provides a server-paginated grid, search, sorting, CSV/TSV/JSON import normalization, column profiling, cleaning transformations, validation rules, immutable dataset versions, version comparison and record-level diffs. A safe formula bar supports SUM, AVERAGE, COUNT, COUNTA, MIN, MAX, SUMIF, COUNTIF and AVERAGEIF over the currently visible 50-row page only. Formula calculations are read-only and are not persisted as workbook formulas. Synchronous analysis is limited to 256 KiB for operations that do not have a background job; background profiling supports the documented 10 MiB safety limit.
 
-Not yet implemented: editable workbook cells, formula bar, Excel-compatible formula library, multiple sheets, workbook files, pivot tables, Power Query, conditional formatting parity, XLSX/XLS/JSON/TSV imports and external Get Data connectors.
+Not yet implemented: editable workbook cells, persistent formulas, cross-page formula ranges, multiple sheets, XLSX/XLS workbook files, pivot tables, Power Query, conditional formatting parity and external Get Data connectors.
 
 ## SQL Studio
 
@@ -48,5 +48,5 @@ The active Cloudflare Worker currently uses D1 for metadata and KV for private d
 - SQL output: maximum 500 returned rows; JOIN intermediate rows: maximum 100,000.
 - Python execution is disabled until a secure runner is deployed.
 - No device downloads are permitted by the application download route.
-- XLSX/XLS/JSON/TSV ingestion, Get Data connectors, spreadsheet formulas, full SQL compatibility and advanced BI remain future work.
+- XLSX/XLS workbook ingestion, external Get Data connectors, persistent workbook formulas, full SQL compatibility and advanced BI remain future work.
 - Production hardening still requires authenticated end-to-end tests, cross-tenant isolation tests, CSRF/MFA review, backups and restore drills, monitoring/alerting, secret management and load testing.
