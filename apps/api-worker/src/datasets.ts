@@ -329,10 +329,11 @@ if(sub==="clean"&&req.method==="POST"){
   const params:unknown[]=[datasetId,user.id];
   if(m.role==="OWNER"||m.role==="MANAGER"){scope="1=1";params.splice(1,1);}
   else if(m.role==="LEADER"){scope="EXISTS (SELECT 1 FROM team_members tm JOIN teams t ON t.id=tm.team_id WHERE t.organization_id=h.organization_id AND t.leader_user_id=? AND tm.user_id=h.assigned_to)";}
-  else if(m.role!=="ANALYST")return json({error:"Insufficient permissions."},403);
-  const sql="SELECT h.id,h.stage,h.status,h.assigned_to AS assignedTo,h.assigned_by AS assignedBy,h.input_version AS inputVersion,h.output_version AS outputVersion,h.handoff_note AS handoffNote,h.review_note AS reviewNote,h.created_at AS createdAt,h.updated_at AS updatedAt,u.full_name AS assigneeName,a.full_name AS assignedByName FROM dataset_handoffs h JOIN users u ON u.id=h.assigned_to JOIN users a ON a.id=h.assigned_by WHERE h.dataset_id=? AND "+scope+" ORDER BY h.created_at DESC";
+  else if(m.role==="ANALYST")scope="(h.assigned_to=? OR (h.status='APPROVED' AND h.stage IN ('SQL_REVIEW','RECONCILIATION')))";
+  else return json({error:"Insufficient permissions."},403);
+  const sql="SELECT h.id,h.stage,h.status,h.assigned_to AS assignedTo,h.assigned_by AS assignedBy,h.input_version AS inputVersion,h.output_version AS outputVersion,h.handoff_note AS handoffNote,h.review_note AS reviewNote,h.result_json AS resultJson,h.created_at AS createdAt,h.updated_at AS updatedAt,u.full_name AS assigneeName,a.full_name AS assignedByName FROM dataset_handoffs h JOIN users u ON u.id=h.assigned_to JOIN users a ON a.id=h.assigned_by WHERE h.dataset_id=? AND "+scope+" ORDER BY h.created_at DESC";
   const {results}=await env.DB.prepare(sql).bind(...params).all<any>();
-  return json({handoffs:results.map((h:any)=>({...h,canUpdate:h.assignedTo===user.id,canReview:m.role==="OWNER"||m.role==="MANAGER"||m.role==="LEADER"}))});
+  return json({handoffs:results.map((h:any)=>({...h,result:h.resultJson?JSON.parse(String(h.resultJson)):null,canUpdate:h.assignedTo===user.id,canReview:m.role==="OWNER"||m.role==="LEADER"}))});
  }
  if(sub==="handoffs"&&req.method==="POST"){
   if(m.role!=="OWNER"&&m.role!=="LEADER")return json({error:"Only the Owner or the assigned Team Leader can create handoffs."},403);
@@ -358,6 +359,8 @@ if(sub==="clean"&&req.method==="POST"){
  if(handoffMatch&&req.method==="PATCH"){
   let body:any;try{body=await req.json();}catch{return json({error:"Send a valid handoff status."},400);}
   const status=String(body.status||""),outputVersion=Number(body.outputVersion||0),reviewNote=typeof body.reviewNote==="string"?body.reviewNote.trim():"";
+  let resultJson:string|null=null;
+  if(body.result!==undefined){if(!body.result||typeof body.result!=="object"||Array.isArray(body.result))return json({error:"The shared result must be a JSON object."},400);resultJson=JSON.stringify(body.result);if(resultJson.length>50000)return json({error:"Shared query results are limited to 50 KB. Reduce rows or columns."},413);const columns=body.result.columns,rows=body.result.rows;if(!Array.isArray(columns)||columns.length>50||!Array.isArray(rows)||rows.length>100||columns.some((v:any)=>typeof v!=="string"||v.length>200))return json({error:"Shared results may contain up to 50 columns and 100 rows."},400);}
   if(!["IN_PROGRESS","SUBMITTED","APPROVED","RETURNED"].includes(status)||reviewNote.length>1000)return json({error:"Choose a valid status and review note."},400);
   const handoff=await env.DB.prepare("SELECT * FROM dataset_handoffs WHERE id=? AND dataset_id=?").bind(handoffMatch[1],datasetId).first<any>();
   if(!handoff)return json({error:"Handoff not found."},404);
@@ -376,7 +379,7 @@ if(sub==="clean"&&req.method==="POST"){
    }
    if(!reviewer||handoff.status!=="SUBMITTED")return json({error:"Only an Owner or the assigned Team Leader can review a submitted handoff."},403);
   }
-  await env.DB.prepare("UPDATE dataset_handoffs SET status=?,output_version=CASE WHEN ?>0 THEN ? ELSE output_version END,review_note=CASE WHEN ?<>'' THEN ? ELSE review_note END,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(status,outputVersion,outputVersion,reviewNote,reviewNote,handoffMatch[1]).run();
+  await env.DB.prepare("UPDATE dataset_handoffs SET status=?,output_version=CASE WHEN ?>0 THEN ? ELSE output_version END,result_json=COALESCE(?,result_json),review_note=CASE WHEN ?<>'' THEN ? ELSE review_note END,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(status,outputVersion,outputVersion,resultJson,reviewNote,reviewNote,handoffMatch[1]).run();
   await audit(env,dataset.organization_id,user.id,"DATASET_HANDOFF_"+status,handoffMatch[1],{datasetId,stage:handoff.stage,outputVersion:outputVersion||null,reviewNote});
   return json({message:"Handoff updated.",status});
  }
