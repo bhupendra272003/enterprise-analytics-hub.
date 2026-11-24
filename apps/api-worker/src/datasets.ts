@@ -4,7 +4,7 @@ type Env={DB:D1Database;DATASETS:KVNamespace};
 const readStored=async(env:Env,key:string):Promise<{arrayBuffer:()=>Promise<ArrayBuffer>}|null>=>{const bytes=await env.DATASETS.get(key,"arrayBuffer");return bytes?{arrayBuffer:async()=>bytes}:null;};
 const MAX_SYNC_CSV_BYTES=256*1024;
 const MAX_UPLOAD_CSV_BYTES=10*1024*1024;
-const syncLimitError=()=>json({error:"This CSV is larger than the current synchronous processing limit (256 KB). Background CSV jobs are being prepared; please use a smaller CSV for now."},413);
+const syncLimitError=()=>json({error:"This dataset exceeds the 256 KiB synchronous SQL limit. Queue a background SQL job to process datasets up to 10 MiB."},413);
 type User={id:string;account_status:string};
 type Role="OWNER"|"MANAGER"|"LEADER"|"ANALYST";
 const json=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store"}});
