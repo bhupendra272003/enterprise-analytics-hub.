@@ -220,3 +220,6 @@ When `client.csv`, `account.csv`, and `disp.csv` are present under `output/sourc
 - `disposition_type_summary.csv` — counts by the observed `disp.type` label.
 
 The JSON build report includes unmatched client/account references and repeated `disp_id` counts. Treat `disp.type` as an observed source label only; do not infer legal ownership or primary-holder meaning without verifying the data dictionary. These outputs preserve the bridge grain and do not join raw transactions to loans.
+
+
+The offline validation report includes `client_account_bridge_reconciliation` when raw client, account, and disposition exports are available. It reconciles derived coverage files to the raw bridge rows and preserves source-row counts for disposition labels.
