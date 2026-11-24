@@ -1,9 +1,18 @@
 # Analytics Studio — Execution and Governance
 
-## SQL Studio
-SQL Studio runs queries against the single dataset selected in the workspace. The Worker re-reads that dataset from private organization-scoped storage after validating the user's active membership. Only OWNER, LEADER and ANALYST can execute queries; MANAGER remains read-only.
+## Spreadsheet Lab
 
-The current query engine is a bounded CSV query engine, not a general-purpose connection to the D1 control database. It supports one read-only SELECT statement, column selection and `SELECT DISTINCT` for projected values; COUNT/SUM/AVG/MIN/MAX; WHERE comparisons (`=`, `!=`, `<>`, `>`, `>=`, `<`, `<=`), `LIKE`, `IS NULL` and `IS NOT NULL`; `AND` and `OR` predicates (with standard SQL precedence: AND is evaluated before OR); GROUP BY, ORDER BY and LIMIT (maximum 500 returned rows). DISTINCT aggregate expressions are not supported. INNER JOIN and LEFT JOIN can combine the selected dataset with one other dataset in the same organization, using qualified column references; joined intermediate results are capped at 100,000 rows. Writes, multi-statement SQL and unsupported clauses are rejected. The current synchronous source limit is 256 KiB. SQL execution is audited without storing query text or cell values.
+The current Spreadsheet Lab is a governed data inspector, not a complete Excel-compatible spreadsheet. It provides a server-paginated grid, search, sorting, CSV upload, column profiling, cleaning transformations, validation rules, immutable dataset versions, version comparison and record-level diffs. The current ingestion format is CSV (maximum 10 MiB). Synchronous analysis is limited to 256 KiB for operations that do not have a background job; background profiling supports the documented 10 MiB safety limit.
+
+Not yet implemented: editable workbook cells, formula bar, Excel-compatible formula library, multiple sheets, workbook files, pivot tables, Power Query, conditional formatting parity, XLSX/XLS/JSON/TSV imports and external Get Data connectors.
+
+## SQL Studio
+
+SQL Studio runs against private, organization-scoped CSV datasets. It is not a MySQL server or a complete MySQL dialect. The Worker supports one read-only SELECT statement, projected columns and DISTINCT, COUNT/SUM/AVG/MIN/MAX, WHERE comparisons, LIKE, IS NULL/IS NOT NULL, AND/OR predicates, GROUP BY, ORDER BY and LIMIT (maximum 500 returned rows). INNER JOIN and LEFT JOIN can combine the selected dataset with one other dataset in the same organization; joined intermediate rows are capped at 100,000. Writes and multi-statement SQL are rejected.
+
+Synchronous source processing is limited to 256 KiB. Background SQL jobs support datasets up to 10 MiB, but results still use the bounded query engine and result preview. Query outputs can be saved as new private Vyron datasets and shared through dataset handoffs. They are not downloaded to the device.
+
+Not yet implemented: native MySQL connectivity, connection manager, schema browser, query plans, transactions, stored procedures, triggers, full dialect compatibility, larger durable result materialization and arbitrary multi-table joins.
 
 Example:
 ```sql
@@ -16,27 +25,28 @@ LIMIT 20;
 ```
 
 ## Python Lab
-Python Lab loads the selected CSV through the authenticated download endpoint and executes the user's code in a browser Web Worker using Pyodide with pandas and NumPy. The code itself is not sent to the API and cannot access the page DOM through the worker. The first run downloads the Pyodide runtime and packages from its CDN and therefore needs internet access. Execution is stopped after 60 seconds. This is a client-side convenience runtime, not a server-hosted secure multi-tenant Python sandbox; users should not run untrusted notebooks or treat it as an isolated environment for secrets.
 
-The starter notebook reads `data.csv`:
-```python
-import pandas as pd
-import numpy as np
+Python Lab currently provides a code editor and starter template only. Execution is disabled. No source dataset is transferred to a browser/CDN Python runtime. A private isolated server-side runner must be provisioned before execution can be safely enabled. Required controls include tenant-scoped inputs, no public file URLs, no outbound network, ephemeral storage, CPU/memory/time/output limits, and results written back to Vyron's private storage.
 
-df = pd.read_csv("data.csv")
-print(df.head())
-print(df.describe(include="all"))
-```
+## BI Studio
 
-## Transformations and data quality
-OWNER, LEADER and ANALYST can create a new immutable version using whitespace trimming, duplicate removal, missing-value fill strategies, empty-row removal, header normalization and explicit numeric-column conversion. The original source upload is Owner-only. Prior versions remain in history. Numeric conversion rejects columns containing non-numeric values instead of silently coercing them. Quality checks, anomaly scans, version comparison and CSV report export remain available in Data Workspace.
+BI Studio calculates full-dataset summaries and grouped category totals for the selected internal dataset. For larger datasets it can queue a background analysis job. The current chart view is a grouped bar-chart preview with a category filter and a top-20 category limit. Users can save dashboard configurations, chart data and report JSON as internal Vyron datasets. A saved dashboard configuration is not a full Power BI report.
 
-## BI Studio and insights
-BI Studio currently builds a grouped bar-chart preview from the visible, server-paginated 50-row page. Users can select a category, numeric measure and text filter, export the chart data, and save named dashboard configurations to the organization's D1 store. Dashboards are scoped to the selected dataset; the Owner can delete any saved dashboard and its creator can delete their own. Automated data notes summarize visible-page missing cells, numeric ranges/averages and common categorical values. These are deterministic calculations, not an external generative-AI service, and they are not whole-dataset claims. Full-dataset chart aggregation, advanced visual types and AI-provider integration remain future work.
+Not yet implemented: DAX, semantic models, relationships, measures/calculated columns, advanced visual library, drill-through, bookmarks, paginated reports, scheduled refresh, Power BI Desktop parity or licensed Power BI Service embedding.
 
-## Operational limits
-- Current synchronous CSV processing and SQL query execution are limited to 256 KiB.
-- SQL results are capped at 500 rows.
-- Python runs locally in the browser and needs a network connection for the initial Pyodide download.
-- BI charts and notes are based on the currently visible page.
-- Live production validation still requires authenticated end-to-end tests, cross-tenant access tests, large-file/load testing, and confirmation that the deployed Cloudflare D1/KV/Queue bindings and migrations match the intended environment.
+## Private storage and sharing
+
+Uploaded CSV files and generated result datasets are stored under private workspace storage and are accessed through organization membership and dataset permissions. SQL, BI and quality-report outputs can be saved as internal datasets and opened through Data Workspace or a handoff. Device-download endpoints are disabled for every role. Importing a source file still requires selecting and uploading it into Vyron.
+
+The active Cloudflare Worker currently uses D1 for metadata and KV for private dataset bytes. KV is not a dedicated object-storage vault; migration to private R2/object storage, retention policies, larger-file streaming and storage lifecycle controls remain outstanding.
+
+## Operational limits and security work
+
+- CSV upload maximum: 10 MiB.
+- Synchronous data processing: 256 KiB for routes without background processing.
+- Background profile and SQL jobs: up to 10 MiB.
+- SQL output: maximum 500 returned rows; JOIN intermediate rows: maximum 100,000.
+- Python execution is disabled until a secure runner is deployed.
+- No device downloads are permitted by the application download route.
+- XLSX/XLS/JSON/TSV ingestion, Get Data connectors, spreadsheet formulas, full SQL compatibility and advanced BI remain future work.
+- Production hardening still requires authenticated end-to-end tests, cross-tenant isolation tests, CSRF/MFA review, backups and restore drills, monitoring/alerting, secret management and load testing.
