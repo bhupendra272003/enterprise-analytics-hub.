@@ -1,7 +1,9 @@
 name: Deploy Bhupendra's Vyron to Cloudflare Free
 
 on:
-  # Production deployment is intentionally manual until the product scope and verification are complete.
+  # Deploy on main after each validated change; manual dispatch remains available.
+  push:
+    branches: [main]
   workflow_dispatch:
 
 concurrency:

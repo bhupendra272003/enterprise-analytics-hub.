@@ -76,7 +76,7 @@ jobs:
           assert any(item.get("binding") == "DATASETS" for item in api.get("kv_namespaces", [])), "Private dataset KV binding missing"
           assert any(item.get("binding") == "API" and item.get("service") == api["name"] for item in web.get("services", [])), "Frontend API service binding does not match API Worker name"
           deploy = Path(".github/workflows/cloudflare-deploy.yml").read_text()
-          assert "workflow_dispatch:" in deploy and "push:" not in deploy, "Production deployment must remain manual"
+          assert "workflow_dispatch:" in deploy and "push:" in deploy, "Production deployment must support validated main-branch pushes and manual dispatch"
           assert all(queue in deploy for queue in required), "Deploy workflow must provision both queues"
           print("Cloudflare bindings, both queue producers, and manual-only deployment verified.")
           PY
