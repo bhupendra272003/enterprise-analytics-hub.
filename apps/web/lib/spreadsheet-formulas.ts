@@ -99,7 +99,7 @@ export function evaluateSpreadsheetFormula(formula: string, rows: SpreadsheetRow
     const value = String(scalar(args[0]) ?? "");
     if (name === "UPPER") return value.toLocaleUpperCase();
     if (name === "LOWER") return value.toLocaleLowerCase();
-    return value.toLocaleLowerCase().replace(/(^|[\\s_-])([a-z])/g, (_, prefix, letter) => prefix + letter.toLocaleUpperCase());
+    return value.toLocaleLowerCase().replace(/(^|[\s_-])([a-z])/g, (_, prefix, letter) => prefix + letter.toLocaleUpperCase());
   }
   if (["ABS","SQRT","POWER","MOD"].includes(name)) {
     const expected = name === "POWER" || name === "MOD" ? 2 : 1;
