@@ -7,7 +7,7 @@ type Org = {id:string;name:string;role:string};
 type Dataset = {id:string;name:string;rowCount:number;columnCount:number};
 type Member = {userId:string;fullName:string;role:string};
 type Version = {versionNumber:number;rowCount:number;uploadedBy:string;changeNote:string|null};
-type Handoff = {id:string;stage:string;status:string;assignedTo:string;assigneeName:string;assignedByName:string;inputVersion:number;outputVersion:number|null;handoffNote:string;reviewNote:string|null;createdAt:string};
+type Handoff = {id:string;stage:string;status:string;assignedTo:string;assigneeName:string;assignedByName:string;inputVersion:number;outputVersion:number|null;handoffNote:string;reviewNote:string|null;createdAt:string;canUpdate:boolean;canReview:boolean};
 async function call(path:string, options:RequestInit={}) {
   const response = await fetch(API+path,{...options,credentials:'include',headers:{'X-Hub-Request':'1','Content-Type':'application/json',...(options.headers||{})}});
   const data = await response.json();
@@ -119,10 +119,9 @@ export default function HandoffsPage(){
             <small>Assigned by {item.assignedByName} · {new Date(item.createdAt).toLocaleString()}</small>
             {item.handoffNote&&<p>{item.handoffNote}</p>}
             {item.reviewNote&&<p className="upload-hint">Review: {item.reviewNote}</p>}
-            {item.assignedTo===undefined?null:null}
-            {item.status==='ASSIGNED'&&item.assignedTo&&<button className="manage-team-link" disabled={busy} onClick={()=>update(item,'IN_PROGRESS')}>Start work</button>}
-            {['ASSIGNED','IN_PROGRESS','RETURNED'].includes(item.status)&&item.assignedTo&&<button className="manage-team-link" disabled={busy||!latestVersion} onClick={()=>update(item,'SUBMITTED')}>Submit latest saved version</button>}
-            {item.status==='SUBMITTED'&&canAssign&&<div className="form-grid"><label>REVIEW NOTE<input value={reviewNotes[item.id]||''} onChange={e=>setReviewNotes(old=>({...old,[item.id]:e.target.value}))} maxLength={1000} placeholder="Review feedback"/></label><div><button className="manage-team-link" disabled={busy} onClick={()=>update(item,'APPROVED')}>Approve</button> <button className="manage-team-link" disabled={busy} onClick={()=>update(item,'RETURNED')}>Return for changes</button></div></div>}
+            {item.status==='ASSIGNED'&&item.canUpdate&&<button className="manage-team-link" disabled={busy} onClick={()=>update(item,'IN_PROGRESS')}>Start work</button>}
+            {['ASSIGNED','IN_PROGRESS','RETURNED'].includes(item.status)&&item.canUpdate&&<button className="manage-team-link" disabled={busy||!latestVersion} onClick={()=>update(item,'SUBMITTED')}>Submit latest saved version</button>}
+            {item.status==='SUBMITTED'&&item.canReview&&<div className="form-grid"><label>REVIEW NOTE<input value={reviewNotes[item.id]||''} onChange={e=>setReviewNotes(old=>({...old,[item.id]:e.target.value}))} maxLength={1000} placeholder="Review feedback"/></label><div><button className="manage-team-link" disabled={busy} onClick={()=>update(item,'APPROVED')}>Approve</button> <button className="manage-team-link" disabled={busy} onClick={()=>update(item,'RETURNED')}>Return for changes</button></div></div>}
           </article>)}</div>}
         </div>
         {notice&&<div className="team-notice" role="status">✳ {notice}</div>}
