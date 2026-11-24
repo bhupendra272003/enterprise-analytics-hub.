@@ -6,6 +6,12 @@ type Env={DB:D1Database;DATASETS:KVNamespace;DATASET_JOBS:Queue<Msg>};
 const json=(v:unknown,s=200)=>new Response(JSON.stringify(v),{status:s,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store"}});
 const userFor=async(req:Request,env:Env)=>{const c=req.headers.get("Cookie")||"",sid=c.split(";").map(x=>x.trim()).find(x=>x.startsWith("hub.sid="))?.slice(8);if(!sid)return null;return env.DB.prepare("SELECT u.id,u.account_status FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.id=? AND s.expires_at>unixepoch()").bind(decodeURIComponent(sid)).first<{id:string;account_status:string}>();};
 const canRun=(r:Role)=>canAnalyzeDataset(r);
+const hasDatasetAccess=async(env:Env,datasetId:string,orgId:string,userId:string,role:Role)=>{
+ if(role==="OWNER"||role==="MANAGER")return true;
+ if(role==="ANALYST")return !!(await env.DB.prepare("SELECT id FROM dataset_handoffs WHERE dataset_id=? AND assigned_to=? LIMIT 1").bind(datasetId,userId).first());
+ if(role==="LEADER")return !!(await env.DB.prepare("SELECT h.id FROM dataset_handoffs h JOIN team_members tm ON tm.user_id=h.assigned_to JOIN teams t ON t.id=tm.team_id WHERE h.dataset_id=? AND t.organization_id=? AND t.leader_user_id=? LIMIT 1").bind(datasetId,orgId,userId).first());
+ return false;
+};
 const view=(r:any)=>({id:r.id,datasetId:r.dataset_id,type:r.job_type,status:r.status,progress:r.progress,stage:r.stage,result:r.result_json?JSON.parse(r.result_json):null,error:r.error_code?{code:r.error_code,message:r.error_message}:null,attemptCount:r.attempt_count,createdAt:r.created_at,updatedAt:r.updated_at,completedAt:r.completed_at});
 export async function handleDatasetJobs(req:Request,env:Env,path:string):Promise<Response|null>{
  if(!path.startsWith("/api/datasets/")&&!path.startsWith("/api/dataset-jobs/"))return null;
@@ -16,6 +22,7 @@ export async function handleDatasetJobs(req:Request,env:Env,path:string):Promise
   if(!ds)return json({error:"Dataset not found."},404);
   const m=await env.DB.prepare("SELECT role FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE'").bind(ds.organization_id,user.id).first<{role:Role}>();
   if(!m||!canRun(m.role))return json({error:"Insufficient organization permissions."},403);
+  if(!await hasDatasetAccess(env,ds.id,ds.organization_id,user.id,m.role))return json({error:"This dataset has not been assigned to your workspace role."},403);
   if(ds.file_size>10*1024*1024)return json({error:"Dataset exceeds the current 10 MiB background-job safety limit."},413);
   let body:any={};try{body=await req.json();}catch{return json({error:"Invalid job request."},400);}
   if(body.type!=="PROFILE"&&body.type!=="SQL")return json({error:"Supported background job types are PROFILE and SQL."},400);
@@ -56,6 +63,7 @@ export async function handleDatasetJobs(req:Request,env:Env,path:string):Promise
   if(!ds)return json({error:"Dataset not found."},404);
   const m=await env.DB.prepare("SELECT role FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE'").bind(ds.organization_id,user.id).first();
   if(!m)return json({error:"Insufficient organization permissions."},403);
+  if(!await hasDatasetAccess(env,job.dataset_id,job.organization_id,user.id,m.role))return json({error:"This dataset has not been assigned to your workspace role."},403);
   const {results}=await env.DB.prepare("SELECT * FROM dataset_jobs WHERE dataset_id=? ORDER BY created_at DESC LIMIT 50").bind(list[1]).all();
   return json({jobs:results.map(view)});
  }
