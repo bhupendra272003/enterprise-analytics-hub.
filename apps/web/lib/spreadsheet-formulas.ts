@@ -51,13 +51,16 @@ function criterionMatches(value: unknown, criterion: string): boolean {
   const bothNumeric = String(value ?? "").trim() !== "" && expected.trim() !== "" && Number.isFinite(leftNumber) && Number.isFinite(rightNumber);
   const left = bothNumeric ? leftNumber : String(value ?? "");
   const right = bothNumeric ? rightNumber : expected;
+  const comparison = typeof left === "number" && typeof right === "number"
+    ? left - right
+    : String(left).localeCompare(String(right));
   switch (op[1]) {
-    case ">": return left > right;
-    case "<": return left < right;
-    case ">=": return left >= right;
-    case "<=": return left <= right;
-    case "<>": return left !== right;
-    default: return left === right;
+    case ">": return comparison > 0;
+    case "<": return comparison < 0;
+    case ">=": return comparison >= 0;
+    case "<=": return comparison <= 0;
+    case "<>": return comparison !== 0;
+    default: return comparison === 0;
   }
 }
 
