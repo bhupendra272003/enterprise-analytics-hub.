@@ -92,3 +92,25 @@ test("extracts only a valid same-workspace dataset token from JOIN SQL", () => {
   assert.equal(extractJoinDatasetToken("SELECT * FROM data"), null);
   assert.equal(extractJoinDatasetToken("SELECT * FROM data JOIN dataset_not-a-valid-token b ON data.id = b.id"), null);
 });
+
+test("supports OR predicates with standard AND precedence", () => {
+  const sample = [
+    { id: "1", region: "North", sales: "80" },
+    { id: "2", region: "South", sales: "150" },
+    { id: "3", region: "West", sales: "200" },
+    { id: "4", region: "South", sales: "50" }
+  ];
+  const result = runDatasetQuery("SELECT id FROM data WHERE region = 'North' OR region = 'South' AND sales >= 100 ORDER BY id", sample, columns);
+  assert.deepEqual(result.rows, [{ id: "1" }, { id: "2" }]);
+});
+
+test("supports DISTINCT projected values without splitting quoted OR text", () => {
+  const sample = [
+    { id: "1", region: "North OR South", sales: "10" },
+    { id: "2", region: "North OR South", sales: "20" },
+    { id: "3", region: "West", sales: "30" }
+  ];
+  const result = runDatasetQuery("SELECT DISTINCT region FROM data WHERE region = 'North OR South' OR region = 'West' ORDER BY region", sample, columns);
+  assert.deepEqual(result.rows, [{ region: "North OR South" }, { region: "West" }]);
+  assert.equal(result.rowCount, 2);
+});
