@@ -10,18 +10,28 @@ export async function handleDatasetJobs(req:Request,env:Env,path:string):Promise
  const user=await userFor(req,env);if(!user)return json({error:"Authentication required."},401);if(user.account_status==="SUSPENDED")return json({error:"This account has been suspended."},403);
  const create=path.match(/^\/api\/datasets\/([^/]+)\/jobs$/);
  if(create&&req.method==="POST"){
-  const ds=await env.DB.prepare("SELECT id,organization_id,file_size FROM datasets WHERE id=?").bind(create[1]).first<{id:string;organization_id:string;file_size:number}>();
+  const ds=await env.DB.prepare("SELECT id,organization_id,file_size,columns_json FROM datasets WHERE id=?").bind(create[1]).first<{id:string;organization_id:string;file_size:number;columns_json:string}>();
   if(!ds)return json({error:"Dataset not found."},404);
   const m=await env.DB.prepare("SELECT role FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE'").bind(ds.organization_id,user.id).first<{role:Role}>();
   if(!m||!canRun(m.role))return json({error:"Insufficient organization permissions."},403);
   if(ds.file_size>10*1024*1024)return json({error:"Dataset exceeds the current 10 MiB background-job safety limit."},413);
   let body:any={};try{body=await req.json();}catch{return json({error:"Invalid job request."},400);}
   if(body.type!=="PROFILE")return json({error:"PROFILE is currently the only enabled background job type."},400);
+  let payload:{analysis?:{categoryColumn:string;measureColumn:string;filter:string}}={};
+  if(body.analysis!==undefined){
+   if(!body.analysis||typeof body.analysis!=="object"||Array.isArray(body.analysis))return json({error:"Analysis configuration is invalid."},400);
+   let columns:string[]=[];try{columns=JSON.parse(ds.columns_json||"[]");}catch{return json({error:"Dataset column metadata is invalid."},500);}
+   const categoryColumn=typeof body.analysis.categoryColumn==="string"?body.analysis.categoryColumn:"";
+   const measureColumn=typeof body.analysis.measureColumn==="string"?body.analysis.measureColumn:"";
+   const filter=typeof body.analysis.filter==="string"?body.analysis.filter.trim():"";
+   if(!columns.includes(categoryColumn)||!columns.includes(measureColumn)||filter.length>120)return json({error:"Choose valid analysis columns and a filter up to 120 characters."},400);
+   payload={analysis:{categoryColumn,measureColumn,filter}};
+  }
   const id=crypto.randomUUID();
-  await env.DB.prepare("INSERT INTO dataset_jobs (id,organization_id,dataset_id,requested_by,job_type,status,progress,stage,payload_json,max_attempts) VALUES (?,?,?,?,'PROFILE','QUEUED',0,'QUEUED','{}',3)").bind(id,ds.organization_id,ds.id,user.id).run();
+  await env.DB.prepare("INSERT INTO dataset_jobs (id,organization_id,dataset_id,requested_by,job_type,status,progress,stage,payload_json,max_attempts) VALUES (?,?,?,?,'PROFILE','QUEUED',0,'QUEUED',?,3)").bind(id,ds.organization_id,ds.id,user.id,JSON.stringify(payload)).run();
   try{await env.DATASET_JOBS.send({jobId:id});await env.DB.prepare("UPDATE dataset_jobs SET updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(id).run();}
   catch{await env.DB.prepare("UPDATE dataset_jobs SET status='FAILED',stage='QUEUE_UNAVAILABLE',error_code='QUEUE_SEND_FAILED',error_message='The queue is temporarily unavailable.',completed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(id).run();return json({error:"The job could not be queued. Please try again later."},503);}
-  await env.DB.prepare("INSERT INTO audit_logs (organization_id,actor_user_id,action,target_type,target_id,metadata) VALUES (?,?,?,'DATASET_JOB',?,?)").bind(ds.organization_id,user.id,"DATASET_JOB_QUEUED",id,JSON.stringify({type:"PROFILE",datasetId:ds.id})).run();
+  await env.DB.prepare("INSERT INTO audit_logs (organization_id,actor_user_id,action,target_type,target_id,metadata) VALUES (?,?,?,'DATASET_JOB',?,?)").bind(ds.organization_id,user.id,"DATASET_JOB_QUEUED",id,JSON.stringify({type:"PROFILE",datasetId:ds.id,analysis:payload.analysis||null})).run();
   return json({job:{id,type:"PROFILE",status:"QUEUED",progress:0,stage:"QUEUED"}},202);
  }
  const list=path.match(/^\/api\/datasets\/([^/]+)\/jobs$/);
@@ -54,8 +64,20 @@ async function runProfile(msg:Msg,env:Env){
   const source=await env.DATASETS.get(ds.storage_path,"text");if(source===null)throw new Error("SOURCE_FILE_MISSING");
   const {parse}=await import("csv-parse/sync");const rows=parse(source,{columns:true,skip_empty_lines:true,bom:true,trim:true,relax_column_count:false}) as Record<string,unknown>[];if(!rows.length)throw new Error("EMPTY_DATASET");
   const columns=Object.keys(rows[0]);if(!columns.length||columns.length>200)throw new Error("INVALID_HEADERS");
-  const profile=columns.map(name=>{const vals=rows.map((r:any)=>String(r[name]??"").trim()),present=vals.filter((v:string)=>v!==""),nums=present.map(Number).filter(Number.isFinite),numeric=present.length>0&&nums.length/present.length>=.9;return {name,type:!present.length?"EMPTY":numeric?"NUMERIC":"TEXT",total:vals.length,missing:vals.length-present.length,distinct:new Set(present).size,...(numeric?{min:Math.min(...nums),max:Math.max(...nums),mean:Number((nums.reduce((a:number,b:number)=>a+b,0)/nums.length).toFixed(3))}:{})};});
-  const result={datasetId:job.dataset_id,name:ds.name,rowCount:rows.length,columnCount:columns.length,columns:profile};
+  const profile=columns.map(name=>{const vals=rows.map((r:any)=>String(r[name]??"").trim()),present=vals.filter((v:string)=>v!==""),nums=present.map(Number).filter(Number.isFinite),numeric=present.length>0&&nums.length/present.length>=.9,sum=nums.reduce((a:number,b:number)=>a+b,0);return {name,type:!present.length?"EMPTY":numeric?"NUMERIC":"TEXT",total:vals.length,missing:vals.length-present.length,distinct:new Set(present).size,...(numeric?{count:nums.length,sum:Number(sum.toFixed(3)),min:nums.reduce((a:number,b:number)=>Math.min(a,b),Infinity),max:nums.reduce((a:number,b:number)=>Math.max(a,b),-Infinity),mean:Number((sum/nums.length).toFixed(3))}:{})};});
+  let missingCells=0,duplicateRows=0;const seen=new Set<string>();
+  for(const item of profile)missingCells+=item.missing;
+  for(const row of rows){const key=JSON.stringify(columns.map(column=>String(row[column]??"")));if(seen.has(key))duplicateRows++;else seen.add(key);}
+  const numericStats=profile.filter(item=>item.type==="NUMERIC").map(({name,count,sum,min,max,mean})=>({column:name,count,sum,mean,min,max}));
+  const payload=JSON.parse(job.payload_json||"{}"),analysis=payload.analysis||{},categoryColumn=columns.includes(analysis.categoryColumn)?analysis.categoryColumn:"",measureColumn=columns.includes(analysis.measureColumn)?analysis.measureColumn:"",filter=typeof analysis.filter==="string"?analysis.filter.trim().toLocaleLowerCase():"";
+  const groups=new Map<string,number>();
+  if(categoryColumn&&measureColumn){for(const row of rows){const label=String(row[categoryColumn]??"").trim()||"(blank)";if(filter&&!label.toLocaleLowerCase().includes(filter))continue;const raw=String(row[measureColumn]??"").trim(),value=Number(raw);if(!raw||!Number.isFinite(value))continue;groups.set(label,(groups.get(label)||0)+value);}}
+  const chartRows=[...groups.entries()].sort((a,b)=>b[1]-a[1]).slice(0,20).map(([label,value])=>({label,value:Number(value.toFixed(3))}));
+  const summary={rowCount:rows.length,columnCount:columns.length,missingCells,duplicateRows,numericColumns:numericStats.length};
+  const insights=[rows.length.toLocaleString()+" records analysed across the full dataset",missingCells.toLocaleString()+" missing cells",duplicateRows.toLocaleString()+" duplicate rows detected",numericStats.length+" numeric columns detected"];
+  if(numericStats.length){const top=numericStats.slice().sort((a,b)=>b.sum-a.sum)[0];insights.push(top.column+" has the largest numeric total ("+top.sum.toLocaleString()+")");}
+  if(chartRows.length)insights.push("Top category by "+measureColumn+": "+chartRows[0].label+" ("+chartRows[0].value.toLocaleString()+")");
+  const result={datasetId:job.dataset_id,name:ds.name,rowCount:rows.length,columnCount:columns.length,columns:profile,summary,numericStats,chartRows,insights,scope:"FULL_DATASET"};
   await env.DB.prepare("UPDATE dataset_jobs SET status='COMPLETED',progress=100,stage='COMPLETED',result_json=?,completed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP,error_code=NULL,error_message=NULL WHERE id=? AND status='RUNNING'").bind(JSON.stringify(result),job.id).run();
   await env.DB.prepare("INSERT INTO notifications (id,user_id,organization_id,type,title,message,href) VALUES (?,?,?,'DATASET_JOB','Dataset profiling completed',?,?)").bind(crypto.randomUUID(),job.requested_by,job.organization_id,"Profiling for "+ds.name+" is ready.","/workspace/data").run();
  }catch(e){
