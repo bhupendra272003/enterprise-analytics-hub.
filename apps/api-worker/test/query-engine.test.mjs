@@ -6,7 +6,7 @@ import ts from "typescript";
 const source = await readFile(new URL("../src/query-engine.ts", import.meta.url), "utf8");
 const compiled = ts.transpile(source, { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 });
 const moduleUrl = "data:text/javascript;base64," + Buffer.from(compiled).toString("base64");
-const { runDatasetQuery, runDatasetJoinQuery } = await import(moduleUrl);
+const { runDatasetQuery, runDatasetJoinQuery, extractJoinDatasetToken } = await import(moduleUrl);
 const columns = ["id", "region", "sales"];
 const rows = [
   { id: "1", region: "North", sales: "100" },
@@ -84,4 +84,11 @@ test("supports left joins and enforces the result cap", () => {
   assert.equal(result.rowCount,2);
   assert.equal(result.rows[1].o_amount,null);
   assert.throws(()=>runDatasetJoinQuery("SELECT * FROM data c INNER JOIN dataset_0123456789abcdef0123456789abcdef o ON c.id = o.customer_id LIMIT 501", [], ["id"], [], ["customer_id"]),/LIMIT/);
+});
+
+test("extracts only a valid same-workspace dataset token from JOIN SQL", () => {
+  const token = "a".repeat(32);
+  assert.equal(extractJoinDatasetToken("SELECT a.id FROM data a INNER JOIN dataset_" + token + " b ON a.id = b.id"), token);
+  assert.equal(extractJoinDatasetToken("SELECT * FROM data"), null);
+  assert.equal(extractJoinDatasetToken("SELECT * FROM data JOIN dataset_not-a-valid-token b ON data.id = b.id"), null);
 });
