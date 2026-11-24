@@ -81,6 +81,54 @@ export async function handleOrganizations(request: Request, env: Env, path: stri
     return reply({organization:{id,name,slug,industry,role:"OWNER"}},201);
   }
 
+  const profileMatch=path.match(/^\\/api\\/organizations\\/([^/]+)\\/profile$/);
+  if(profileMatch) {
+    const orgId=profileMatch[1], m=await membership(env,orgId,user.id);
+    if(!m) return reply({error:"Active organization membership required."},403);
+    const org=await env.DB.prepare("SELECT id,name,slug,industry,profile_json FROM organizations WHERE id=?").bind(orgId).first<any>();
+    if(!org) return reply({error:"Organization not found."},404);
+    let currentProfile:any={};try{currentProfile=JSON.parse(String(org.profile_json||"{}"));}catch{currentProfile={};}
+    if(request.method==="GET") return reply({organization:{id:org.id,name:org.name,slug:org.slug,industry:org.industry||"BFSI",profile:currentProfile,role:m.role}});
+    if(request.method==="PATCH") {
+      if(m.role!=="OWNER") return reply({error:"Only the organization Owner can edit company profile and branding."},403);
+      let body:any;try{body=await request.json();}catch{return reply({error:"Invalid JSON body."},400);}
+      const name=body.name===undefined?String(org.name):typeof body.name==="string"?body.name.trim():"";
+      const industry=body.industry===undefined?String(org.industry||"BFSI"):typeof body.industry==="string"?body.industry.trim().toUpperCase():"";
+      const tagline=body.tagline===undefined?String(currentProfile.tagline||""):typeof body.tagline==="string"?body.tagline.trim():"";
+      const description=body.description===undefined?String(currentProfile.description||""):typeof body.description==="string"?body.description.trim():"";
+      const primaryColor=body.primaryColor===undefined?String(currentProfile.primaryColor||"#D6C49C"):typeof body.primaryColor==="string"?body.primaryColor.trim():"";
+      const accentColor=body.accentColor===undefined?String(currentProfile.accentColor||"#8FB7E8"):typeof body.accentColor==="string"?body.accentColor.trim():"";
+      if(name.length<2||name.length>160||![ "BFSI","ECOMMERCE","LOGISTICS","HOTELS" ].includes(industry)||tagline.length>140||description.length>600||!/^#[0-9a-fA-F]{6}$/.test(primaryColor)||!/^#[0-9a-fA-F]{6}$/.test(accentColor)) return reply({error:"Check the organization name, industry, tagline, description and six-digit brand colors."},400);
+      const profile={tagline,description,primaryColor,accentColor};
+      await env.DB.batch([
+        env.DB.prepare("UPDATE organizations SET name=?,industry=?,profile_json=? WHERE id=?").bind(name,industry,JSON.stringify(profile),orgId),
+        env.DB.prepare("INSERT INTO audit_logs (organization_id,actor_user_id,action,target_type,target_id,metadata) VALUES (?,?, 'ORGANIZATION_PROFILE_UPDATED','ORGANIZATION',?,?)").bind(orgId,user.id,orgId,JSON.stringify({industry,brandingUpdated:true}))
+      ]);
+      return reply({message:"Company profile and branding saved.",organization:{id:orgId,name,slug:org.slug,industry,profile,role:m.role}});
+    }
+    return reply({error:"Method not allowed."},405);
+  }
+
+  const activityMatch=path.match(/^\\/api\\/organizations\\/([^/]+)\\/activity$/);
+  if(activityMatch && request.method==="GET") {
+    const orgId=activityMatch[1],m=await membership(env,orgId,user.id);
+    if(!m) return reply({error:"Active organization membership required."},403);
+    const requested=Number(new URL(request.url).searchParams.get("limit")||"40");
+    const limit=Number.isFinite(requested)?Math.max(1,Math.min(100,Math.floor(requested))):40;
+    const {results}=await env.DB.prepare("SELECT a.id,a.action,a.target_type AS targetType,a.target_id AS targetId,a.metadata,u.full_name AS actorName,u.email AS actorEmail,a.created_at AS createdAt FROM audit_logs a LEFT JOIN users u ON u.id=a.actor_user_id WHERE a.organization_id=? AND (? IN ('OWNER','MANAGER') OR a.actor_user_id=? OR (?='LEADER' AND a.target_type='TEAM' AND a.target_id IN (SELECT id FROM teams WHERE organization_id=? AND leader_user_id=?)) OR (?='LEADER' AND a.target_type='TASK' AND a.target_id IN (SELECT t.id FROM tasks t JOIN teams tm ON tm.id=t.team_id WHERE tm.organization_id=? AND tm.leader_user_id=?)) OR (?='ANALYST' AND a.target_type='TASK' AND a.target_id IN (SELECT id FROM tasks WHERE assignee_id=?))) ORDER BY a.id DESC LIMIT ?").bind(orgId,m.role,user.id,m.role,orgId,user.id,m.role,orgId,user.id,m.role,user.id,limit).all<any>();
+    return reply({events:results.map((event:any)=>{let metadata:any=null;try{metadata=event.metadata?JSON.parse(event.metadata):null;}catch{}return {...event,metadata};})});
+  }
+
+  const auditMatch=path.match(/^\\/api\\/organizations\\/([^/]+)\\/audit$/);
+  if(auditMatch && request.method==="GET") {
+    const orgId=auditMatch[1],m=await membership(env,orgId,user.id);
+    if(!m||m.role!=="OWNER") return reply({error:"Audit activity is available to the organization Owner."},403);
+    const requested=Number(new URL(request.url).searchParams.get("limit")||"100");
+    const limit=Number.isFinite(requested)?Math.max(1,Math.min(200,Math.floor(requested))):100;
+    const {results}=await env.DB.prepare("SELECT a.id,a.action,a.target_type AS targetType,a.target_id AS targetId,a.metadata,u.full_name AS actorName,u.email AS actorEmail,a.created_at AS createdAt,a.ip_address AS ipAddress FROM audit_logs a LEFT JOIN users u ON u.id=a.actor_user_id WHERE a.organization_id=? ORDER BY a.id DESC LIMIT ?").bind(orgId,limit).all<any>();
+    return reply({events:results.map((event:any)=>{let metadata:any=null;try{metadata=event.metadata?JSON.parse(event.metadata):null;}catch{}return {...event,metadata};})});
+  }
+
   const memberMatch=path.match(/^\/api\/organizations\/([^/]+)\/members$/);
   if(memberMatch && request.method==="GET") {
     const orgId=memberMatch[1], m=await membership(env,orgId,user.id);
