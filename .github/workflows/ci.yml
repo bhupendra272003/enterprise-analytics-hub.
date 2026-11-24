@@ -60,6 +60,7 @@ jobs:
           cd apps/web
           npm install
           npm audit --audit-level=moderate
+          npm run test:unit
           npm run build
           npm run cf:build
       - name: Validate PKDD Financial project assets
