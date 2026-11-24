@@ -290,7 +290,7 @@ def validate_exports(directory: Path) -> dict:
     record("artifact_readability", True, "JSON and CSV exports are readable.")
     raw_ok, raw_detail = validate_raw_source_exports(directory)
     source_rel_ok, source_rel_detail = validate_source_relationships(directory)
-    record("eight_table_relationship_integrity", source_rel_ok, source_rel_detail, severity="warning")
+    record("eight_table_relationship_integrity", source_rel_ok, source_rel_detail)
     record("raw_source_table_exports", raw_ok, raw_detail)
     bridge_ok, bridge_detail = validate_client_account_outputs(directory)
     record("client_account_bridge_reconciliation", bridge_ok, bridge_detail)
