@@ -122,6 +122,53 @@ def _write_csv(path: Path, columns: tuple[str, ...], rows: list[dict[str, str]])
     temporary.replace(path)
 
 
+
+REPAYMENT_COLUMNS = (
+    "duration_months", "status", "loan_count", "valid_schedule_rows",
+    "valid_ratio_rows", "average_monthly_installment",
+    "average_scheduled_total", "average_scheduled_to_principal_ratio",
+)
+
+
+def summarize_scheduled_repayments(rows: list[dict[str, str]]) -> list[dict[str, str]]:
+    """Summarize scheduled installments; these are not observed repayments."""
+    grouped: dict[tuple[str, str], list[dict[str, str]]] = defaultdict(list)
+    for row in rows:
+        grouped[(normalize_duration(row.get("duration")), _status(row.get("status")))].append(row)
+    output = []
+    for (duration, status), group in sorted(grouped.items()):
+        schedules, ratios = [], []
+        for row in group:
+            payment, months, principal = (
+                _decimal(row.get("payments")), _decimal(row.get("duration")),
+                _decimal(row.get("amount")),
+            )
+            if payment is not None and months is not None and payment >= 0 and months > 0:
+                schedules.append(payment * months)
+                if principal is not None and principal > 0:
+                    ratios.append((payment * months) / principal)
+        def average(values: list[Decimal]) -> str:
+            return format((sum(values, Decimal("0")) / len(values)).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP), "f") if values else ""
+        output.append({
+            "duration_months": duration, "status": status,
+            "loan_count": str(len(group)), "valid_schedule_rows": str(len(schedules)),
+            "valid_ratio_rows": str(len(ratios)),
+            "average_monthly_installment": average([
+                value / _decimal(group[index].get("duration"))
+                for index, value in enumerate(schedules)
+            ]) if False else average([
+                payment for row in group
+                if (payment := _decimal(row.get("payments"))) is not None
+                and (months := _decimal(row.get("duration"))) is not None
+                and payment >= 0 and months > 0
+            ]),
+            "average_scheduled_total": average(schedules),
+            "average_scheduled_to_principal_ratio": average(ratios),
+        })
+    return output
+
+
 def build_analytics(directory: Path) -> dict:
     source = directory / "loan_analysis_extract.csv"
     with source.open("r", encoding="utf-8-sig", newline="") as handle:
@@ -134,20 +181,24 @@ def build_analytics(directory: Path) -> dict:
 
     duration_rows = summarize_loans(loans, "duration_months")
     vintage_rows = summarize_loans(loans, "loan_month")
+    repayment_rows = summarize_scheduled_repayments(loans)
     account_activity = build_account_activity(directory)
     relationship_analysis = build_client_account_relationships(directory)
     district_loan_analysis = build_district_loan_outcomes(directory, loans)
     directory.mkdir(parents=True, exist_ok=True)
     _write_csv(directory / "loan_duration_outcome_summary.csv", SUMMARY_COLUMNS, duration_rows)
     _write_csv(directory / "loan_vintage_outcome_summary.csv", VINTAGE_COLUMNS, vintage_rows)
+    _write_csv(directory / "loan_scheduled_repayment_summary.csv", REPAYMENT_COLUMNS, repayment_rows)
     return {
         "source_file": source.name,
         "loan_rows": len(loans),
         "duration_groups": len(duration_rows),
         "vintage_groups": len(vintage_rows),
+        "scheduled_repayment_groups": len(repayment_rows),
         "outputs": [
             "loan_duration_outcome_summary.csv",
             "loan_vintage_outcome_summary.csv",
+            "loan_scheduled_repayment_summary.csv",
         ],
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
         "account_activity": account_activity,
