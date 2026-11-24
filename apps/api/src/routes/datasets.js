@@ -510,4 +510,29 @@ router.get('/datasets/:datasetId/profile',async(req,res,next)=>{
   }catch(e){next(e);}
 });
 
+
+// Full-file export is deliberately Owner-only. Analysts and other collaborators
+// work with governed in-app views, not downloadable source files.
+router.get('/datasets/:datasetId/download', async (req,res,next) => {
+  try {
+    const [rows] = await pool.execute(
+      'SELECT id,name,organization_id,storage_path FROM datasets WHERE id=? LIMIT 1',
+      [req.params.datasetId]
+    );
+    if (!rows.length) return res.status(404).json({error:'Dataset not found.'});
+    const [members] = await pool.execute(
+      "SELECT role FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE' LIMIT 1",
+      [rows[0].organization_id,req.user.id]
+    );
+    if (!members.length) return res.status(403).json({error:'Insufficient organization permissions.'});
+    if (members[0].role !== 'OWNER') {
+      await audit({orgId:rows[0].organization_id,actorId:req.user.id,action:'DATASET_EXPORT_DENIED',targetType:'DATASET',targetId:req.params.datasetId,metadata:{role:members[0].role},ip:req.ip});
+      return res.status(403).json({error:'Full dataset export is disabled for your role. Use the internal workspace and approved handoff outputs.'});
+    }
+    await audit({orgId:rows[0].organization_id,actorId:req.user.id,action:'DATASET_EXPORTED',targetType:'DATASET',targetId:req.params.datasetId,metadata:{scope:'FULL_SOURCE',ownerOnly:true},ip:req.ip});
+    res.download(rows[0].storage_path, path.basename(rows[0].name).replace(/[^a-z0-9-_]+/gi,'_')+'.csv');
+  } catch(e) { next(e); }
+});
+
+
 export default router;
