@@ -23,8 +23,9 @@ const parseCsv=(buffer:ArrayBuffer,maxBytes=MAX_SYNC_CSV_BYTES)=>{
  if(!columns.length||columns.length>200||columns.some(c=>!c.trim()))throw new Error("HEADERS");
  return {records,columns,preview:records.slice(0,10).map((row:any)=>Object.fromEntries(columns.map(c=>[c,String(row[c]??"").slice(0,500)])))};
 };
-const allowed=(role:Role)=>["OWNER","LEADER","ANALYST"].includes(role);
-const ownerOnly=(role:Role)=>role==="OWNER";
+import { canAnalyzeDataset, canUploadSourceDataset } from "./role-policy";
+const allowed=(role:Role)=>canAnalyzeDataset(role);
+const ownerOnly=(role:Role)=>canUploadSourceDataset(role);
 const ownerRequired=()=>json({error:"Only the organization owner can change or replace original source data."},403);
 const isNum=(v:string)=>v.trim()!==""&&Number.isFinite(Number(v));
 const csvEncode=(rows:Record<string,string>[],columns:string[])=>[columns,...rows.map(r=>columns.map(k=>r[k]??""))].map(row=>row.map(v=>{const s=String(v);return /[",\r\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}).join(",")).join("\r\n")+"\r\n";
