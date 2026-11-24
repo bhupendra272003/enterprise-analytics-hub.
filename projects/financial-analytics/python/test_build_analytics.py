@@ -99,6 +99,31 @@ class BuildAnalyticsTests(unittest.TestCase):
             rows = list(csv.DictReader(handle))
         self.assertEqual({row["account_id"]: row["distinct_clients"] for row in rows}, {"10": "2", "20": "1"})
 
+    def test_district_loan_outcomes_keep_unmapped_and_ambiguous_rows(self):
+        source = self.directory / "source_tables"
+        source.mkdir()
+        (source / "account.csv").write_text(
+            "account_id,district_id\n100,1\n200,2\n300,3\n300,4\n", encoding="utf-8"
+        )
+        from build_analytics import build_district_loan_outcomes
+        loans = [
+            {"loan_id": "1", "account_id": "100", "amount": "1000", "status": "A"},
+            {"loan_id": "2", "account_id": "200", "amount": "2000", "status": "B"},
+            {"loan_id": "3", "account_id": "999", "amount": "3000", "status": "A"},
+            {"loan_id": "4", "account_id": "300", "amount": "4000", "status": "C"},
+        ]
+        result = build_district_loan_outcomes(self.directory, loans)
+        self.assertEqual(result["loan_rows"], 4)
+        self.assertEqual(result["mapped_loan_rows"], 2)
+        self.assertEqual(result["unmapped_loan_rows"], 1)
+        self.assertEqual(result["ambiguous_account_district_loan_rows"], 1)
+        self.assertEqual(result["conflicting_account_district_ids"], 1)
+        with (self.directory / "loan_district_outcome_summary.csv").open(encoding="utf-8-sig", newline="") as handle:
+            rows = list(csv.DictReader(handle))
+        self.assertEqual(sum(int(row["loan_count"]) for row in rows), 4)
+        self.assertIn("<UNMAPPED>", {row["district_id"] for row in rows})
+        self.assertIn("<AMBIGUOUS_ACCOUNT_DISTRICT>", {row["district_id"] for row in rows})
+
     def test_account_activity_requires_matching_source_exports(self):
         from build_analytics import build_account_activity
         result = build_account_activity(self.directory)
