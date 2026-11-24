@@ -81,7 +81,7 @@ export async function handleOrganizations(request: Request, env: Env, path: stri
     return reply({organization:{id,name,slug,industry,role:"OWNER"}},201);
   }
 
-  const profileMatch=path.match(/^\\/api\\/organizations\\/([^/]+)\\/profile$/);
+  const profileMatch=path.match(/^\/api\/organizations\/([^/]+)\\/profile$/);
   if(profileMatch) {
     const orgId=profileMatch[1], m=await membership(env,orgId,user.id);
     if(!m) return reply({error:"Active organization membership required."},403);
@@ -109,7 +109,7 @@ export async function handleOrganizations(request: Request, env: Env, path: stri
     return reply({error:"Method not allowed."},405);
   }
 
-  const activityMatch=path.match(/^\\/api\\/organizations\\/([^/]+)\\/activity$/);
+  const activityMatch=path.match(/^\/api\/organizations\/([^/]+)\\/activity$/);
   if(activityMatch && request.method==="GET") {
     const orgId=activityMatch[1],m=await membership(env,orgId,user.id);
     if(!m) return reply({error:"Active organization membership required."},403);
@@ -119,7 +119,7 @@ export async function handleOrganizations(request: Request, env: Env, path: stri
     return reply({events:results.map((event:any)=>{let metadata:any=null;try{metadata=event.metadata?JSON.parse(event.metadata):null;}catch{}return {...event,metadata};})});
   }
 
-  const auditMatch=path.match(/^\\/api\\/organizations\\/([^/]+)\\/audit$/);
+  const auditMatch=path.match(/^\/api\/organizations\/([^/]+)\\/audit$/);
   if(auditMatch && request.method==="GET") {
     const orgId=auditMatch[1],m=await membership(env,orgId,user.id);
     if(!m||m.role!=="OWNER") return reply({error:"Audit activity is available to the organization Owner."},403);
