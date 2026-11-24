@@ -1,5 +1,6 @@
 import { parse } from "csv-parse/sync";
 import { runDatasetJoinQuery, runDatasetQuery } from "./query-engine";
+import { applyDatasetCellEdits } from "./dataset-edits";
 type Env={DB:D1Database;DATASETS:KVNamespace};
 const readStored=async(env:Env,key:string):Promise<{arrayBuffer:()=>Promise<ArrayBuffer>}|null>=>{const bytes=await env.DATASETS.get(key,"arrayBuffer");return bytes?{arrayBuffer:async()=>bytes}:null;};
 const MAX_SYNC_CSV_BYTES=256*1024;
@@ -89,7 +90,7 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
   const grant=await env.DB.prepare("SELECT h.id FROM dataset_handoffs h JOIN team_members tm ON tm.user_id=h.assigned_to JOIN teams t ON t.id=tm.team_id WHERE h.dataset_id=? AND h.status<>'REVOKED' AND t.organization_id=? AND t.leader_user_id=? LIMIT 1").bind(datasetId,dataset.organization_id,user.id).first();
   if(!grant)return json({error:"This dataset is outside your assigned team scope."},403);
  }
- if(["clean","profile","validate","anomalies","quality-dashboard","compare","insights","query"].includes(sub)&&Number(dataset.file_size)>MAX_SYNC_CSV_BYTES)return syncLimitError();
+ if(["clean","edits","profile","validate","anomalies","quality-dashboard","compare","insights","query"].includes(sub)&&Number(dataset.file_size)>MAX_SYNC_CSV_BYTES)return syncLimitError();
  if(sub==="dashboards"&&req.method==="GET"){
   const {results}=await env.DB.prepare("SELECT id,title,config_json AS configJson,created_by AS createdBy,created_at AS createdAt,updated_at AS updatedAt FROM analytics_dashboards WHERE organization_id=? AND dataset_id=? ORDER BY updated_at DESC").bind(dataset.organization_id,datasetId).all();
   return json({dashboards:(results||[]).map((item:any)=>({...item,canDelete:m.role==="OWNER"||item.createdBy===user.id,config:JSON.parse(String(item.configJson||"{}"))}))});
@@ -148,6 +149,25 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
   }catch(error){return json({error:error instanceof Error?error.message:"SQL query could not be executed."},400);}
  }
 
+if(sub==="edits"&&req.method==="POST"){
+  if(!allowed(m.role))return json({error:"Only OWNER, LEADER and ANALYST roles can edit assigned dataset cells."},403);
+  if(Number(dataset.file_size)>MAX_SYNC_CSV_BYTES)return syncLimitError();
+  let body:any={};try{body=await req.json();}catch{return json({error:"Invalid cell edit request."},400);}
+  const source=await readStored(env,dataset.storage_path);if(!source)return json({error:"Stored dataset file is missing."},500);
+  let parsed;try{parsed=parseCsv(await source.arrayBuffer());}catch{return json({error:"The stored CSV is invalid and cannot be edited."},400);}
+  let edited;try{edited=applyDatasetCellEdits(parsed.records,parsed.columns,body.changes);}catch(e){return json({error:e instanceof Error?e.message:"Cell edits are invalid."},400);}
+  const output=csvEncode(edited.rows,parsed.columns),bytes=new TextEncoder().encode(output);
+  if(bytes.byteLength>MAX_SYNC_CSV_BYTES)return syncLimitError();
+  const latest=await env.DB.prepare("SELECT COALESCE(MAX(version_number),0) AS v FROM dataset_versions WHERE dataset_id=?").bind(datasetId).first<{v:number}>(),version=Number(latest?.v||0)+1,key=dataset.organization_id+"/"+datasetId+"/v"+version+"-edited.csv";
+  const preview=edited.rows.slice(0,10).map(row=>Object.fromEntries(parsed.columns.map(column=>[column,String(row[column]??"").slice(0,500)])));
+  await env.DATASETS.put(key,bytes);
+  try{await env.DB.batch([
+   env.DB.prepare("INSERT INTO dataset_versions (id,dataset_id,version_number,storage_path,file_size,row_count,column_count,columns_json,preview_json,uploaded_by,change_note) VALUES (?,?,?,?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(),datasetId,version,key,bytes.length,edited.rows.length,parsed.columns.length,JSON.stringify(parsed.columns),JSON.stringify(preview),user.id,(typeof body.changeNote==="string"?body.changeNote:"Spreadsheet cell edits").slice(0,500)),
+   env.DB.prepare("UPDATE datasets SET storage_path=?,file_size=?,row_count=?,column_count=?,columns_json=?,preview_json=?,uploaded_by=? WHERE id=?").bind(key,bytes.length,edited.rows.length,parsed.columns.length,JSON.stringify(parsed.columns),JSON.stringify(preview),user.id,datasetId)
+  ]);}catch{await env.DATASETS.delete(key);return json({error:"Edited dataset version could not be saved."},500);}
+  await audit(env,dataset.organization_id,user.id,"DATASET_CELLS_EDITED",datasetId,{versionNumber:version,editedCells:edited.applied});
+  return json({version:{versionNumber:version,rowCount:edited.rows.length,columnCount:parsed.columns.length,columns:parsed.columns,preview},editedCells:edited.applied},201);
+}
 if(sub==="clean"&&req.method==="POST"){
   if(!allowed(m.role))return json({error:"Only OWNER, LEADER and ANALYST roles can create cleaned dataset versions."},403);
   let body:any={};try{body=await req.json();}catch{return json({error:"Invalid cleaning options."},400);}
