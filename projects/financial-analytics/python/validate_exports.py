@@ -11,10 +11,13 @@ import json
 from datetime import date, datetime, timezone
 from pathlib import Path
 
+from build_analytics import summarize_loans
+
 REQUIRED_FILES = (
     "source_profile.json", "data_quality_summary.csv", "missing_value_profile.csv",
     "relationship_integrity.csv", "loan_analysis_extract.csv",
     "loan_outcome_summary.csv", "loan_prior_features.csv",
+    "loan_duration_outcome_summary.csv", "loan_vintage_outcome_summary.csv",
 )
 ALLOWED_STATUSES = {"A", "B", "C", "D"}
 
@@ -109,6 +112,8 @@ def validate_exports(directory: Path) -> dict:
         loans = read_csv(directory / "loan_analysis_extract.csv")
         outcomes = read_csv(directory / "loan_outcome_summary.csv")
         features = read_csv(directory / "loan_prior_features.csv")
+        duration_summary = read_csv(directory / "loan_duration_outcome_summary.csv")
+        vintage_summary = read_csv(directory / "loan_vintage_outcome_summary.csv")
     except (OSError, json.JSONDecodeError, csv.Error) as exc:
         record("artifact_readability", False, str(exc))
         return report
@@ -198,6 +203,42 @@ def validate_exports(directory: Path) -> dict:
            "loan_status" not in feature_columns and "status" not in feature_columns,
            "Target status is excluded from the as-of feature CSV.")
 
+    def reconcile_analytics_summary(name: str, dimension: str, rows: list[dict[str, str]]) -> None:
+        required = {
+            dimension, "status", "loan_count", "distinct_accounts",
+            "average_loan_amount", "share_pct",
+        }
+        schema_ok = bool(rows) and required <= set(rows[0])
+        if not schema_ok:
+            record(name, False, f"Required columns missing: {sorted(required - (set(rows[0]) if rows else set()))}.")
+            return
+        expected_rows = summarize_loans(loans, dimension)
+        expected_map = {(row[dimension], row["status"]): row for row in expected_rows}
+        actual_map = {}
+        duplicate_keys = 0
+        for row in rows:
+            key = (row.get(dimension, ""), row.get("status", ""))
+            if key in actual_map:
+                duplicate_keys += 1
+            actual_map[key] = {column: row.get(column, "") for column in required}
+        expected_map = {
+            key: {column: row.get(column, "") for column in required}
+            for key, row in expected_map.items()
+        }
+        passed = duplicate_keys == 0 and actual_map == expected_map
+        record(
+            name, passed,
+            f"{len(rows)} grouped rows; {duplicate_keys} duplicate group keys; "
+            f"expected {len(expected_map)} groups from {len(loans)} loan rows.",
+        )
+
+    reconcile_analytics_summary(
+        "duration_outcome_summary_reconciliation", "duration_months", duration_summary
+    )
+    reconcile_analytics_summary(
+        "vintage_outcome_summary_reconciliation", "loan_month", vintage_summary
+    )
+
     loan_id_set = set(nonblank_ids)
     feature_ids = [row.get("loan_id", "").strip() for row in features]
     unknown_feature_ids = sorted(value for value in set(feature_ids) if value and value not in loan_id_set)
@@ -253,7 +294,8 @@ def validate_exports(directory: Path) -> dict:
 
     report["summary"] = {
         "loan_rows": len(loans), "feature_rows": len(features),
-        "status_groups": len(outcomes), "source_columns_profiled": len(missing_rows),
+        "status_groups": len(outcomes), "duration_groups": len(duration_summary),
+        "vintage_groups": len(vintage_summary), "source_columns_profiled": len(missing_rows),
         "relationship_checks": len(relationship_rows),
         "foreign_key_orphan_rows": orphan_total,
     }

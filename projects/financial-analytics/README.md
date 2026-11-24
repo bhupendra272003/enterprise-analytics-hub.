@@ -32,6 +32,7 @@ python -m venv .venv
 pip install -r requirements.txt
 python python/profile_financial.py
 python python/export_source_tables.py
+python python/build_analytics.py
 python python/validate_exports.py
 ~~~
 
@@ -45,13 +46,15 @@ The profiler prompts for the database user and password; it does not write them 
 | output/relationship_integrity.csv | Orphan-row counts for documented foreign-key relationships |
 | output/loan_analysis_extract.csv | Loan-grain source extract, retaining loan_id and account_id |
 | output/loan_outcome_summary.csv | Loan count, distinct accounts, average amount/duration and share by observed status |
+| output/loan_duration_outcome_summary.csv | Descriptive loan counts, distinct accounts, average amount and overall share by duration and observed status |
+| output/loan_vintage_outcome_summary.csv | Descriptive loan counts, distinct accounts, average amount and overall share by loan month and observed status |
 | output/loan_prior_features.csv | Transaction aggregates strictly before each loan date, without the target status |
 | output/source_tables/*.csv | Full raw-table extracts for all eight source tables, streamed in 10,000-row batches |
 | output/source_tables/manifest.json | Export completion marker with UTC timestamp, row counts, column counts and source column names for all eight tables |
 | output/validation_report.json | Offline consistency, grain, target-leakage and temporal-boundary validation |
 | output/validation_summary.csv | One row per validator check |
 
-The optional raw-table exporter streams each of the eight source tables to separate CSV files under output/source_tables/ in bounded batches; it uses SELECT only and does not load the full transaction table into memory. It stages all eight files first and publishes manifest.json last; treat that manifest as the export completion marker and use its row/column counts when validating a refresh. The export validator is offline and uses only the Python standard library. A failed check exits with code 1; foreign-key orphan counts are surfaced as warnings so source exceptions are not silently hidden.
+The optional raw-table exporter streams each of the eight source tables to separate CSV files under output/source_tables/ in bounded batches; it uses SELECT only and does not load the full transaction table into memory. It stages all eight files first and publishes manifest.json last; treat that manifest as the export completion marker and use its row/column counts when validating a refresh. The grouped analytics builder and export validator are offline and use only the Python standard library. The builder reads the saved loan extract and never reconnects to MariaDB. A failed check exits with code 1; foreign-key orphan counts are surfaced as warnings so source exceptions are not silently hidden.
 
 ## Analysis guardrails
 
@@ -63,8 +66,8 @@ Transaction types are retained as observed categories. Do not label them income/
 
 ## Power BI workflow
 
-1. Run the profiler and offline validator.
-2. Load source_profile.json, loan_analysis_extract.csv, loan_prior_features.csv, missing_value_profile.csv, and relationship_integrity.csv into Vyron's Financial Analytics page for local review.
+1. Run the profiler, build the grouped analytical summaries, then run the offline validator.
+2. Load source_profile.json, loan_analysis_extract.csv, loan_prior_features.csv, loan_duration_outcome_summary.csv, loan_vintage_outcome_summary.csv, missing_value_profile.csv, and relationship_integrity.csv into Vyron's Financial Analytics page for local review.
 3. Import the CSV outputs into Power BI Desktop.
 4. Follow POWER_BI_MODEL.md for relationship cardinality, measures, temporal leakage controls and report pages.
 5. Keep source extract date, query version, row counts and validation report with the PBIX deliverable.

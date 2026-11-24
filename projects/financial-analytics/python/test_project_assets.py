@@ -50,6 +50,15 @@ class FinancialProjectAssetTests(unittest.TestCase):
         self.assertIn("loan[loan_id]", guide)
         self.assertIn("account_id", guide)
 
+    def test_offline_analytics_builder_is_documented(self):
+        script = (ROOT / "python" / "build_analytics.py").read_text(encoding="utf-8")
+        self.assertIn("loan_duration_outcome_summary.csv", script)
+        self.assertIn("loan_vintage_outcome_summary.csv", script)
+        self.assertIn("def summarize_loans", script)
+        self.assertNotIn("mysql.connector", script)
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        self.assertIn("python python/build_analytics.py", readme)
+
     def test_python_profiler_covers_all_table_nulls_and_relationships(self):
         script = (ROOT / "python" / "profile_financial.py").read_text(encoding="utf-8")
         self.assertIn("fetch_missing_values", script)

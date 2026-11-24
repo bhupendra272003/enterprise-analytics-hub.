@@ -25,7 +25,7 @@ jobs:
           python -m unittest discover -s python -p 'test_*.py' -v
       - name: Validate PKDD Financial project assets
         run: |
-          python -m py_compile projects/financial-analytics/python/profile_financial.py
+          python -m py_compile projects/financial-analytics/python/profile_financial.py projects/financial-analytics/python/export_source_tables.py projects/financial-analytics/python/build_analytics.py projects/financial-analytics/python/validate_exports.py
           python -m unittest discover -s projects/financial-analytics/python -p 'test_*.py' -v
       - name: Validate all Cloudflare D1 migrations
         run: |

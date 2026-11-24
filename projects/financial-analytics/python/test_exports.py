@@ -41,6 +41,14 @@ class ExportValidatorTests(unittest.TestCase):
             {"status": "A", "loan_count": "1", "distinct_accounts": "1", "average_loan_amount": "1000", "average_duration_months": "12", "share_pct": "50"},
             {"status": "B", "loan_count": "1", "distinct_accounts": "1", "average_loan_amount": "2000", "average_duration_months": "24", "share_pct": "50"},
         ])
+        self.write_csv("loan_duration_outcome_summary.csv", [
+            {"duration_months": "12", "status": "A", "loan_count": "1", "distinct_accounts": "1", "average_loan_amount": "1000.00", "share_pct": "50.00"},
+            {"duration_months": "24", "status": "B", "loan_count": "1", "distinct_accounts": "1", "average_loan_amount": "2000.00", "share_pct": "50.00"},
+        ])
+        self.write_csv("loan_vintage_outcome_summary.csv", [
+            {"loan_month": "1994-01", "status": "A", "loan_count": "1", "distinct_accounts": "1", "average_loan_amount": "1000.00", "share_pct": "50.00"},
+            {"loan_month": "1994-02", "status": "B", "loan_count": "1", "distinct_accounts": "1", "average_loan_amount": "2000.00", "share_pct": "50.00"},
+        ])
         self.write_csv("loan_prior_features.csv", [{
             "loan_id": "1", "account_id": "100", "loan_date": "1994-01-10",
             "loan_amount": "1000", "loan_duration_months": "12",
@@ -93,6 +101,14 @@ class ExportValidatorTests(unittest.TestCase):
         profile_path.write_text(json.dumps(profile), encoding="utf-8")
         report = validate_exports(self.directory)
         self.assertIn("feature_row_count", {item["check"] for item in report["errors"]})
+
+    def test_grouped_summary_mismatch_fails(self):
+        self.write_csv("loan_duration_outcome_summary.csv", [
+            {"duration_months": "12", "status": "A", "loan_count": "9", "distinct_accounts": "1", "average_loan_amount": "1000.00", "share_pct": "50.00"},
+            {"duration_months": "24", "status": "B", "loan_count": "1", "distinct_accounts": "1", "average_loan_amount": "2000.00", "share_pct": "50.00"},
+        ])
+        report = validate_exports(self.directory)
+        self.assertIn("duration_outcome_summary_reconciliation", {item["check"] for item in report["errors"]})
 
     def test_missing_required_export_fails(self):
         (self.directory / "loan_prior_features.csv").unlink()

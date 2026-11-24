@@ -49,7 +49,7 @@ Run python python/validate_exports.py after profiling. It checks the output file
 
 ## Suggested report pages
 
-1. **Loan outcomes** — loan count by status, share by status, loan amount and duration distributions. Clearly distinguish finished target classes A/B from unfinished C/D outcomes.
+1. **Loan outcomes** — loan count and share by status, loan amount and duration distributions, duration-by-status comparisons, and monthly loan-vintage trends. The grouped summary files are descriptive views, not model features. Clearly distinguish finished target classes A/B from unfinished C/D outcomes.
 2. **Borrower and district profile** — demographic and district attributes after checking the source data dictionary and privacy implications.
 3. **Account activity** — transaction counts and amounts by observed transaction type. Do not label transaction types as income/expense until their meanings are confirmed.
 4. **Data quality** — missing values, duplicate-key exceptions, orphan references, loan grain audit and transaction date-boundary checks.
@@ -96,14 +96,16 @@ If the report filters to completed target classes A/B, create an explicitly name
 
 ### Import only artifacts that exist in the current profiler output
 
-For the current CSV export workflow, begin with these tables:
+After running `python python/build_analytics.py`, the current CSV workflow provides these tables:
 
 - `loan_analysis_extract.csv` — one row per source loan; keep `loan_id` as the unique row key.
 - `loan_prior_features.csv` — one row per loan and observed transaction type; the key is the composite `loan_id` + `transaction_type`. A blank transaction type can represent a loan with no matching prior transactions.
 - `loan_outcome_summary.csv` — pre-aggregated status summary for reconciliation only; do not relate it as another loan fact table.
+- `loan_duration_outcome_summary.csv` — descriptive outcome counts by loan duration and observed status; use for duration comparisons, not as a predictor table.
+- `loan_vintage_outcome_summary.csv` — descriptive outcome counts by loan month and observed status; use for historical cohort trends, not as a predictor table.
 - `data_quality_summary.csv`, `missing_value_profile.csv`, and `relationship_integrity.csv` — quality/audit tables for the quality page.
 
-The profiler creates the quality and loan-focused extracts. Run `python python/export_source_tables.py` to create full raw CSV extracts for all eight source tables under `output/source_tables/`. Import these raw extracts only when needed for the wider relational report; preserve the exact source column names and validate row counts against `source_profile.json` before modelling.
+The profiler creates the quality and loan-focused extracts. `build_analytics.py` adds the duration and monthly-vintage summaries from the saved loan extract without reconnecting to MariaDB. Run `python python/export_source_tables.py` to create full raw CSV extracts for all eight source tables under `output/source_tables/`. Import these raw extracts only when needed for the wider relational report; preserve the exact source column names and validate row counts against `source_profile.json` before modelling.
 
 ### Optional full relational model from raw source exports
 
@@ -184,7 +186,7 @@ A/B are the finished-loan classes described by the source task. Keep C/D visible
 ### Refresh and reconciliation procedure
 
 1. Preserve the complete `output/` folder from one profiler run; do not mix CSVs from different runs.
-2. Import the six CSV artifacts listed above using **Get Data → Text/CSV**.
+2. Import the eight CSV artifacts listed above using **Get Data → Text/CSV**.
 3. Set `loan_id` and `account_id` to whole number (or a consistent text key if the source connector exports them as text); set dates to Date and amount/balance fields to Decimal Number.
 4. Disable automatic relationship detection and create only the documented loan-to-features relationship after checking uniqueness.
 5. Compare `[Loan Rows]` with the loan row count in `source_profile.json` and the sum of `loan_outcome_summary[loan_count]`.
