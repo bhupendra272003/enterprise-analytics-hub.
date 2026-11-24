@@ -48,6 +48,7 @@ test("supports blank counting, text case and additional numeric functions", () =
   assert.equal(calc("=UPPER(A2)"), "NORTH");
   assert.equal(calc("=LOWER(A2)"), "north");
   assert.equal(calc('=PROPER("north east")'), "North East");
+  assert.equal(calc('=PROPER("north-east_sales")'), "North-East_Sales");
   assert.equal(calc('=CONCATENATE(A2,"-","Q1")'), "North-Q1");
   assert.equal(calc("=ABS(-12.5)"), "12.5");
   assert.equal(calc("=SQRT(81)"), "9");
