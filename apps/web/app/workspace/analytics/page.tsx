@@ -12,6 +12,7 @@ export default function AnalyticsStudio(){
  const [orgs,setOrgs]=useState<Org[]>([]),[org,setOrg]=useState(''),[datasets,setDatasets]=useState<Dataset[]>([]);
  const [active,setActive]=useState<TableData|null>(null),[query,setQuery]=useState(''),[filter,setFilter]=useState(''),[pageRows,setPageRows]=useState<Record<string,string>[]>([]),[pageInfo,setPageInfo]=useState({page:1,pageSize:50,totalRows:0,totalPages:1}),[page,setPage]=useState(1),[notice,setNotice]=useState('Loading your internal data workspace…');
  const [tab,setTab]=useState<'grid'|'python'|'sql'|'bi'>('grid'),[sort,setSort]=useState(''),[ascending,setAscending]=useState(true);
+  const [formula,setFormula]=useState('=SUM(B2:B51)'),[formulaResult,setFormulaResult]=useState('');
  useEffect(()=>{const requested=new URLSearchParams(window.location.search).get('tool');if(requested==='sql'||requested==='bi'||requested==='python')setTab(requested);},[]);
  const pythonStarter='import pandas as pd\nimport numpy as np\n\n# The selected dataset is available as data.csv\ndf = pd.read_csv("data.csv")\n\nprint(df.head())\nprint(df.describe(include="all"))';
  const sqlStarter='-- Query the selected CSV dataset (read-only)\nSELECT *\nFROM data\nLIMIT 100;';
