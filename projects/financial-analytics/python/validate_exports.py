@@ -73,6 +73,55 @@ def validate_raw_source_exports(directory: Path) -> tuple[bool, str]:
 
 
 
+def validate_client_account_outputs(directory: Path) -> tuple[bool, str]:
+    """Reconcile derived client/account bridge CSVs to the raw disposition table."""
+    source = directory / "source_tables"
+    raw_paths = (source / "client.csv", source / "account.csv", source / "disp.csv")
+    output_paths = (
+        source / "client_account_coverage.csv",
+        source / "account_client_coverage.csv",
+        source / "disposition_type_summary.csv",
+    )
+    if not all(path.is_file() for path in raw_paths):
+        return True, "Client-account raw exports are incomplete; bridge reconciliation skipped."
+    if not all(path.is_file() for path in output_paths):
+        return False, "Raw client/account/disp exports exist but one or more derived bridge outputs are missing."
+
+    clients, accounts, dispositions = (read_csv(path) for path in raw_paths)
+    client_ids = {r.get("client_id", "").strip() for r in clients if r.get("client_id", "").strip()}
+    account_ids = {r.get("account_id", "").strip() for r in accounts if r.get("account_id", "").strip()}
+    expected_client: dict[str, set[str]] = {}
+    expected_account: dict[str, set[str]] = {}
+    expected_types: dict[str, int] = {}
+    for row in dispositions:
+        client_id, account_id = row.get("client_id", "").strip(), row.get("account_id", "").strip()
+        if client_id and account_id:
+            expected_client.setdefault(client_id, set()).add(account_id)
+            expected_account.setdefault(account_id, set()).add(client_id)
+        label = row.get("type", "").strip() or "<MISSING>"
+        expected_types[label] = expected_types.get(label, 0) + 1
+
+    actual_client_rows = read_csv(output_paths[0])
+    actual_account_rows = read_csv(output_paths[1])
+    actual_type_rows = read_csv(output_paths[2])
+    actual_client = {r.get("client_id", ""): r.get("distinct_accounts", "") for r in actual_client_rows}
+    actual_account = {r.get("account_id", ""): r.get("distinct_clients", "") for r in actual_account_rows}
+    actual_types = {r.get("observed_disposition_type", ""): r.get("relationship_count", "") for r in actual_type_rows}
+    expected_client_counts = {k: str(len(v)) for k, v in expected_client.items()}
+    expected_account_counts = {k: str(len(v)) for k, v in expected_account.items()}
+    expected_type_counts = {k: str(v) for k, v in expected_types.items()}
+    passed = (actual_client == expected_client_counts and actual_account == expected_account_counts
+              and actual_types == expected_type_counts)
+    unmatched_clients = {r.get("client_id", "").strip() for r in dispositions if r.get("client_id", "").strip()} - client_ids
+    unmatched_accounts = {r.get("account_id", "").strip() for r in dispositions if r.get("account_id", "").strip()} - account_ids
+    detail = (
+        f"Disposition rows={len(dispositions)}; client groups={len(actual_client)}; "
+        f"account groups={len(actual_account)}; unmatched clients={len(unmatched_clients)}; "
+        f"unmatched accounts={len(unmatched_accounts)}."
+    )
+    return passed, detail
+
+
 def read_csv(path: Path) -> list[dict[str, str]]:
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
         return list(csv.DictReader(handle))
@@ -121,6 +170,8 @@ def validate_exports(directory: Path) -> dict:
     record("artifact_readability", True, "JSON and CSV exports are readable.")
     raw_ok, raw_detail = validate_raw_source_exports(directory)
     record("raw_source_table_exports", raw_ok, raw_detail)
+    bridge_ok, bridge_detail = validate_client_account_outputs(directory)
+    record("client_account_bridge_reconciliation", bridge_ok, bridge_detail)
     inventory = profile.get("inventory", [])
     record("source_inventory", len(inventory) == 8,
            f"Profiler reports {len(inventory)} of 8 expected source tables.")
