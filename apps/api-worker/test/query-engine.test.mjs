@@ -69,3 +69,21 @@ test("supports grouped COUNT and numeric MIN/MAX", () => {
   assert.equal(result.rows[0].low, 100);
   assert.equal(result.rows[0].high, 175);
 });
+
+
+test("supports tenant-scoped inner joins with qualified projections", () => {
+  const { runDatasetJoinQuery } = await import(moduleUrl);
+  const customers = [{id:"1",name:"A"},{id:"2",name:"B"},{id:"3",name:"C"}];
+  const orders = [{customer_id:"1",amount:"20"},{customer_id:"1",amount:"30"},{customer_id:"3",amount:"15"}];
+  const result = runDatasetJoinQuery("SELECT c.name AS customer, o.amount FROM data c INNER JOIN dataset_0123456789abcdef0123456789abcdef o ON c.id = o.customer_id ORDER BY o.amount DESC LIMIT 10", customers, ["id","name"], orders, ["customer_id","amount"]);
+  assert.equal(result.rowCount,3);
+  assert.deepEqual(result.rows[0],{customer:"A",o_amount:"30"});
+});
+
+test("supports left joins and enforces the result cap", async () => {
+  const { runDatasetJoinQuery } = await import(moduleUrl);
+  const result = runDatasetJoinQuery("SELECT c.name, o.amount FROM data c LEFT JOIN dataset_0123456789abcdef0123456789abcdef o ON c.id = o.customer_id LIMIT 10", [{id:"1",name:"A"},{id:"2",name:"B"}], ["id","name"], [{customer_id:"1",amount:"20"}], ["customer_id","amount"]);
+  assert.equal(result.rowCount,2);
+  assert.equal(result.rows[1].o_amount,null);
+  assert.throws(()=>runDatasetJoinQuery("SELECT * FROM data c INNER JOIN dataset_0123456789abcdef0123456789abcdef o ON c.id = o.customer_id LIMIT 501", [], ["id"], [], ["customer_id"]),/LIMIT/);
+});
