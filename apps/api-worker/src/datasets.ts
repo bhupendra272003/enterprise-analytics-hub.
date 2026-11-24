@@ -367,12 +367,12 @@ if(sub==="clean"&&req.method==="POST"){
   if(status==="IN_PROGRESS"||status==="SUBMITTED"){
    if(handoff.assigned_to!==user.id||!["ASSIGNED","IN_PROGRESS","RETURNED"].includes(handoff.status))return json({error:"Only the assigned Analyst can start or submit this handoff."},403);
    if(status==="SUBMITTED"){
-    if(!Number.isInteger(outputVersion)||outputVersion<1)return json({error:"Choose the internally saved output version before submitting."},400);
-    const version=await env.DB.prepare("SELECT id FROM dataset_versions WHERE dataset_id=? AND version_number=?").bind(datasetId,outputVersion).first();
-    if(!version)return json({error:"The submitted output version does not exist."},400);
+    if((handoff.stage==="SQL_REVIEW"||handoff.stage==="RECONCILIATION")&&!resultJson)return json({error:"Attach the internal SQL/QA result JSON before submitting this stage."},400);
+    if(outputVersion>0){const version=await env.DB.prepare("SELECT id FROM dataset_versions WHERE dataset_id=? AND version_number=?").bind(datasetId,outputVersion).first();if(!version)return json({error:"The submitted output version does not exist."},400);}
+    if(outputVersion<1&&!resultJson)return json({error:"Submit an internally saved dataset version or a structured result."},400);
    }
   }else{
-   let reviewer=m.role==="OWNER"||m.role==="MANAGER";
+   let reviewer=m.role==="OWNER";
    if(m.role==="LEADER"){
     const team=await env.DB.prepare("SELECT t.id FROM teams t JOIN team_members tm ON tm.team_id=t.id WHERE t.organization_id=? AND t.leader_user_id=? AND tm.user_id=? LIMIT 1").bind(dataset.organization_id,user.id,handoff.assigned_to).first();
     reviewer=!!team;
