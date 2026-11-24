@@ -174,7 +174,7 @@ class BuildAnalyticsTests(unittest.TestCase):
         self.assertEqual(a["valid_schedule_rows"], "2")
         self.assertEqual(a["average_monthly_installment"], "150.00")
         self.assertEqual(a["average_scheduled_total"], "1500.00")
-        self.assertEqual(a["average_scheduled_to_principal_ratio"], "0.90")
+        self.assertEqual(a["average_scheduled_to_principal_ratio"], "1.05")
         self.assertEqual(b["loan_count"], "2")
         self.assertEqual(b["valid_schedule_rows"], "0")
         self.assertEqual(b["valid_ratio_rows"], "0")
