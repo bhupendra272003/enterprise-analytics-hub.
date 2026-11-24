@@ -159,5 +159,26 @@ class BuildAnalyticsTests(unittest.TestCase):
         self.assertIn("card.disp_id->disp.disp_id: 1", detail)
 
 
+    def test_scheduled_repayment_summary_is_explicitly_scheduled(self):
+        from build_analytics import summarize_scheduled_repayments
+        rows = [
+            {"loan_id": "1", "amount": "1000", "duration": "10", "payments": "120", "status": "A"},
+            {"loan_id": "2", "amount": "2000", "duration": "10", "payments": "180", "status": "A"},
+            {"loan_id": "3", "amount": "0", "duration": "10", "payments": "100", "status": "B"},
+            {"loan_id": "4", "amount": "500", "duration": "0", "payments": "100", "status": "B"},
+        ]
+        result = summarize_scheduled_repayments(rows)
+        a = next(row for row in result if row["status"] == "A")
+        b = next(row for row in result if row["status"] == "B")
+        self.assertEqual(a["loan_count"], "2")
+        self.assertEqual(a["valid_schedule_rows"], "2")
+        self.assertEqual(a["average_monthly_installment"], "150.00")
+        self.assertEqual(a["average_scheduled_total"], "1500.00")
+        self.assertEqual(a["average_scheduled_to_principal_ratio"], "0.90")
+        self.assertEqual(b["loan_count"], "2")
+        self.assertEqual(b["valid_schedule_rows"], "0")
+        self.assertEqual(b["valid_ratio_rows"], "0")
+
+
 if __name__ == "__main__":
     unittest.main()
