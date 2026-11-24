@@ -90,6 +90,28 @@ export function evaluateSpreadsheetFormula(formula: string, rows: SpreadsheetRow
     if (name === "MIN") return String(Math.min(...nums));
     return String(Math.max(...nums));
   }
+  if (name === "COUNTBLANK") {
+    if (args.length !== 1) throw new Error("COUNTBLANK expects one cell range.");
+    return String(range(args[0]).filter(v => v === null || v === undefined || String(v).trim() === "").length);
+  }
+  if (["UPPER","LOWER","PROPER"].includes(name)) {
+    if (args.length !== 1) throw new Error(name + " expects one text argument.");
+    const value = String(scalar(args[0]) ?? "");
+    if (name === "UPPER") return value.toLocaleUpperCase();
+    if (name === "LOWER") return value.toLocaleLowerCase();
+    return value.toLocaleLowerCase().replace(/(^|[\\s_-])([a-z])/g, (_, prefix, letter) => prefix + letter.toLocaleUpperCase());
+  }
+  if (["ABS","SQRT","POWER","MOD"].includes(name)) {
+    const expected = name === "POWER" || name === "MOD" ? 2 : 1;
+    if (args.length !== expected) throw new Error(name + " expects " + expected + " numeric argument(s).");
+    const values = args.map(arg => Number(scalar(arg)));
+    if (values.some(value => !Number.isFinite(value))) throw new Error(name + " requires finite numeric arguments.");
+    if (name === "SQRT" && values[0] < 0) throw new Error("SQRT requires a non-negative number.");
+    if (name === "MOD" && values[1] === 0) throw new Error("MOD cannot divide by zero.");
+    const result = name === "ABS" ? Math.abs(values[0]) : name === "SQRT" ? Math.sqrt(values[0]) : name === "POWER" ? values[0] ** values[1] : values[0] % values[1];
+    if (!Number.isFinite(result)) throw new Error(name + " result is outside the supported numeric range.");
+    return String(result);
+  }
   if (["SUMIF","COUNTIF","AVERAGEIF"].includes(name)) {
     if (args.length < 2 || args.length > 3) throw new Error(name + " expects criteria range, criteria and optional sum/average range.");
     const criteriaValues = range(args[0]), criterion = args[1].replace(/^"|"$/g, "");
@@ -109,7 +131,7 @@ export function evaluateSpreadsheetFormula(formula: string, rows: SpreadsheetRow
     else { const value = scalar(args[0]); passed = value === true || (typeof value === "number" && value !== 0) || (typeof value === "string" && value.length > 0); }
     return String(scalar(passed ? args[1] : args[2]) ?? "");
   }
-  if (name === "CONCAT") return args.flatMap(arg => arg.includes(":") ? range(arg) : [scalar(arg)]).map(v => String(v ?? "")).join("");
+  if (name === "CONCAT" || name === "CONCATENATE") return args.flatMap(arg => arg.includes(":") ? range(arg) : [scalar(arg)]).map(v => String(v ?? "")).join("");
   if (["LEFT","RIGHT","LEN","TRIM"].includes(name)) {
     if ((name === "LEN" || name === "TRIM") ? args.length !== 1 : args.length < 1 || args.length > 2) throw new Error(name + " has an invalid number of arguments.");
     const value = String(scalar(args[0]) ?? "");
@@ -119,12 +141,12 @@ export function evaluateSpreadsheetFormula(formula: string, rows: SpreadsheetRow
     if (name === "TRIM") return value.trim().replace(/\s+/g, " ");
     return name === "LEFT" ? value.slice(0, count) : count === 0 ? "" : value.slice(-count);
   }
-  if (name === "ROUND") {
-    if (args.length < 1 || args.length > 2) throw new Error("ROUND expects a number and optional decimal places.");
+  if (["ROUND","ROUNDUP","ROUNDDOWN"].includes(name)) {
+    if (args.length < 1 || args.length > 2) throw new Error(name + " expects a number and optional decimal places.");
     const value = Number(scalar(args[0])), places = args[1] ? Number(scalar(args[1])) : 0;
     if (!Number.isFinite(value) || !Number.isInteger(places) || Math.abs(places) > 10) throw new Error("ROUND requires a finite number and decimal places between -10 and 10.");
     const factor = 10 ** places;
-    return String(Math.round((value + Number.EPSILON) * factor) / factor);
+    const scaled = value * factor;\n    const rounded = name === "ROUNDUP" ? Math.sign(scaled) * Math.ceil(Math.abs(scaled)) : name === "ROUNDDOWN" ? Math.trunc(scaled) : Math.round(scaled + Number.EPSILON);\n    return String(rounded / factor);
   }
   throw new Error("This formula is not supported yet.");
 }
