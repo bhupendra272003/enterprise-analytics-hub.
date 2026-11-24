@@ -74,6 +74,18 @@ function parseProjection(source: string, columns: string[]) {
     return { kind: "column" as const, column, alias: col[2] || column };
   });
 }
+function parseHavingCondition(source: string, projections: ReturnType<typeof parseProjection>): Condition {
+  const match = source.match(/^(.+?)\\s*(>=|<=|<>|!=|=|>|<)\\s*(?:'((?:''|[^'])*)'|("(?:[^"]|"")*")|(-?\\d+(?:\\.\\d+)?))$/i);
+  if (!match) throw new Error("Unsupported HAVING condition: " + source);
+  const expression = match[1].trim().replace(/\\s+/g, "").toLowerCase();
+  const projection = projections.find(p => p.kind === "aggregate" && (
+    p.alias.toLowerCase() === expression ||
+    (p.fn + "(" + p.column + ")").toLowerCase() === expression
+  ));
+  if (!projection || projection.kind !== "aggregate") throw new Error("HAVING must reference an aggregate expression or its SELECT alias.");
+  const value = match[3] !== undefined ? match[3].replace(/''/g, "'") : match[4] !== undefined ? match[4].slice(1,-1).replace(/""/g,'"') : Number(match[5]);
+  return { column: projection.alias, operator: match[2], value };
+}
 function aggregateValue(fn: string, column: string, rows: QueryRow[]) {
   const values = column === "*" ? rows.map(() => 1) : rows.map(row => row[column]).filter(v => v !== "" && v !== null && v !== undefined);
   const nums = values.map(Number).filter(Number.isFinite);
@@ -89,8 +101,8 @@ export function runDatasetQuery(sql: string, sourceRows: QueryRow[], sourceColum
   const statement = sql.replace(/--[^\n\r]*/g, "").trim().replace(/;\s*$/, "").trim();
   if (statement.includes(";") || !/^SELECT\b/i.test(statement)) throw new Error("Only one read-only SELECT statement is allowed.");
   if (/\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|REPLACE|ATTACH|DETACH|PRAGMA|VACUUM|INTO|UNION|WITH|RECURSIVE)\b/i.test(statement)) throw new Error("This SQL Studio supports read-only SELECT queries only.");
-  const match = statement.match(/^SELECT\s+([\s\S]+?)\s+FROM\s+([\w-]+)(?:\s+WHERE\s+([\s\S]+?))?(?:\s+GROUP\s+BY\s+([\w."`\[\]-]+(?:\s*,\s*[\w."`\[\]-]+)*))?(?:\s+ORDER\s+BY\s+([\w."`\[\]-]+)(?:\s+(ASC|DESC))?)?(?:\s+LIMIT\s+(\d+))?$/i);
-  if (!match) throw new Error("Use SELECT columns FROM data with optional WHERE, GROUP BY, ORDER BY and LIMIT clauses.");
+  const match = statement.match(/^SELECT\s+([\s\S]+?)\s+FROM\s+([\w-]+)(?:\s+WHERE\s+([\s\S]+?))?(?:\s+GROUP\s+BY\s+([\w."`\[\]-]+(?:\s*,\s*[\w."`\[\]-]+)*))?(?:\s+HAVING\s+([\s\S]+?))?(?:\s+ORDER\s+BY\s+([\w."`\[\]-]+)(?:\s+(ASC|DESC))?)?(?:\s+LIMIT\s+(\d+))?$/i);
+  if (!match) throw new Error("Use SELECT columns FROM data with optional WHERE, GROUP BY, HAVING, ORDER BY and LIMIT clauses.");
   if (!["data","dataset","records"].includes(match[2].toLowerCase())) throw new Error("FROM must reference the selected dataset as data.");
   const selectClause=match[1].trim(),distinct=/^DISTINCT\b/i.test(selectClause);
   const projections = parseProjection(distinct?selectClause.replace(/^DISTINCT\s+/i,""):selectClause, sourceColumns);
@@ -98,7 +110,8 @@ export function runDatasetQuery(sql: string, sourceRows: QueryRow[], sourceColum
   const where = match[3] ? splitLogical(match[3],"OR").map(group=>splitLogical(group,"AND").map(v=>parseCondition(v, sourceColumns))) : [];
   const groupColumns = match[4] ? match[4].split(",").map(v=>cleanIdentifier(v.trim())) : [];
   if (groupColumns.some(c=>!sourceColumns.includes(c))) throw new Error("GROUP BY contains an unknown column.");
-  const limit = match[7] ? Number(match[7]) : 100;
+  const having = match[5] ? splitLogical(match[5],"OR").map(group=>splitLogical(group,"AND").map(value=>parseHavingCondition(value,projections))) : [];
+  const limit = match[8] ? Number(match[8]) : 100;
   if (!Number.isInteger(limit) || limit < 1 || limit > 500) throw new Error("LIMIT must be between 1 and 500.");
   const filteredRows = sourceRows.filter(row => !where.length || where.some(group => group.every(condition => compareCondition(row, condition))));
   const matchedRows = filteredRows.length;
@@ -139,12 +152,14 @@ export function runDatasetQuery(sql: string, sourceRows: QueryRow[], sourceColum
     const seen=new Set<string>();
     result=result.filter(row=>{const key=JSON.stringify(resultColumns.map(column=>row[column]??null));if(seen.has(key))return false;seen.add(key);return true;});
   }
-  const orderBy = match[5] ? cleanIdentifier(match[5]) : "";
+  if(having.length&&!groupColumns.length)throw new Error("HAVING requires a GROUP BY clause.");
+  if(having.length)result=result.filter(row=>having.some(group=>group.every(condition=>compareCondition(row,condition))));
+  const orderBy = match[6] ? cleanIdentifier(match[6]) : "";
   if (orderBy) {
     const projection = projections.find(p=>p.kind==="column"&&(p.alias===orderBy||p.column===orderBy)||p.kind==="aggregate"&&p.alias===orderBy);
     const outputKey = resultColumns.includes(orderBy) ? orderBy : projection?.kind==="column" ? projection.alias : "";
     if (!outputKey) throw new Error("Unknown ORDER BY column: " + orderBy);
-    const direction = match[6]?.toUpperCase()==="DESC" ? -1 : 1;
+    const direction = match[7]?.toUpperCase()==="DESC" ? -1 : 1;
     result = result.slice().sort((a,b)=>{
       const av=a[outputKey]??"",bv=b[outputKey]??"",an=Number(av),bn=Number(bv);
       const cmp=String(av).trim()!==""&&String(bv).trim()!==""&&Number.isFinite(an)&&Number.isFinite(bn)?an-bn:String(av).localeCompare(String(bv));
