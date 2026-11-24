@@ -11,7 +11,7 @@ const splitLogical = (value: string, operator: "AND" | "OR") => {
     if(char==="'"||char==='"'){quote=char;i++;continue;}
     if(char==="("){depth++;i++;continue;}
     if(char===")"){depth=Math.max(0,depth-1);i++;continue;}
-    if(depth===0&&value.slice(i,i+operator.length).toUpperCase()===operator&&(i===0||/\\s/.test(value[i-1]))&&(i+operator.length===value.length||/\\s/.test(value[i+operator.length]))){
+    if(depth===0&&value.slice(i,i+operator.length).toUpperCase()===operator&&(i===0||/\s/.test(value[i-1]))&&(i+operator.length===value.length||/\s/.test(value[i+operator.length]))){
       parts.push(value.slice(start,i).trim());i+=operator.length;start=i;continue;
     }
     i++;
@@ -92,8 +92,8 @@ export function runDatasetQuery(sql: string, sourceRows: QueryRow[], sourceColum
   const match = statement.match(/^SELECT\s+([\s\S]+?)\s+FROM\s+([\w-]+)(?:\s+WHERE\s+([\s\S]+?))?(?:\s+GROUP\s+BY\s+([\w."`\[\]-]+(?:\s*,\s*[\w."`\[\]-]+)*))?(?:\s+ORDER\s+BY\s+([\w."`\[\]-]+)(?:\s+(ASC|DESC))?)?(?:\s+LIMIT\s+(\d+))?$/i);
   if (!match) throw new Error("Use SELECT columns FROM data with optional WHERE, GROUP BY, ORDER BY and LIMIT clauses.");
   if (!["data","dataset","records"].includes(match[2].toLowerCase())) throw new Error("FROM must reference the selected dataset as data.");
-  const selectClause=match[1].trim(),distinct=/^DISTINCT\\b/i.test(selectClause);
-  const projections = parseProjection(distinct?selectClause.replace(/^DISTINCT\\s+/i,""):selectClause, sourceColumns);
+  const selectClause=match[1].trim(),distinct=/^DISTINCT\b/i.test(selectClause);
+  const projections = parseProjection(distinct?selectClause.replace(/^DISTINCT\s+/i,""):selectClause, sourceColumns);
   if(distinct&&projections.some(p=>p.kind==="aggregate"))throw new Error("DISTINCT aggregate expressions are not supported; use a grouped query.");
   const where = match[3] ? splitLogical(match[3],"OR").map(group=>splitLogical(group,"AND").map(v=>parseCondition(v, sourceColumns))) : [];
   const groupColumns = match[4] ? match[4].split(",").map(v=>cleanIdentifier(v.trim())) : [];
