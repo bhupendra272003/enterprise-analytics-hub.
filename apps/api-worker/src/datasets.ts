@@ -47,7 +47,12 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
  const orgList=path.match(/^\/api\/organizations\/([^/]+)\/datasets$/);
  if(orgList&&req.method==="GET"){
   const orgId=orgList[1],m=await membership(env,orgId,user.id);if(!m)return json({error:"Insufficient organization permissions."},403);
-  const {results}=await env.DB.prepare("SELECT d.id,d.name,d.original_filename AS originalFilename,d.file_size AS fileSize,d.row_count AS rowCount,d.column_count AS columnCount,d.created_at AS createdAt,u.full_name AS uploadedBy FROM datasets d JOIN users u ON u.id=d.uploaded_by WHERE d.organization_id=? ORDER BY d.created_at DESC").bind(orgId).all();
+  let sql="SELECT d.id,d.name,d.original_filename AS originalFilename,d.file_size AS fileSize,d.row_count AS rowCount,d.column_count AS columnCount,d.created_at AS createdAt,u.full_name AS uploadedBy FROM datasets d JOIN users u ON u.id=d.uploaded_by WHERE d.organization_id=?";
+  const params:unknown[]=[orgId];
+  if(m.role==="ANALYST"){sql+=" AND EXISTS (SELECT 1 FROM dataset_handoffs h WHERE h.dataset_id=d.id AND h.assigned_to=?)";params.push(user.id);}
+  else if(m.role==="LEADER"){sql+=" AND EXISTS (SELECT 1 FROM dataset_handoffs h JOIN team_members tm ON tm.user_id=h.assigned_to JOIN teams t ON t.id=tm.team_id WHERE h.dataset_id=d.id AND t.organization_id=d.organization_id AND t.leader_user_id=?)";params.push(user.id);}
+  sql+=" ORDER BY d.created_at DESC";
+  const {results}=await env.DB.prepare(sql).bind(...params).all();
   return json({datasets:results});
  }
  if(orgList&&req.method==="POST"){
@@ -77,6 +82,13 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
  const dataset=await env.DB.prepare("SELECT id,organization_id,name,original_filename,storage_path,file_size,row_count,column_count,columns_json,preview_json FROM datasets WHERE id=?").bind(datasetId).first<any>();
  if(!dataset)return json({error:"Dataset not found."},404);
  const m=await membership(env,dataset.organization_id,user.id);if(!m)return json({error:"Insufficient organization permissions."},403);
+ if(m.role==="ANALYST"){
+  const grant=await env.DB.prepare("SELECT id FROM dataset_handoffs WHERE dataset_id=? AND assigned_to=? LIMIT 1").bind(datasetId,user.id).first();
+  if(!grant)return json({error:"This dataset has not been assigned to you. Ask the Owner or your Team Leader for access."},403);
+ }else if(m.role==="LEADER"){
+  const grant=await env.DB.prepare("SELECT h.id FROM dataset_handoffs h JOIN team_members tm ON tm.user_id=h.assigned_to JOIN teams t ON t.id=tm.team_id WHERE h.dataset_id=? AND t.organization_id=? AND t.leader_user_id=? LIMIT 1").bind(datasetId,dataset.organization_id,user.id).first();
+  if(!grant)return json({error:"This dataset is outside your assigned team scope."},403);
+ }
  if(["clean","profile","validate","anomalies","quality-dashboard","compare","insights","query"].includes(sub)&&Number(dataset.file_size)>MAX_SYNC_CSV_BYTES)return syncLimitError();
  if(sub==="dashboards"&&req.method==="GET"){
   const {results}=await env.DB.prepare("SELECT id,title,config_json AS configJson,created_by AS createdBy,created_at AS createdAt,updated_at AS updatedAt FROM analytics_dashboards WHERE organization_id=? AND dataset_id=? ORDER BY updated_at DESC").bind(dataset.organization_id,datasetId).all();
