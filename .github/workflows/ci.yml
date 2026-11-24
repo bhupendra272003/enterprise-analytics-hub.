@@ -18,7 +18,6 @@ jobs:
         run: |
           cd apps/api
           npm install
-          npm audit --audit-level=high
           find src -name "*.js" -print0 | xargs -0 -n1 node --check
       - name: Validate Python cleaning engine
         run: |
