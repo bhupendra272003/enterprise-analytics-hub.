@@ -511,6 +511,92 @@ router.get('/datasets/:datasetId/profile',async(req,res,next)=>{
 });
 
 
+
+// Internal handoffs pass version references, never a downloadable file URL.
+router.get('/datasets/:datasetId/handoffs', async (req,res,next) => {
+  try {
+    const [datasets] = await pool.execute('SELECT organization_id FROM datasets WHERE id=? LIMIT 1',[req.params.datasetId]);
+    if (!datasets.length) return res.status(404).json({error:'Dataset not found.'});
+    const [members] = await pool.execute("SELECT role FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE' LIMIT 1",[datasets[0].organization_id,req.user.id]);
+    if (!members.length) return res.status(403).json({error:'Organization membership required.'});
+    const role = members[0].role;
+    let scope = 'h.assigned_to=?';
+    const params = [req.params.datasetId,req.user.id];
+    if (['OWNER','MANAGER'].includes(role)) { scope = '1=1'; params.splice(1,1); }
+    else if (role === 'LEADER') {
+      scope = 'EXISTS (SELECT 1 FROM team_members tm JOIN teams t ON t.id=tm.team_id WHERE t.organization_id=h.organization_id AND t.leader_user_id=? AND tm.user_id=h.assigned_to)';
+      params.splice(1,0,req.user.id);
+    } else if (role !== 'ANALYST') return res.status(403).json({error:'Insufficient permissions.'});
+    const sql = 'SELECT h.id,h.stage,h.status,h.assigned_to AS assignedTo,h.assigned_by AS assignedBy,h.input_version AS inputVersion,h.output_version AS outputVersion,h.handoff_note AS handoffNote,h.review_note AS reviewNote,h.created_at AS createdAt,h.updated_at AS updatedAt,u.full_name AS assigneeName,a.full_name AS assignedByName FROM dataset_handoffs h JOIN users u ON u.id=h.assigned_to JOIN users a ON a.id=h.assigned_by WHERE h.dataset_id=? AND ' + scope + ' ORDER BY h.created_at DESC';
+    const [handoffs] = await pool.execute(sql,params);
+    res.json({handoffs});
+  } catch(e) { next(e); }
+});
+
+router.post('/datasets/:datasetId/handoffs', async (req,res,next) => {
+  try {
+    const input = z.object({
+      stage:z.enum(['CLEANING','SQL_REVIEW','DASHBOARD','RECONCILIATION']),
+      assignedTo:z.string().uuid(),
+      inputVersion:z.number().int().positive().optional(),
+      handoffNote:z.string().trim().max(1000).optional().default('')
+    }).parse(req.body);
+    const [datasets] = await pool.execute('SELECT organization_id FROM datasets WHERE id=? LIMIT 1',[req.params.datasetId]);
+    if (!datasets.length) return res.status(404).json({error:'Dataset not found.'});
+    const orgId = datasets[0].organization_id;
+    const [members] = await pool.execute("SELECT role FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE' LIMIT 1",[orgId,req.user.id]);
+    if (!members.length || !['OWNER','LEADER'].includes(members[0].role)) return res.status(403).json({error:'Only the Owner or the assigned Team Leader can create handoffs.'});
+    const [assignee] = await pool.execute("SELECT m.role,u.full_name FROM memberships m JOIN users u ON u.id=m.user_id WHERE m.organization_id=? AND m.user_id=? AND m.membership_status='ACTIVE' LIMIT 1",[orgId,input.assignedTo]);
+    if (!assignee.length || assignee[0].role !== 'ANALYST') return res.status(400).json({error:'Handoffs must be assigned to an active Analyst in this organization.'});
+    if (members[0].role === 'LEADER') {
+      const [team] = await pool.execute('SELECT tm.user_id FROM teams t JOIN team_members tm ON tm.team_id=t.id WHERE t.organization_id=? AND t.leader_user_id=? AND tm.user_id=? LIMIT 1',[orgId,req.user.id,input.assignedTo]);
+      if (!team.length) return res.status(403).json({error:'A Leader can assign work only to Analysts in their own team.'});
+    }
+    const [latest] = await pool.execute('SELECT COALESCE(MAX(version_number),0) AS latest FROM dataset_versions WHERE dataset_id=?',[req.params.datasetId]);
+    const inputVersion = input.inputVersion || Number(latest[0].latest);
+    const [version] = await pool.execute('SELECT id FROM dataset_versions WHERE dataset_id=? AND version_number=? LIMIT 1',[req.params.datasetId,inputVersion]);
+    if (!version.length) return res.status(400).json({error:'The selected input dataset version does not exist.'});
+    const id = randomUUID();
+    await pool.execute("INSERT INTO dataset_handoffs (id,organization_id,dataset_id,stage,status,assigned_to,assigned_by,input_version,handoff_note) VALUES (?,?,?,?, 'ASSIGNED',?,?,?,?)",[id,orgId,req.params.datasetId,input.stage,input.assignedTo,req.user.id,inputVersion,input.handoffNote]);
+    await audit({orgId,actorId:req.user.id,action:'DATASET_HANDOFF_ASSIGNED',targetType:'DATASET_HANDOFF',targetId:id,metadata:{stage:input.stage,assignedTo:input.assignedTo,inputVersion},ip:req.ip});
+    res.status(201).json({handoff:{id,stage:input.stage,status:'ASSIGNED',assignedTo:input.assignedTo,inputVersion,handoffNote:input.handoffNote,assigneeName:assignee[0].full_name}});
+  } catch(e) { next(e); }
+});
+
+router.patch('/datasets/:datasetId/handoffs/:handoffId', async (req,res,next) => {
+  try {
+    const input = z.object({
+      status:z.enum(['IN_PROGRESS','SUBMITTED','APPROVED','RETURNED']),
+      outputVersion:z.number().int().positive().optional(),
+      reviewNote:z.string().trim().max(1000).optional().default('')
+    }).parse(req.body);
+    const [rows] = await pool.execute('SELECT h.*,d.organization_id FROM dataset_handoffs h JOIN datasets d ON d.id=h.dataset_id WHERE h.id=? AND h.dataset_id=? LIMIT 1',[req.params.handoffId,req.params.datasetId]);
+    if (!rows.length) return res.status(404).json({error:'Handoff not found.'});
+    const handoff = rows[0];
+    const [members] = await pool.execute("SELECT role FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE' LIMIT 1",[handoff.organization_id,req.user.id]);
+    if (!members.length) return res.status(403).json({error:'Organization membership required.'});
+    const role = members[0].role;
+    let isReviewer = ['OWNER','MANAGER'].includes(role);
+    if (role === 'LEADER') {
+      const [team] = await pool.execute('SELECT id FROM teams WHERE organization_id=? AND leader_user_id=? LIMIT 1',[handoff.organization_id,req.user.id]);
+      isReviewer = team.length > 0;
+    }
+    if (input.status === 'IN_PROGRESS' || input.status === 'SUBMITTED') {
+      if (handoff.assigned_to !== req.user.id || !['ASSIGNED','IN_PROGRESS','RETURNED'].includes(handoff.status)) return res.status(403).json({error:'Only the assigned Analyst can start or submit this handoff.'});
+      if (input.status === 'SUBMITTED') {
+        if (!input.outputVersion) return res.status(400).json({error:'Choose the internally saved output version before submitting.'});
+        const [version] = await pool.execute('SELECT id FROM dataset_versions WHERE dataset_id=? AND version_number=? LIMIT 1',[req.params.datasetId,input.outputVersion]);
+        if (!version.length) return res.status(400).json({error:'The submitted output version does not exist.'});
+      }
+    } else {
+      if (!isReviewer || handoff.status !== 'SUBMITTED') return res.status(403).json({error:'Only an Owner or authorized Team Leader can review a submitted handoff.'});
+    }
+    await pool.execute('UPDATE dataset_handoffs SET status=?,output_version=COALESCE(?,output_version),review_note=CASE WHEN ?<>"" THEN ? ELSE review_note END WHERE id=?',[input.status,input.outputVersion||null,input.reviewNote,input.reviewNote,req.params.handoffId]);
+    await audit({orgId:handoff.organization_id,actorId:req.user.id,action:'DATASET_HANDOFF_'+input.status,targetType:'DATASET_HANDOFF',targetId:req.params.handoffId,metadata:{stage:handoff.stage,outputVersion:input.outputVersion||null,reviewNote:input.reviewNote},ip:req.ip});
+    res.json({message:'Handoff updated.',status:input.status});
+  } catch(e) { next(e); }
+});
+
 // Full-file export is deliberately Owner-only. Analysts and other collaborators
 // work with governed in-app views, not downloadable source files.
 router.get('/datasets/:datasetId/download', async (req,res,next) => {
