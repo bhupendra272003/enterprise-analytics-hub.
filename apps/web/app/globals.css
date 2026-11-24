@@ -625,3 +625,17 @@ body{background-image:radial-gradient(ellipse at 15% 48%,rgba(103,151,70,.08),tr
 .python-code-toolbar{margin-top:18px}
 @media(max-width:850px){.python-options{grid-template-columns:1fr}.python-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:620px){.python-intro{align-items:flex-start;flex-direction:column}.python-runtime-pill{white-space:normal}.analytics-editor{min-height:250px}.result-toolbar select{width:100%}}
+
+.bi-visual-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 0;padding:10px 12px;border:1px solid rgba(190,155,101,.18);border-radius:9px;background:#0b131d}
+.bi-visual-toolbar label{display:flex;align-items:center;gap:10px;font:9px 'DM Mono',monospace;color:#9ba8b5;letter-spacing:.7px}
+.bi-visual-toolbar select{min-width:160px}
+.bi-data-table{width:100%;overflow:auto;border:1px solid #293643;border-radius:9px}
+.bi-data-table table{width:100%;border-collapse:collapse;font-size:12px}
+.bi-data-table th,.bi-data-table td{padding:11px 14px;text-align:left;border-bottom:1px solid #26323d}
+.bi-data-table th{color:#d8bd8e;background:#17212c;font:10px 'DM Mono',monospace}
+.bi-data-table td{color:#d3dbe2}
+.bi-line-wrap{width:100%;min-width:0;padding:12px;border:1px solid #293643;border-radius:10px;background:linear-gradient(180deg,#111b26,#0c131c)}
+.bi-line-wrap svg{display:block;width:100%;height:230px;overflow:visible;color:#82909e}
+.bi-line-labels{display:flex;justify-content:space-between;gap:8px;overflow:hidden;color:#9aa6b2;font-size:10px}
+.bi-line-labels span{max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:600px){.bi-visual-toolbar{align-items:flex-start;flex-direction:column}.bi-line-wrap svg{height:180px}.bi-line-labels span:nth-child(even){display:none}}
