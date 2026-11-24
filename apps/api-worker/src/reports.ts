@@ -1,6 +1,7 @@
 type Env={DB:D1Database};
 type User={id:string;account_status:string};
 type Role="OWNER"|"MANAGER"|"LEADER"|"ANALYST";
+import { canManageReports } from "./role-policy";
 const json=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store"}});
 const getUser=async(req:Request,env:Env):Promise<User|null>=>{
  const raw=req.headers.get("Cookie")||"",sid=raw.split(";").map(v=>v.trim()).find(v=>v.startsWith("hub.sid="))?.slice(8);
@@ -9,7 +10,7 @@ const getUser=async(req:Request,env:Env):Promise<User|null>=>{
 };
 const membership=async(env:Env,orgId:string,userId:string)=>env.DB.prepare("SELECT role FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE'").bind(orgId,userId).first<{role:Role}>();
 const audit=(env:Env,orgId:string,userId:string,action:string,id:string,metadata?:unknown)=>env.DB.prepare("INSERT INTO audit_logs (organization_id,actor_user_id,action,target_type,target_id,metadata) VALUES (?,?,?,'REPORT',?,?)").bind(orgId,userId,action,id,metadata===undefined?null:JSON.stringify(metadata)).run();
-const canManage=(role:Role)=>role==="OWNER";
+const canManage=(role:Role)=>canManageReports(role);
 const validReportUrl=(value:string)=>{try{const u=new URL(value);return u.protocol==="https:"&&["app.powerbi.com","app.powerbi.de","app.powerbigov.us"].includes(u.hostname);}catch{return false;}};
 export async function handleReports(req:Request,env:Env,path:string):Promise<Response|null>{
  if(!path.startsWith("/api/reports/")&&!(/^\/api\/organizations\/[^/]+\/reports$/.test(path)))return null;
