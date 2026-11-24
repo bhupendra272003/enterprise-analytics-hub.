@@ -49,6 +49,10 @@ class ExportValidatorTests(unittest.TestCase):
             {"loan_month": "1994-01", "status": "A", "loan_count": "1", "distinct_accounts": "1", "average_loan_amount": "1000.00", "share_pct": "50.00"},
             {"loan_month": "1994-02", "status": "B", "loan_count": "1", "distinct_accounts": "1", "average_loan_amount": "2000.00", "share_pct": "50.00"},
         ])
+        self.write_csv("loan_scheduled_repayment_summary.csv", [
+            {"duration_months": "12", "status": "A", "loan_count": "1", "valid_schedule_rows": "1", "valid_ratio_rows": "1", "average_monthly_installment": "100.00", "average_scheduled_total": "1200.00", "average_scheduled_to_principal_ratio": "1.20"},
+            {"duration_months": "24", "status": "B", "loan_count": "1", "valid_schedule_rows": "1", "valid_ratio_rows": "1", "average_monthly_installment": "100.00", "average_scheduled_total": "2400.00", "average_scheduled_to_principal_ratio": "1.20"},
+        ])
         self.write_csv("loan_prior_features.csv", [{
             "loan_id": "1", "account_id": "100", "loan_date": "1994-01-10",
             "loan_amount": "1000", "loan_duration_months": "12",
