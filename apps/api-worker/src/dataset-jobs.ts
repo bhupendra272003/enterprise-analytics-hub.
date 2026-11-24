@@ -1,3 +1,4 @@
+import { runDatasetJoinQuery, runDatasetQuery } from "./query-engine";
 type Role="OWNER"|"MANAGER"|"LEADER"|"ANALYST";
 type Msg={jobId:string};
 type Env={DB:D1Database;DATASETS:KVNamespace;DATASET_JOBS:Queue<Msg>};
@@ -16,9 +17,23 @@ export async function handleDatasetJobs(req:Request,env:Env,path:string):Promise
   if(!m||!canRun(m.role))return json({error:"Insufficient organization permissions."},403);
   if(ds.file_size>10*1024*1024)return json({error:"Dataset exceeds the current 10 MiB background-job safety limit."},413);
   let body:any={};try{body=await req.json();}catch{return json({error:"Invalid job request."},400);}
-  if(body.type!=="PROFILE")return json({error:"PROFILE is currently the only enabled background job type."},400);
-  let payload:{analysis?:{categoryColumn:string;measureColumn:string;filter:string}}={};
-  if(body.analysis!==undefined){
+  if(body.type!=="PROFILE"&&body.type!=="SQL")return json({error:"Supported background job types are PROFILE and SQL."},400);
+  let jobType:"PROFILE"|"SQL"=body.type;
+  let payload:{analysis?:{categoryColumn:string;measureColumn:string;filter:string};sql?:string;joinDatasetId?:string}={};
+  if(jobType==="SQL"){
+   if(typeof body.sql!=="string"||!body.sql.trim()||body.sql.length>12000)return json({error:"SQL query must be a string up to 12,000 characters."},400);
+   const joinToken=body.sql.match(/\\bJOIN\\s+dataset_([a-f0-9]{32})\\b/i)?.[1]?.toLowerCase();
+   let joinDatasetId:string|undefined;
+   if(joinToken){
+    const joined=await env.DB.prepare("SELECT id,file_size FROM datasets WHERE replace(id,'-','')=? AND organization_id=?").bind(joinToken,ds.organization_id).first<{id:string;file_size:number}>();
+    if(!joined)return json({error:"The JOIN dataset must exist in the same organization."},404);
+    if(joined.id===ds.id)return json({error:"JOIN requires a second dataset."},400);
+    if(joined.file_size>10*1024*1024)return json({error:"The joined dataset exceeds the 10 MiB background SQL safety limit."},413);
+    joinDatasetId=joined.id;
+   }
+   payload={sql:body.sql,joinDatasetId};
+  }
+  if(jobType==="PROFILE"&&body.analysis!==undefined){
    if(!body.analysis||typeof body.analysis!=="object"||Array.isArray(body.analysis))return json({error:"Analysis configuration is invalid."},400);
    let columns:string[]=[];try{columns=JSON.parse(ds.columns_json||"[]");}catch{return json({error:"Dataset column metadata is invalid."},500);}
    const categoryColumn=typeof body.analysis.categoryColumn==="string"?body.analysis.categoryColumn:"";
@@ -28,11 +43,11 @@ export async function handleDatasetJobs(req:Request,env:Env,path:string):Promise
    payload={analysis:{categoryColumn,measureColumn,filter}};
   }
   const id=crypto.randomUUID();
-  await env.DB.prepare("INSERT INTO dataset_jobs (id,organization_id,dataset_id,requested_by,job_type,status,progress,stage,payload_json,max_attempts) VALUES (?,?,?,?,'PROFILE','QUEUED',0,'QUEUED',?,3)").bind(id,ds.organization_id,ds.id,user.id,JSON.stringify(payload)).run();
+  await env.DB.prepare("INSERT INTO dataset_jobs (id,organization_id,dataset_id,requested_by,job_type,status,progress,stage,payload_json,max_attempts) VALUES (?,?,?,?,?,'QUEUED',0,'QUEUED',?,3)").bind(id,ds.organization_id,ds.id,user.id,jobType,JSON.stringify(payload)).run();
   try{await env.DATASET_JOBS.send({jobId:id});await env.DB.prepare("UPDATE dataset_jobs SET updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(id).run();}
   catch{await env.DB.prepare("UPDATE dataset_jobs SET status='FAILED',stage='QUEUE_UNAVAILABLE',error_code='QUEUE_SEND_FAILED',error_message='The queue is temporarily unavailable.',completed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(id).run();return json({error:"The job could not be queued. Please try again later."},503);}
-  await env.DB.prepare("INSERT INTO audit_logs (organization_id,actor_user_id,action,target_type,target_id,metadata) VALUES (?,?,?,'DATASET_JOB',?,?)").bind(ds.organization_id,user.id,"DATASET_JOB_QUEUED",id,JSON.stringify({type:"PROFILE",datasetId:ds.id,analysis:payload.analysis||null})).run();
-  return json({job:{id,type:"PROFILE",status:"QUEUED",progress:0,stage:"QUEUED"}},202);
+  await env.DB.prepare("INSERT INTO audit_logs (organization_id,actor_user_id,action,target_type,target_id,metadata) VALUES (?,?,?,'DATASET_JOB',?,?)").bind(ds.organization_id,user.id,"DATASET_JOB_QUEUED",id,JSON.stringify({type:jobType,datasetId:ds.id,analysis:payload.analysis||null,joinDatasetId:payload.joinDatasetId||null})).run();
+  return json({job:{id,type:jobType,status:"QUEUED",progress:0,stage:"QUEUED"}},202);
  }
  const list=path.match(/^\/api\/datasets\/([^/]+)\/jobs$/);
  if(list&&req.method==="GET"){
@@ -55,6 +70,38 @@ export async function handleDatasetJobs(req:Request,env:Env,path:string):Promise
   const updated=await env.DB.prepare("SELECT * FROM dataset_jobs WHERE id=?").bind(job.id).first<any>();return json({job:view(updated)});
  }
  return json({error:"Method not allowed."},405);
+}
+async function runSqlJob(msg:Msg,env:Env){
+ const job=await env.DB.prepare("SELECT * FROM dataset_jobs WHERE id=?").bind(msg.jobId).first<any>();if(!job||["COMPLETED","FAILED","CANCELLED"].includes(job.status))return;
+ const claim=await env.DB.prepare("UPDATE dataset_jobs SET status='RUNNING',stage='LOADING_SOURCE',progress=10,attempt_count=attempt_count+1,started_at=COALESCE(started_at,CURRENT_TIMESTAMP),updated_at=CURRENT_TIMESTAMP WHERE id=? AND status IN ('QUEUED','RETRYING')").bind(job.id).run();if(!claim.meta.changes)return;
+ try{
+  const ds=await env.DB.prepare("SELECT name,storage_path,file_size FROM datasets WHERE id=? AND organization_id=?").bind(job.dataset_id,job.organization_id).first<any>();if(!ds)throw new Error("DATASET_NOT_FOUND");if(ds.file_size>10*1024*1024)throw new Error("DATASET_TOO_LARGE");
+  const payload=JSON.parse(job.payload_json||"{}");if(typeof payload.sql!=="string"||payload.sql.length>12000)throw new Error("INVALID_SQL_PAYLOAD");
+  const source=await env.DATASETS.get(ds.storage_path,"text");if(source===null)throw new Error("SOURCE_FILE_MISSING");
+  const {parse}=await import("csv-parse/sync");const parsed=parse(source,{columns:true,skip_empty_lines:true,bom:true,trim:true,relax_column_count:false}) as Record<string,unknown>[];
+  if(!parsed.length)throw new Error("EMPTY_DATASET");
+  const columns=Object.keys(parsed[0]);if(!columns.length||columns.length>200)throw new Error("INVALID_HEADERS");
+  const rows=parsed.map(row=>Object.fromEntries(columns.map(column=>[column,String(row[column]??"")])));
+  await env.DB.prepare("UPDATE dataset_jobs SET progress=45,stage='EXECUTING_SQL',updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='RUNNING'").bind(job.id).run();
+  let result:any;
+  if(payload.joinDatasetId){
+   const right=await env.DB.prepare("SELECT storage_path,file_size FROM datasets WHERE id=? AND organization_id=?").bind(payload.joinDatasetId,job.organization_id).first<any>();
+   if(!right||right.file_size>10*1024*1024)throw new Error("JOIN_DATASET_UNAVAILABLE");
+   const rightSource=await env.DATASETS.get(right.storage_path,"text");if(rightSource===null)throw new Error("JOIN_SOURCE_MISSING");
+   const rightParsed=parse(rightSource,{columns:true,skip_empty_lines:true,bom:true,trim:true,relax_column_count:false}) as Record<string,unknown>[];
+   const rightColumns=rightParsed.length?Object.keys(rightParsed[0]):[];
+   if(!rightColumns.length||rightColumns.length>200)throw new Error("INVALID_JOIN_HEADERS");
+   const rightRows=rightParsed.map(row=>Object.fromEntries(rightColumns.map(column=>[column,String(row[column]??"")])));
+   result=runDatasetJoinQuery(payload.sql,rows,columns,rightRows,rightColumns);
+  }else result=runDatasetQuery(payload.sql,rows,columns);
+  const resultJson=JSON.stringify({ ...result, scope:"FULL_DATASET",datasetId:job.dataset_id,name:ds.name });
+  if(resultJson.length>600000)throw new Error("RESULT_TOO_LARGE");
+  await env.DB.prepare("UPDATE dataset_jobs SET status='COMPLETED',progress=100,stage='COMPLETED',result_json=?,completed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP,error_code=NULL,error_message=NULL WHERE id=? AND status='RUNNING'").bind(resultJson,job.id).run();
+  await env.DB.prepare("INSERT INTO notifications (id,user_id,organization_id,type,title,message,href) VALUES (?,?,?,'DATASET_JOB','SQL query completed',?,?)").bind(crypto.randomUUID(),job.requested_by,job.organization_id,"Background SQL query for "+ds.name+" is ready.","/workspace/analytics").run();
+ }catch(e){
+  const code=e instanceof Error?e.message:"SQL_PROCESSING_FAILED";const latest=await env.DB.prepare("SELECT attempt_count,max_attempts,status FROM dataset_jobs WHERE id=?").bind(job.id).first<any>();if(latest?.status==="CANCELLED")return;
+  const retry=!!latest&&latest.attempt_count<latest.max_attempts;await env.DB.prepare("UPDATE dataset_jobs SET status=?,stage=?,error_code=?,error_message=?,updated_at=CURRENT_TIMESTAMP,completed_at=? WHERE id=?").bind(retry?"RETRYING":"FAILED",retry?"RETRYING":"FAILED",code,"The background SQL job could not be completed.",retry?null:new Date().toISOString(),job.id).run();if(retry)throw e;
+ }
 }
 async function runProfile(msg:Msg,env:Env){
  const job=await env.DB.prepare("SELECT * FROM dataset_jobs WHERE id=?").bind(msg.jobId).first<any>();if(!job||["COMPLETED","FAILED","CANCELLED"].includes(job.status))return;
@@ -85,5 +132,5 @@ async function runProfile(msg:Msg,env:Env){
   const retry=!!latest&&latest.attempt_count<latest.max_attempts;await env.DB.prepare("UPDATE dataset_jobs SET status=?,stage=?,error_code=?,error_message=?,updated_at=CURRENT_TIMESTAMP,completed_at=? WHERE id=?").bind(retry?"RETRYING":"FAILED",retry?"RETRYING":"FAILED",code,"The background job could not be completed.",retry?null:new Date().toISOString(),job.id).run();if(retry)throw e;
  }
 }
-const consumer={async queue(batch:MessageBatch<Msg>,env:Env){for(const msg of batch.messages){try{await runProfile(msg.body,env);msg.ack();}catch{if(msg.attempts>=3){await env.DB.prepare("UPDATE dataset_jobs SET status='FAILED',stage='RETRY_EXHAUSTED',error_code='QUEUE_RETRIES_EXHAUSTED',error_message='The background queue exhausted its retry attempts.',completed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status IN ('QUEUED','RUNNING','RETRYING')").bind(msg.body.jobId).run();msg.ack();}else{await env.DB.prepare("UPDATE dataset_jobs SET status='RETRYING',stage='RETRYING',updated_at=CURRENT_TIMESTAMP WHERE id=? AND status IN ('QUEUED','RUNNING')").bind(msg.body.jobId).run();msg.retry({delaySeconds:30});}}}}};
+const consumer={async queue(batch:MessageBatch<Msg>,env:Env){for(const msg of batch.messages){try{const type=await env.DB.prepare("SELECT job_type FROM dataset_jobs WHERE id=?").bind(msg.body.jobId).first<{job_type:string}>();if(type?.job_type==="SQL")await runSqlJob(msg.body,env);else await runProfile(msg.body,env);msg.ack();}catch{if(msg.attempts>=3){await env.DB.prepare("UPDATE dataset_jobs SET status='FAILED',stage='RETRY_EXHAUSTED',error_code='QUEUE_RETRIES_EXHAUSTED',error_message='The background queue exhausted its retry attempts.',completed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status IN ('QUEUED','RUNNING','RETRYING')").bind(msg.body.jobId).run();msg.ack();}else{await env.DB.prepare("UPDATE dataset_jobs SET status='RETRYING',stage='RETRYING',updated_at=CURRENT_TIMESTAMP WHERE id=? AND status IN ('QUEUED','RUNNING')").bind(msg.body.jobId).run();msg.retry({delaySeconds:30});}}}}};
 export default consumer;
