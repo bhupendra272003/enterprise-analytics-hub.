@@ -22,7 +22,7 @@ export async function handleDatasetJobs(req:Request,env:Env,path:string):Promise
   let payload:{analysis?:{categoryColumn:string;measureColumn:string;filter:string};sql?:string;joinDatasetId?:string}={};
   if(jobType==="SQL"){
    if(typeof body.sql!=="string"||!body.sql.trim()||body.sql.length>12000)return json({error:"SQL query must be a string up to 12,000 characters."},400);
-   const joinToken=body.sql.match(/\\bJOIN\\s+dataset_([a-f0-9]{32})\\b/i)?.[1]?.toLowerCase();
+   const joinToken=body.sql.match(/\bJOIN\s+dataset_([a-f0-9]{32})\b/i)?.[1]?.toLowerCase();
    let joinDatasetId:string|undefined;
    if(joinToken){
     const joined=await env.DB.prepare("SELECT id,file_size FROM datasets WHERE replace(id,'-','')=? AND organization_id=?").bind(joinToken,ds.organization_id).first<{id:string;file_size:number}>();
