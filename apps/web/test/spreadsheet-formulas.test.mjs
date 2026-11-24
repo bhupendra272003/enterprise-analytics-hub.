@@ -42,3 +42,17 @@ test("rejects malformed and out-of-page references safely", () => {
   assert.throws(() => calc("=SUM(Z2:Z5)"), /stay inside/);
   assert.throws(() => calc("=UNKNOWN(B2:B5)"), /not supported/);
 });
+
+test("supports blank counting, text case and additional numeric functions", () => {
+  assert.equal(calc("=COUNTBLANK(D2:D5)"), "1");
+  assert.equal(calc("=UPPER(A2)"), "NORTH");
+  assert.equal(calc("=LOWER(A2)"), "north");
+  assert.equal(calc('=PROPER("north east")'), "North East");
+  assert.equal(calc('=CONCATENATE(A2,"-","Q1")'), "North-Q1");
+  assert.equal(calc("=ABS(-12.5)"), "12.5");
+  assert.equal(calc("=SQRT(81)"), "9");
+  assert.equal(calc("=POWER(2,5)"), "32");
+  assert.equal(calc("=MOD(17,5)"), "2");
+  assert.equal(calc("=ROUNDUP(12.341,2)"), "12.35");
+  assert.equal(calc("=ROUNDDOWN(12.349,2)"), "12.34");
+});
