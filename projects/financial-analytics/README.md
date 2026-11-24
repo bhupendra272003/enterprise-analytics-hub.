@@ -47,7 +47,7 @@ The profiler prompts for the database user and password; it does not write them 
 | output/loan_analysis_extract.csv | Loan-grain source extract, retaining loan_id and account_id |
 | output/loan_outcome_summary.csv | Loan count, distinct accounts, average amount/duration and share by observed status |
 | output/loan_duration_outcome_summary.csv | Descriptive loan counts, distinct accounts, average amount and overall share by duration and observed status |
-| output/loan_vintage_outcome_summary.csv | Descriptive loan counts, distinct accounts, average amount and overall share by loan month and observed status |
+| output/loan_vintage_outcome_summary.csv | Descriptive loan counts, distinct accounts, average amount and overall share by loan month and observed status |\n| output/loan_scheduled_repayment_summary.csv | Scheduled installment and scheduled-total-to-principal metrics by duration/status; not actual repayments |
 | output/loan_prior_features.csv | Transaction aggregates strictly before each loan date, without the target status |
 | output/source_tables/*.csv | Full raw-table extracts for all eight source tables, streamed in 10,000-row batches |
 | output/source_tables/manifest.json | Export completion marker with UTC timestamp, row counts, column counts and source column names for all eight tables |\n| output/source_tables/account_transaction_activity.csv | Account-by-observed-transaction-type counts and amount summaries; source labels are not reclassified as income/expense |\n| output/source_tables/district_account_summary.csv | Distinct account counts by source district identifier, when district_id is present in account.csv |
@@ -67,7 +67,7 @@ Transaction types are retained as observed categories. Do not label them income/
 ## Power BI workflow
 
 1. Run the profiler, build the grouped analytical summaries, then run the offline validator.
-2. Load source_profile.json, loan_analysis_extract.csv, loan_prior_features.csv, loan_duration_outcome_summary.csv, loan_vintage_outcome_summary.csv, missing_value_profile.csv, and relationship_integrity.csv into Vyron's Financial Analytics page for local review.
+2. Load source_profile.json, loan_analysis_extract.csv, loan_prior_features.csv, loan_duration_outcome_summary.csv, loan_vintage_outcome_summary.csv, loan_scheduled_repayment_summary.csv, missing_value_profile.csv, and relationship_integrity.csv into Vyron's Financial Analytics page for local review.
 3. Import the CSV outputs into Power BI Desktop.
 4. Follow POWER_BI_MODEL.md for relationship cardinality, measures, temporal leakage controls and report pages.
 5. Keep source extract date, query version, row counts and validation report with the PBIX deliverable.
