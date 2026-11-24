@@ -1,26 +1,8 @@
 name: Deploy Bhupendra's Vyron to Cloudflare Free
 
 on:
+  # Production deployment is intentionally manual until the product scope and verification are complete.
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - 'apps/web/app/page.tsx'
-      - 'apps/web/app/layout.tsx'
-      - 'apps/web/app/globals.css'
-      - 'apps/web/app/workspace/**'
-      - 'apps/web/app/**'
-      - 'apps/web/app/api/**'
-      - 'apps/web/next.config.mjs'
-      - 'apps/web/package.json'
-      - 'apps/web/package-lock.json'
-      - 'apps/api-worker/package.json'
-      - 'apps/api-worker/package-lock.json'
-      - 'apps/api-worker/src/**'
-      - 'apps/api-worker/wrangler.jsonc'
-      - 'apps/web/wrangler.jsonc'
-      - 'database/d1/**'
-      - '.github/workflows/cloudflare-deploy.yml'
 
 concurrency:
   group: vyron-cloudflare-production-deploy
