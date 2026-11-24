@@ -209,3 +209,14 @@ A/B are the finished-loan classes described by the source task. Keep C/D visible
 - Missingness and orphan counts are visible rather than silently filtered away.
 - Report labels state that this is a historical dataset analysis, not current bank performance.
 
+
+
+### Client-account relationship outputs
+
+When `client.csv`, `account.csv`, and `disp.csv` are present under `output/source_tables/`, the offline builder creates:
+
+- `client_account_coverage.csv` — distinct accounts linked to each client through `disp`.
+- `account_client_coverage.csv` — distinct clients linked to each account through `disp`.
+- `disposition_type_summary.csv` — counts by the observed `disp.type` label.
+
+The JSON build report includes unmatched client/account references and repeated `disp_id` counts. Treat `disp.type` as an observed source label only; do not infer legal ownership or primary-holder meaning without verifying the data dictionary. These outputs preserve the bridge grain and do not join raw transactions to loans.
