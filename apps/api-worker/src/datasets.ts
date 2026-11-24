@@ -310,10 +310,70 @@ if(sub==="clean"&&req.method==="POST"){
   const totalRows=rows.length,totalPages=Math.max(1,Math.ceil(totalRows/pageSize)),safePage=Math.min(page,totalPages),start=(safePage-1)*pageSize;
   return json({datasetId:datasetId,page:safePage,pageSize,totalRows,totalPages,columns:parsed.columns,rows:rows.slice(start,start+pageSize)});
  }
+ if(sub==="handoffs"&&req.method==="GET"){
+  let scope="h.assigned_to=?";
+  const params:unknown[]=[datasetId,user.id];
+  if(m.role==="OWNER"||m.role==="MANAGER"){scope="1=1";params.splice(1,1);}
+  else if(m.role==="LEADER"){scope="EXISTS (SELECT 1 FROM team_members tm JOIN teams t ON t.id=tm.team_id WHERE t.organization_id=h.organization_id AND t.leader_user_id=? AND tm.user_id=h.assigned_to)";params.splice(1,0,user.id);}
+  else if(m.role!=="ANALYST")return json({error:"Insufficient permissions."},403);
+  const sql="SELECT h.id,h.stage,h.status,h.assigned_to AS assignedTo,h.assigned_by AS assignedBy,h.input_version AS inputVersion,h.output_version AS outputVersion,h.handoff_note AS handoffNote,h.review_note AS reviewNote,h.created_at AS createdAt,h.updated_at AS updatedAt,u.full_name AS assigneeName,a.full_name AS assignedByName FROM dataset_handoffs h JOIN users u ON u.id=h.assigned_to JOIN users a ON a.id=h.assigned_by WHERE h.dataset_id=? AND "+scope+" ORDER BY h.created_at DESC";
+  const {results}=await env.DB.prepare(sql).bind(...params).all<any>();
+  return json({handoffs:results.map((h:any)=>({...h,canUpdate:h.assignedTo===user.id,canReview:m.role==="OWNER"||m.role==="MANAGER"||m.role==="LEADER"}))});
+ }
+ if(sub==="handoffs"&&req.method==="POST"){
+  if(m.role!=="OWNER"&&m.role!=="LEADER")return json({error:"Only the Owner or the assigned Team Leader can create handoffs."},403);
+  let body:any;try{body=await req.json();}catch{return json({error:"Send valid handoff details."},400);}
+  const stage=String(body.stage||""),assignedTo=String(body.assignedTo||""),handoffNote=typeof body.handoffNote==="string"?body.handoffNote.trim():"";
+  if(!["CLEANING","SQL_REVIEW","DASHBOARD","RECONCILIATION"].includes(stage)||!/^[0-9a-f-]{36}$/i.test(assignedTo)||handoffNote.length>1000)return json({error:"Choose a valid stage, Analyst and handoff note."},400);
+  const assignee=await env.DB.prepare("SELECT u.full_name,m.role FROM memberships m JOIN users u ON u.id=m.user_id WHERE m.organization_id=? AND m.user_id=? AND m.membership_status='ACTIVE'").bind(dataset.organization_id,assignedTo).first<any>();
+  if(!assignee||assignee.role!=="ANALYST")return json({error:"Handoffs must be assigned to an active Analyst in this organization."},400);
+  if(m.role==="LEADER"){
+   const team=await env.DB.prepare("SELECT tm.user_id FROM teams t JOIN team_members tm ON tm.team_id=t.id WHERE t.organization_id=? AND t.leader_user_id=? AND tm.user_id=? LIMIT 1").bind(dataset.organization_id,user.id,assignedTo).first();
+   if(!team)return json({error:"A Leader can assign work only to Analysts in their own team."},403);
+  }
+  const latest=await env.DB.prepare("SELECT version_number AS versionNumber FROM dataset_versions WHERE dataset_id=? ORDER BY version_number DESC LIMIT 1").bind(datasetId).first<{versionNumber:number}>();
+  const inputVersion=Number(body.inputVersion||latest?.versionNumber||0);
+  const version=await env.DB.prepare("SELECT id FROM dataset_versions WHERE dataset_id=? AND version_number=?").bind(datasetId,inputVersion).first();
+  if(!version)return json({error:"The selected input dataset version does not exist."},400);
+  const id=crypto.randomUUID();
+  await env.DB.prepare("INSERT INTO dataset_handoffs (id,organization_id,dataset_id,stage,status,assigned_to,assigned_by,input_version,handoff_note) VALUES (?,?,?,?,'ASSIGNED',?,?,?,?)").bind(id,dataset.organization_id,datasetId,stage,assignedTo,user.id,inputVersion,handoffNote).run();
+  await audit(env,dataset.organization_id,user.id,"DATASET_HANDOFF_ASSIGNED",id,{datasetId,stage,assignedTo,inputVersion});
+  return json({handoff:{id,stage,status:"ASSIGNED",assignedTo,inputVersion,handoffNote,assigneeName:assignee.full_name}},201);
+ }
+ const handoffMatch=sub.match(/^handoffs\/([^/]+)$/);
+ if(handoffMatch&&req.method==="PATCH"){
+  let body:any;try{body=await req.json();}catch{return json({error:"Send a valid handoff status."},400);}
+  const status=String(body.status||""),outputVersion=Number(body.outputVersion||0),reviewNote=typeof body.reviewNote==="string"?body.reviewNote.trim():"";
+  if(!["IN_PROGRESS","SUBMITTED","APPROVED","RETURNED"].includes(status)||reviewNote.length>1000)return json({error:"Choose a valid status and review note."},400);
+  const handoff=await env.DB.prepare("SELECT * FROM dataset_handoffs WHERE id=? AND dataset_id=?").bind(handoffMatch[1],datasetId).first<any>();
+  if(!handoff)return json({error:"Handoff not found."},404);
+  if(status==="IN_PROGRESS"||status==="SUBMITTED"){
+   if(handoff.assigned_to!==user.id||!["ASSIGNED","IN_PROGRESS","RETURNED"].includes(handoff.status))return json({error:"Only the assigned Analyst can start or submit this handoff."},403);
+   if(status==="SUBMITTED"){
+    if(!Number.isInteger(outputVersion)||outputVersion<1)return json({error:"Choose the internally saved output version before submitting."},400);
+    const version=await env.DB.prepare("SELECT id FROM dataset_versions WHERE dataset_id=? AND version_number=?").bind(datasetId,outputVersion).first();
+    if(!version)return json({error:"The submitted output version does not exist."},400);
+   }
+  }else{
+   let reviewer=m.role==="OWNER"||m.role==="MANAGER";
+   if(m.role==="LEADER"){
+    const team=await env.DB.prepare("SELECT t.id FROM teams t JOIN team_members tm ON tm.team_id=t.id WHERE t.organization_id=? AND t.leader_user_id=? AND tm.user_id=? LIMIT 1").bind(dataset.organization_id,user.id,handoff.assigned_to).first();
+    reviewer=!!team;
+   }
+   if(!reviewer||handoff.status!=="SUBMITTED")return json({error:"Only an Owner or the assigned Team Leader can review a submitted handoff."},403);
+  }
+  await env.DB.prepare("UPDATE dataset_handoffs SET status=?,output_version=CASE WHEN ?>0 THEN ? ELSE output_version END,review_note=CASE WHEN ?<>'' THEN ? ELSE review_note END,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(status,outputVersion,outputVersion,reviewNote,reviewNote,handoffMatch[1]).run();
+  await audit(env,dataset.organization_id,user.id,"DATASET_HANDOFF_"+status,handoffMatch[1],{datasetId,stage:handoff.stage,outputVersion:outputVersion||null,reviewNote});
+  return json({message:"Handoff updated.",status});
+ }
  if(sub==="download"&&req.method==="GET"){
+  if(m.role!=="OWNER"){
+   await audit(env,dataset.organization_id,user.id,"DATASET_EXPORT_DENIED",datasetId,{role:m.role});
+   return json({error:"Full source downloads are disabled. Use the internal workspace and approved handoff outputs."},403);
+  }
   const source=await readStored(env,dataset.storage_path);
   if(!source)return json({error:"Stored dataset file is missing."},500);
-  await audit(env,dataset.organization_id,user.id,"DATASET_EXPORTED",datasetId,{exportType:"SOURCE_CSV",fileSize:Number(dataset.file_size),rowCount:Number(dataset.row_count)});
+  await audit(env,dataset.organization_id,user.id,"DATASET_EXPORTED",datasetId,{exportType:"SOURCE_CSV",fileSize:Number(dataset.file_size),rowCount:Number(dataset.row_count),ownerOnly:true});
   const safeName=(dataset.original_filename||dataset.name||"dataset.csv").replace(/[\\r\\n"]/g,"_").replace(/[\\/\\\\]/g,"_");
   return new Response(await source.arrayBuffer(),{status:200,headers:{"content-type":"text/csv; charset=utf-8","content-disposition":'attachment; filename="'+safeName+'"',"cache-control":"private, no-store","x-content-type-options":"nosniff"}});
  }
