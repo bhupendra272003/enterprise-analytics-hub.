@@ -18,6 +18,7 @@ jobs:
         run: |
           cd apps/api
           npm install
+          npm audit --audit-level=high
           find src -name "*.js" -print0 | xargs -0 -n1 node --check
       - name: Validate Python cleaning engine
         run: |
@@ -56,11 +57,13 @@ jobs:
         run: |
           cd apps/api-worker
           npm install
+          npm audit --audit-level=high
           npm run typecheck
           node --test test/*.test.mjs
       - name: Build web application
         run: |
           cd apps/web
           npm install
+          npm audit --audit-level=high
           npm run build
           npm run cf:build
