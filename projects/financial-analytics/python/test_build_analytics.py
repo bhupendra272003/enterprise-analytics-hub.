@@ -47,6 +47,36 @@ class BuildAnalyticsTests(unittest.TestCase):
         duration = summarize_loans(rows, "duration_months")
         self.assertEqual({row["duration_months"] for row in duration}, {"<MISSING>", "<INVALID>"})
 
+
+    def test_account_activity_keeps_observed_categories_and_districts(self):
+        source = self.directory / "source_tables"
+        source.mkdir()
+        (source / "account.csv").write_text(
+            "account_id,district_id\n10,2\n20,2\n30,3\n", encoding="utf-8"
+        )
+        (source / "trans.csv").write_text(
+            "trans_id,account_id,type,amount\n1,10,PRIJEM,100\n2,10,VYDAJ,25\n3,20,PRIJEM,50\n",
+            encoding="utf-8",
+        )
+        from build_analytics import build_account_activity
+        result = build_account_activity(self.directory)
+        self.assertTrue(result["available"])
+        self.assertEqual(result["activity_groups"], 3)
+        self.assertEqual(result["unmatched_transaction_accounts"], 0)
+        with (source / "account_transaction_activity.csv").open(encoding="utf-8-sig", newline="") as handle:
+            rows = list(csv.DictReader(handle))
+        self.assertEqual({row["transaction_type"] for row in rows}, {"PRIJEM", "VYDAJ"})
+        self.assertEqual(sum(int(row["transaction_count"]) for row in rows), 3)
+        with (source / "district_account_summary.csv").open(encoding="utf-8-sig", newline="") as handle:
+            districts = list(csv.DictReader(handle))
+        self.assertEqual({row["district_id"]: row["distinct_accounts"] for row in districts},
+                         {"2": "2", "3": "1"})
+
+    def test_account_activity_requires_matching_source_exports(self):
+        from build_analytics import build_account_activity
+        result = build_account_activity(self.directory)
+        self.assertFalse(result["available"])
+
     def test_missing_required_source_column_fails(self):
         (self.directory / "loan_analysis_extract.csv").write_text("loan_id,status\n1,A\n", encoding="utf-8")
         with self.assertRaisesRegex(ValueError, "missing columns"):
