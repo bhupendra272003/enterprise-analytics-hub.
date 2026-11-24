@@ -135,6 +135,7 @@ def build_analytics(directory: Path) -> dict:
     duration_rows = summarize_loans(loans, "duration_months")
     vintage_rows = summarize_loans(loans, "loan_month")
     account_activity = build_account_activity(directory)
+    relationship_analysis = build_client_account_relationships(directory)
     directory.mkdir(parents=True, exist_ok=True)
     _write_csv(directory / "loan_duration_outcome_summary.csv", SUMMARY_COLUMNS, duration_rows)
     _write_csv(directory / "loan_vintage_outcome_summary.csv", VINTAGE_COLUMNS, vintage_rows)
@@ -149,6 +150,7 @@ def build_analytics(directory: Path) -> dict:
         ],
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
         "account_activity": account_activity,
+        "client_account_relationships": relationship_analysis,
         "descriptive_only": True,
     }
 
@@ -225,6 +227,66 @@ def build_account_activity(directory: Path) -> dict:
         "unmatched_transaction_accounts": len({row.get("account_id", "").strip() for row in transactions if row.get("account_id", "").strip()} - account_ids),
         "outputs": ["source_tables/account_transaction_activity.csv"] + (["source_tables/district_account_summary.csv"] if district_rows else []),
         "transaction_types_are_unclassified": True,
+    }
+
+
+def build_client_account_relationships(directory: Path) -> dict:
+    """Summarize the client-account bridge using the source disposition table."""
+    source_dir = directory / "source_tables"
+    paths = (source_dir / "client.csv", source_dir / "account.csv", source_dir / "disp.csv")
+    if not all(path.is_file() for path in paths):
+        return {"available": False, "reason": "client.csv, account.csv and disp.csv are all required."}
+
+    def load(path: Path) -> tuple[list[str], list[dict[str, str]]]:
+        with path.open("r", encoding="utf-8-sig", newline="") as handle:
+            reader = csv.DictReader(handle)
+            return list(reader.fieldnames or []), list(reader)
+
+    client_columns, clients = load(paths[0])
+    account_columns, accounts = load(paths[1])
+    disp_columns, dispositions = load(paths[2])
+    if not ({"client_id"} <= set(client_columns) and {"account_id"} <= set(account_columns)
+            and {"disp_id", "client_id", "account_id"} <= set(disp_columns)):
+        raise ValueError("client.csv, account.csv and disp.csv are missing required relationship keys.")
+
+    client_ids = {r["client_id"].strip() for r in clients if r.get("client_id", "").strip()}
+    account_ids = {r["account_id"].strip() for r in accounts if r.get("account_id", "").strip()}
+    pairs: set[tuple[str, str, str]] = set()
+    seen_ids: set[str] = set()
+    duplicate_ids = 0
+    for row in dispositions:
+        disp_id = row.get("disp_id", "").strip()
+        if disp_id and disp_id in seen_ids:
+            duplicate_ids += 1
+        if disp_id:
+            seen_ids.add(disp_id)
+        client_id, account_id = row.get("client_id", "").strip(), row.get("account_id", "").strip()
+        if client_id and account_id:
+            pairs.add((client_id, account_id, row.get("type", "").strip() or "<MISSING>"))
+
+    client_accounts: dict[str, set[str]] = defaultdict(set)
+    account_clients: dict[str, set[str]] = defaultdict(set)
+    type_counts: dict[str, int] = defaultdict(int)
+    for client_id, account_id, observed_type in pairs:
+        client_accounts[client_id].add(account_id)
+        account_clients[account_id].add(client_id)
+        type_counts[observed_type] += 1
+    _write_csv(source_dir / "client_account_coverage.csv", ("client_id", "distinct_accounts"),
+               [{"client_id": k, "distinct_accounts": str(len(v))} for k, v in sorted(client_accounts.items())])
+    _write_csv(source_dir / "account_client_coverage.csv", ("account_id", "distinct_clients"),
+               [{"account_id": k, "distinct_clients": str(len(v))} for k, v in sorted(account_clients.items())])
+    _write_csv(source_dir / "disposition_type_summary.csv", ("observed_disposition_type", "relationship_count"),
+               [{"observed_disposition_type": k, "relationship_count": str(v)} for k, v in sorted(type_counts.items())])
+    unmatched_clients = {r.get("client_id", "").strip() for r in dispositions if r.get("client_id", "").strip()} - client_ids
+    unmatched_accounts = {r.get("account_id", "").strip() for r in dispositions if r.get("account_id", "").strip()} - account_ids
+    return {
+        "available": True, "client_rows": len(clients), "account_rows": len(accounts),
+        "disposition_rows": len(dispositions), "unique_client_account_pairs": len(pairs),
+        "clients_with_accounts": len(client_accounts), "accounts_with_clients": len(account_clients),
+        "unmatched_client_ids": len(unmatched_clients), "unmatched_account_ids": len(unmatched_accounts),
+        "duplicate_disposition_ids": duplicate_ids,
+        "outputs": ["source_tables/client_account_coverage.csv", "source_tables/account_client_coverage.csv", "source_tables/disposition_type_summary.csv"],
+        "disposition_types_are_unclassified": True,
     }
 
 def main() -> int:
