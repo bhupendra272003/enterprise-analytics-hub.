@@ -74,6 +74,68 @@ def validate_raw_source_exports(directory: Path) -> tuple[bool, str]:
 
 
 
+
+def validate_source_relationships(directory: Path) -> tuple[bool, str]:
+    """Check all documented source-table foreign keys and parent-key uniqueness."""
+    source = directory / "source_tables"
+    required = {
+        "account": ("account_id", "district_id"),
+        "client": ("client_id", "district_id"),
+        "disp": ("disp_id", "account_id", "client_id"),
+        "card": ("card_id", "disp_id"),
+        "loan": ("loan_id", "account_id"),
+        "orders": ("order_id", "account_id"),
+        "trans": ("trans_id", "account_id"),
+        "district": ("A1",),
+    }
+    if not all((source / f"{table}.csv").is_file() for table in SOURCE_TABLES):
+        return True, "Eight raw source CSVs are not all present; source relationship audit skipped."
+    tables = {name: read_csv(source / f"{name}.csv") for name in SOURCE_TABLES}
+    for table, columns in required.items():
+        available = set(tables[table][0]) if tables[table] else set()
+        # Empty tables still have a header; read_csv does not expose it through rows.
+        with (source / f"{table}.csv").open("r", encoding="utf-8-sig", newline="") as handle:
+            header = set(next(csv.reader(handle), []))
+        missing = set(columns) - header
+        if missing:
+            return False, f"{table}.csv is missing required relationship columns: {sorted(missing)}."
+    primary_keys = {
+        "account": "account_id", "client": "client_id", "disp": "disp_id",
+        "card": "card_id", "loan": "loan_id", "orders": "order_id",
+        "trans": "trans_id", "district": "A1",
+    }
+    duplicates = []
+    indexes = {}
+    for table, key in primary_keys.items():
+        values = [row.get(key, "").strip() for row in tables[table] if row.get(key, "").strip()]
+        if len(values) != len(set(values)):
+            duplicates.append(f"{table}.{key}")
+        indexes[table] = set(values)
+    if duplicates:
+        return False, "Duplicate parent/source keys found: " + ", ".join(duplicates) + "."
+    edges = (
+        ("account", "district_id", "district", "A1"),
+        ("client", "district_id", "district", "A1"),
+        ("disp", "account_id", "account", "account_id"),
+        ("disp", "client_id", "client", "client_id"),
+        ("card", "disp_id", "disp", "disp_id"),
+        ("loan", "account_id", "account", "account_id"),
+        ("orders", "account_id", "account", "account_id"),
+        ("trans", "account_id", "account", "account_id"),
+    )
+    failures = []
+    for child, child_col, parent, parent_col in edges:
+        orphan_count = sum(
+            1 for row in tables[child]
+            if row.get(child_col, "").strip() and row[child_col].strip() not in indexes[parent]
+        )
+        if orphan_count:
+            failures.append(f"{child}.{child_col}->{parent}.{parent_col}: {orphan_count}")
+    if failures:
+        return False, "Foreign-key orphan rows found: " + "; ".join(failures) + "."
+    return True, f"All 8 source tables have unique source keys and all {len(edges)} documented relationship edges have zero nonblank orphans."
+
+
 def validate_client_account_outputs(directory: Path) -> tuple[bool, str]:
     """Reconcile derived client/account bridge CSVs to the raw disposition table."""
     source = directory / "source_tables"
@@ -227,6 +289,8 @@ def validate_exports(directory: Path) -> dict:
 
     record("artifact_readability", True, "JSON and CSV exports are readable.")
     raw_ok, raw_detail = validate_raw_source_exports(directory)
+    source_rel_ok, source_rel_detail = validate_source_relationships(directory)
+    record("eight_table_relationship_integrity", source_rel_ok, source_rel_detail, severity="warning")
     record("raw_source_table_exports", raw_ok, raw_detail)
     bridge_ok, bridge_detail = validate_client_account_outputs(directory)
     record("client_account_bridge_reconciliation", bridge_ok, bridge_detail)
