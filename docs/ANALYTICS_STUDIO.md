@@ -3,7 +3,7 @@
 ## SQL Studio
 SQL Studio runs queries against the single dataset selected in the workspace. The Worker re-reads that dataset from private organization-scoped storage after validating the user's active membership. Only OWNER, LEADER and ANALYST can execute queries; MANAGER remains read-only.
 
-The current query engine is a bounded CSV query engine, not a general-purpose connection to the D1 control database. It supports one read-only SELECT statement, column selection, COUNT/SUM/AVG/MIN/MAX, WHERE conditions joined with AND, GROUP BY, ORDER BY and LIMIT (maximum 500 returned rows). Writes, multi-statement SQL and unsupported clauses are rejected. The current synchronous source limit is 256 KiB. SQL execution is audited without storing query text or cell values.
+The current query engine is a bounded CSV query engine, not a general-purpose connection to the D1 control database. It supports one read-only SELECT statement, column selection and `SELECT DISTINCT` for projected values; COUNT/SUM/AVG/MIN/MAX; WHERE comparisons (`=`, `!=`, `<>`, `>`, `>=`, `<`, `<=`), `LIKE`, `IS NULL` and `IS NOT NULL`; `AND` and `OR` predicates (with standard SQL precedence: AND is evaluated before OR); GROUP BY, ORDER BY and LIMIT (maximum 500 returned rows). DISTINCT aggregate expressions are not supported. INNER JOIN and LEFT JOIN can combine the selected dataset with one other dataset in the same organization, using qualified column references; joined intermediate results are capped at 100,000 rows. Writes, multi-statement SQL and unsupported clauses are rejected. The current synchronous source limit is 256 KiB. SQL execution is audited without storing query text or cell values.
 
 Example:
 ```sql
