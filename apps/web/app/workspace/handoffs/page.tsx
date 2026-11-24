@@ -7,7 +7,7 @@ type Org = {id:string;name:string;role:string};
 type Dataset = {id:string;name:string;rowCount:number;columnCount:number};
 type Member = {userId:string;fullName:string;role:string};
 type Version = {versionNumber:number;rowCount:number;uploadedBy:string;changeNote:string|null};
-type Handoff = {id:string;stage:string;status:string;assignedTo:string;assigneeName:string;assignedByName:string;inputVersion:number;outputVersion:number|null;handoffNote:string;reviewNote:string|null;createdAt:string;canUpdate:boolean;canReview:boolean};
+type Handoff = {id:string;stage:string;status:string;assignedTo:string;assigneeName:string;assignedByName:string;inputVersion:number;outputVersion:number|null;handoffNote:string;reviewNote:string|null;result?:any;createdAt:string;canUpdate:boolean;canReview:boolean};
 async function call(path:string, options:RequestInit={}) {
   const response = await fetch(API+path,{...options,credentials:'include',headers:{'X-Hub-Request':'1','Content-Type':'application/json',...(options.headers||{})}});
   const data = await response.json();
@@ -33,6 +33,7 @@ export default function HandoffsPage(){
   const [inputVersion,setInputVersion]=useState('1');
   const [note,setNote]=useState('');
   const [reviewNotes,setReviewNotes]=useState<Record<string,string>>({});
+  const [resultDrafts,setResultDrafts]=useState<Record<string,string>>({});
   const [busy,setBusy]=useState(false);
   const [notice,setNotice]=useState('Loading secure handoff workspace…');
   const active=orgs.find(item=>item.id===org);
@@ -87,7 +88,13 @@ export default function HandoffsPage(){
     setBusy(true);
     try{
       const body:any={status,reviewNote:reviewNotes[handoff.id]||''};
-      if(status==='SUBMITTED')body.outputVersion=latestVersion;
+      if(status==='SUBMITTED'){
+        if(handoff.stage==='SQL_REVIEW'||handoff.stage==='RECONCILIATION'){
+          const raw=resultDrafts[handoff.id]||'';
+          if(!raw.trim())throw new Error('Paste the SQL/QA result JSON before submitting.');
+          try{body.result=JSON.parse(raw);}catch{throw new Error('The shared result is not valid JSON.');}
+        }else body.outputVersion=latestVersion;
+      }
       await call('/api/datasets/'+dataset+'/handoffs/'+handoff.id,{method:'PATCH',body:JSON.stringify(body)});
       await refreshDataset(dataset);
       setNotice('Handoff status updated.');
@@ -119,6 +126,8 @@ export default function HandoffsPage(){
             <small>Assigned by {item.assignedByName} · {new Date(item.createdAt).toLocaleString()}</small>
             {item.handoffNote&&<p>{item.handoffNote}</p>}
             {item.reviewNote&&<p className="upload-hint">Review: {item.reviewNote}</p>}
+            {item.canUpdate&&(item.stage==='SQL_REVIEW'||item.stage==='RECONCILIATION')&&<label>INTERNAL QUERY / QA RESULT JSON<textarea rows={5} value={resultDrafts[item.id]||''} onChange={e=>setResultDrafts(old=>({...old,[item.id]:e.target.value}))} placeholder={'Paste the SQL/QA result JSON here. Example: {"columns":["region","total"],"rows":[{"region":"North","total":120}],"rowCount":1,"matchedRows":1}'} /></label>}
+            {item.result&&<div className="upload-hint"><b>Shared internal result</b><pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere',maxHeight:220,overflow:'auto'}}>{JSON.stringify(item.result,null,2)}</pre></div>}
             {item.status==='ASSIGNED'&&item.canUpdate&&<button className="manage-team-link" disabled={busy} onClick={()=>update(item,'IN_PROGRESS')}>Start work</button>}
             {['IN_PROGRESS','RETURNED'].includes(item.status)&&item.canUpdate&&<button className="manage-team-link" disabled={busy||!latestVersion} onClick={()=>update(item,'SUBMITTED')}>Submit latest saved version</button>}
             {item.status==='SUBMITTED'&&item.canReview&&<div className="form-grid"><label>REVIEW NOTE<input value={reviewNotes[item.id]||''} onChange={e=>setReviewNotes(old=>({...old,[item.id]:e.target.value}))} maxLength={1000} placeholder="Review feedback"/></label><div><button className="manage-team-link" disabled={busy} onClick={()=>update(item,'APPROVED')}>Approve</button> <button className="manage-team-link" disabled={busy} onClick={()=>update(item,'RETURNED')}>Return for changes</button></div></div>}
