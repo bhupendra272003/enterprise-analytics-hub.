@@ -1,4 +1,5 @@
 type Env = { DB: D1Database };
+import { canCreateOrganization } from "./role-policy";
 type SessionUser = { id: string; full_name: string; email: string; account_status: string; email_verified_at: string | null };
 const reply = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
 const getUser = async (request: Request, env: Env): Promise<SessionUser | null> => {
@@ -62,7 +63,7 @@ export async function handleOrganizations(request: Request, env: Env, path: stri
   if (path === "/api/organizations" && request.method === "POST") {
     const platformAdmin = await env.DB.prepare("SELECT 1 AS allowed FROM platform_admins WHERE user_id=? AND role='SUPER_ADMIN' LIMIT 1").bind(user.id).first();
     const ownerMembership = await env.DB.prepare("SELECT 1 AS allowed FROM memberships WHERE user_id=? AND role='OWNER' AND membership_status='ACTIVE' LIMIT 1").bind(user.id).first();
-    if (!platformAdmin && !ownerMembership) return reply({error:"Only organization owners can create a new organization."},403);
+    if (!canCreateOrganization(!!platformAdmin,!!ownerMembership)) return reply({error:"Only organization owners can create a new organization."},403);
     if (!user.email_verified_at) return reply({error:"Verify your email before creating a workspace."},403);
     let body: any; try { body=await request.json(); } catch { return reply({error:"Invalid JSON body."},400); }
     const name=typeof body.name==="string"?body.name.trim():"";
