@@ -146,7 +146,9 @@ export function evaluateSpreadsheetFormula(formula: string, rows: SpreadsheetRow
     const value = Number(scalar(args[0])), places = args[1] ? Number(scalar(args[1])) : 0;
     if (!Number.isFinite(value) || !Number.isInteger(places) || Math.abs(places) > 10) throw new Error("ROUND requires a finite number and decimal places between -10 and 10.");
     const factor = 10 ** places;
-    const scaled = value * factor;\n    const rounded = name === "ROUNDUP" ? Math.sign(scaled) * Math.ceil(Math.abs(scaled)) : name === "ROUNDDOWN" ? Math.trunc(scaled) : Math.round(scaled + Number.EPSILON);\n    return String(rounded / factor);
+    const scaled = value * factor;
+    const rounded = name === "ROUNDUP" ? Math.sign(scaled) * Math.ceil(Math.abs(scaled)) : name === "ROUNDDOWN" ? Math.trunc(scaled) : Math.round(scaled + Number.EPSILON);
+    return String(rounded / factor);
   }
   throw new Error("This formula is not supported yet.");
 }
