@@ -81,3 +81,8 @@ The offline validator also reconciles the three derived client-account bridge CS
 
 
 When `output/source_tables/account.csv` is available, the offline builder also creates `loan_district_outcome_summary.csv`, grouping loan counts, distinct accounts, average amount, and share by district and observed status. Accounts with conflicting district assignments are isolated as `<AMBIGUOUS_ACCOUNT_DISTRICT>`; missing account mappings remain `<UNMAPPED>`. The validator reconciles the grouped output back to the loan extract and unique account-to-district mappings.
+
+
+### Scheduled repayment burden (descriptive)
+
+The offline builder creates `loan_scheduled_repayment_summary.csv`, grouped by loan duration and observed status. It reports loan counts, valid schedule/ratio counts, average monthly installment, arithmetic scheduled total (`payments × duration`), and scheduled-total-to-principal ratio. These are not actual repayments, interest calculations, delinquency, default labels, or credit-risk predictions. Invalid/non-positive duration or principal values are excluded only from the affected metric averages; loan rows remain in group counts. The validator reconciles all grouped metrics to the loan extract.
