@@ -269,7 +269,7 @@ def validate_exports(directory: Path) -> dict:
 
     missing = [name for name in REQUIRED_FILES if not (directory / name).is_file()]
     record("required_artifacts", not missing,
-           "All seven expected exports are present." if not missing else
+           "All required exports are present." if not missing else
            "Missing files: " + ", ".join(missing))
     if missing:
         return report
@@ -494,7 +494,8 @@ def validate_exports(directory: Path) -> dict:
     report["summary"] = {
         "loan_rows": len(loans), "feature_rows": len(features),
         "status_groups": len(outcomes), "duration_groups": len(duration_summary),
-        "vintage_groups": len(vintage_summary), "source_columns_profiled": len(missing_rows),
+        "vintage_groups": len(vintage_summary), "scheduled_repayment_groups": len(repayment_summary),
+        "source_columns_profiled": len(missing_rows),
         "relationship_checks": len(relationship_rows),
         "foreign_key_orphan_rows": orphan_total,
     }
