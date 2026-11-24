@@ -1,4 +1,5 @@
 export type QueryRow = Record<string, string | number | null>;
+export function extractJoinDatasetToken(sql:string):string|null { return sql.match(/\bJOIN\s+dataset_([a-f0-9]{32})\b/i)?.[1]?.toLowerCase()||null; }
 type Condition = { column: string; operator: string; value?: string | number };
 const cleanIdentifier = (value: string) => value.replace(/^[`"\[]|[`"\]]$/g, "");
 const splitAnd = (value: string) => {
