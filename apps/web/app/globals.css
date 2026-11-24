@@ -584,3 +584,44 @@ body{background-image:radial-gradient(ellipse at 15% 48%,rgba(103,151,70,.08),tr
 .vyron-tool-open,.vyron-tool-disabled{margin-top:auto;min-height:42px;border-radius:7px;display:flex;align-items:center;justify-content:space-between;padding:0 13px;font-size:11px;font-weight:700;text-decoration:none}.vyron-tool-open{background:var(--accent);color:#10180b}.vyron-tool-open span{font-size:16px}.vyron-tool-disabled{width:100%;border:1px solid #35414c;background:#151d25;color:#778594;cursor:not-allowed}
 .vyron-tools-foot{display:flex;flex-wrap:wrap;gap:12px 25px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:17px 0;margin-top:25px;font:9px 'DM Mono',monospace;letter-spacing:1px;color:#92a0ad}.vyron-tools-notice{font-size:11px;color:#c7f69b;margin:15px 0 0}.vyron-tools-disclaimer{font-size:10px;line-height:1.6;color:#71808e;margin:13px 0 0}
 @media(max-width:720px){.vyron-tools{margin:40px auto}.vyron-tools-heading{align-items:stretch;flex-direction:column}.vyron-org-chip{min-width:0}.vyron-tool-grid{grid-template-columns:1fr}.vyron-tool-card{min-height:300px}.vyron-tools-foot{gap:10px 16px}}
+
+/* Refined Analytics Studio: compact, readable, responsive analyst workbench */
+.analytics-tool{min-height:190px;padding:18px;background:linear-gradient(145deg,rgba(29,35,43,.94),rgba(13,19,27,.96));border-color:rgba(190,155,101,.18);box-shadow:0 12px 28px rgba(0,0,0,.12)}
+.analytics-tool.tool-active{box-shadow:0 0 0 1px rgba(197,164,112,.14),0 16px 32px rgba(0,0,0,.2)}
+.analytics-tool:focus-visible,.small-action:focus-visible,.dataset-row:focus-visible{outline:2px solid #d5b77e;outline-offset:3px}
+.preview-panel,.code-workspace{box-shadow:0 18px 44px rgba(0,0,0,.13)}
+.preview-scroll{border:1px solid rgba(190,155,101,.18);border-radius:10px;background:#0b1118}
+.preview-table th{z-index:1;background:#202a35;color:#e0c28f;font:10px 'DM Mono',monospace;letter-spacing:.3px}
+.preview-table td{height:42px}
+.preview-table tbody tr:nth-child(even){background:rgba(255,255,255,.018)}
+.preview-table tbody tr:hover{background:rgba(190,155,101,.07)}
+.analytics-editor{font-size:13px;line-height:1.85;min-height:320px}
+.sql-editor{min-height:290px}
+.editor-toolbar{background:linear-gradient(100deg,#111a24,#0b1118);border-color:rgba(190,155,101,.22)}
+.result-toolbar{align-items:center}
+.result-toolbar select{min-width:170px;max-width:100%}
+.python-intro{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px;border:1px solid rgba(190,155,101,.2);border-radius:11px;background:linear-gradient(110deg,rgba(190,155,101,.09),rgba(255,255,255,.015))}
+.python-intro>div{display:grid;gap:5px;min-width:0}
+.python-intro b{font-size:13px;color:#eadcc4}
+.python-intro span{font-size:11px;line-height:1.6;color:#98a4b0}
+.python-runtime-pill{display:inline-flex;align-items:center;gap:8px;white-space:nowrap;padding:8px 11px;border:1px solid rgba(120,191,141,.25);border-radius:30px;color:#9fc8a8!important;font:9px 'DM Mono',monospace!important}
+.python-runtime-pill i{width:7px;height:7px;border-radius:50%;background:#78bf8d;box-shadow:0 0 10px #78bf8d}
+.python-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0}
+.python-option{display:flex;align-items:flex-start;gap:10px;padding:14px;border:1px solid #293643;border-radius:10px;background:#0b131d;min-width:0}
+.python-option input[type=checkbox]{width:16px;height:16px;min-width:16px;margin:2px 0 0;accent-color:#c7a56b}
+.python-option span{display:grid;gap:5px;min-width:0}
+.python-option b{font:600 11px 'DM Sans',sans-serif;letter-spacing:0;color:#e5dccb}
+.python-option small{font:10px/1.5 'DM Sans',sans-serif;letter-spacing:0;color:#8593a1}
+.python-option select{grid-column:1/-1;min-width:0;width:100%;margin-top:5px}
+.python-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:12px 0}
+.python-actions>span{font-size:10px;color:#8794a2}
+.python-run{background:linear-gradient(110deg,#b89a6b,#dfc99d)!important;color:#17140e!important;border-color:#c7a56b!important;font-weight:700}
+.python-run:disabled{opacity:.55;cursor:not-allowed}
+.python-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:15px 0}
+.python-metrics article{padding:13px;border:1px solid rgba(190,155,101,.2);border-radius:9px;background:#0c131b;min-width:0}
+.python-metrics small,.python-metrics b{display:block}
+.python-metrics small{font:9px 'DM Mono',monospace;color:#8794a2;letter-spacing:.7px}
+.python-metrics b{font:600 14px Manrope;color:#d8bd8e;margin-top:8px;overflow-wrap:anywhere}
+.python-code-toolbar{margin-top:18px}
+@media(max-width:850px){.python-options{grid-template-columns:1fr}.python-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:620px){.python-intro{align-items:flex-start;flex-direction:column}.python-runtime-pill{white-space:normal}.analytics-editor{min-height:250px}.result-toolbar select{width:100%}}
