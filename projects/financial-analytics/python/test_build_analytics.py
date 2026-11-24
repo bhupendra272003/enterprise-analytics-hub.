@@ -72,6 +72,27 @@ class BuildAnalyticsTests(unittest.TestCase):
         self.assertEqual({row["district_id"]: row["distinct_accounts"] for row in districts},
                          {"2": "2", "3": "1"})
 
+    def test_client_account_relationships_reconcile_disposition_bridge(self):
+        source = self.directory / "source_tables"
+        source.mkdir()
+        (source / "client.csv").write_text("client_id\n1\n2\n", encoding="utf-8")
+        (source / "account.csv").write_text("account_id\n10\n20\n", encoding="utf-8")
+        (source / "disp.csv").write_text(
+            "disp_id,client_id,account_id,type\n100,1,10,OWNER\n101,2,10,DISPONENT\n102,2,20,OWNER\n",
+            encoding="utf-8",
+        )
+        from build_analytics import build_client_account_relationships
+        result = build_client_account_relationships(self.directory)
+        self.assertTrue(result["available"])
+        self.assertEqual(result["unique_client_account_pairs"], 3)
+        self.assertEqual(result["clients_with_accounts"], 2)
+        self.assertEqual(result["accounts_with_clients"], 2)
+        self.assertEqual(result["unmatched_client_ids"], 0)
+        self.assertEqual(result["unmatched_account_ids"], 0)
+        with (source / "account_client_coverage.csv").open(encoding="utf-8-sig", newline="") as handle:
+            rows = list(csv.DictReader(handle))
+        self.assertEqual({row["account_id"]: row["distinct_clients"] for row in rows}, {"10": "2", "20": "1"})
+
     def test_account_activity_requires_matching_source_exports(self):
         from build_analytics import build_account_activity
         result = build_account_activity(self.directory)
