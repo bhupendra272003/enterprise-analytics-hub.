@@ -128,3 +128,14 @@ test("supports AND / OR in HAVING and rejects non-aggregate references", () => {
   assert.deepEqual(result.rows, [{ region: "North", total_sales: 275, n: 2 }, { region: "South", total_sales: 250, n: 1 }]);
   assert.throws(() => runDatasetQuery("SELECT region, SUM(sales) AS total_sales FROM data GROUP BY region HAVING region = 'North'", rows, columns), /aggregate expression/);
 });
+
+
+test("supports COUNT DISTINCT for global and grouped aggregates", () => {
+  const sample = [...rows, { id: "4", region: "North", sales: "175" }];
+  assert.equal(runDatasetQuery("SELECT COUNT(DISTINCT region) AS unique_regions FROM data", sample, columns).rows[0].unique_regions, 2);
+  const grouped = runDatasetQuery("SELECT region, COUNT(DISTINCT sales) AS unique_sales FROM data GROUP BY region ORDER BY region", sample, columns);
+  assert.deepEqual(grouped.rows, [{ region: "North", unique_sales: 2 }, { region: "South", unique_sales: 1 }]);
+  const having = runDatasetQuery("SELECT region, COUNT(DISTINCT sales) AS unique_sales FROM data GROUP BY region HAVING COUNT(DISTINCT sales) >= 2", sample, columns);
+  assert.deepEqual(having.rows, [{ region: "North", unique_sales: 2 }]);
+  assert.throws(() => runDatasetQuery("SELECT SUM(DISTINCT sales) FROM data", sample, columns), /only with COUNT/);
+});
