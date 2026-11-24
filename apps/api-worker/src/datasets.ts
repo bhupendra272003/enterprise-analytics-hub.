@@ -1,5 +1,5 @@
 import { parse } from "csv-parse/sync";
-import { runDatasetQuery } from "./query-engine";
+import { runDatasetJoinQuery, runDatasetQuery } from "./query-engine";
 type Env={DB:D1Database;DATASETS:KVNamespace};
 const readStored=async(env:Env,key:string):Promise<{arrayBuffer:()=>Promise<ArrayBuffer>}|null>=>{const bytes=await env.DATASETS.get(key,"arrayBuffer");return bytes?{arrayBuffer:async()=>bytes}:null;};
 const MAX_SYNC_CSV_BYTES=256*1024;
@@ -111,11 +111,22 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
   if(Number(dataset.file_size)>MAX_SYNC_CSV_BYTES)return syncLimitError();
   let body:any;try{body=await req.json();}catch{return json({error:"Send a valid SQL query."},400);}
   if(typeof body.sql!=="string"||body.sql.length>12000)return json({error:"SQL query must be a string up to 12,000 characters."},400);
+  const joinToken=body.sql.match(/\\bJOIN\\s+dataset_([a-f0-9]{32})\\b/i)?.[1]?.toLowerCase();
+  let rightRows:Record<string,string>[]|null=null,rightColumns:string[]=[];
+  if(joinToken){
+   const right=await env.DB.prepare("SELECT id,storage_path,file_size FROM datasets WHERE replace(id,'-','')=? AND organization_id=?").bind(joinToken,dataset.organization_id).first<any>();
+   if(!right)return json({error:"The JOIN dataset must exist in the same organization."},404);
+   if(right.id===dataset.id)return json({error:"JOIN requires a second dataset."},400);
+   if(Number(right.file_size)>MAX_SYNC_CSV_BYTES)return syncLimitError();
+   const rightSource=await readStored(env,right.storage_path);if(!rightSource)return json({error:"Joined dataset file is missing."},500);
+   let rightParsed;try{rightParsed=parseCsv(await rightSource.arrayBuffer());}catch{return json({error:"The joined CSV could not be parsed."},400);}
+   rightColumns=rightParsed.columns;rightRows=rightParsed.records.map((row:Record<string,unknown>)=>Object.fromEntries(rightColumns.map((column:string)=>[column,String(row[column]??""))]));
+  }
   const source=await readStored(env,dataset.storage_path);if(!source)return json({error:"Stored dataset file is missing."},500);
   let parsed;try{parsed=parseCsv(await source.arrayBuffer());}catch{return json({error:"The stored CSV could not be parsed."},400);}
-  const rows=parsed.records.map((row:Record<string,unknown>)=>Object.fromEntries(parsed.columns.map((column:string)=>[column,String(row[column]??"")])));
+  const rows=parsed.records.map((row:Record<string,unknown>)=>Object.fromEntries(parsed.columns.map((column:string)=>[column,String(row[column]??""))]));
   try{
-   const result=runDatasetQuery(body.sql,rows,parsed.columns);
+   const result=joinToken&&rightRows?runDatasetJoinQuery(body.sql,rows,parsed.columns,rightRows,rightColumns):runDatasetQuery(body.sql,rows,parsed.columns);
    await audit(env,dataset.organization_id,user.id,"DATASET_SQL_QUERY",datasetId,{returnedRows:result.rowCount,matchedRows:result.matchedRows});
    return json({result,dataset:{id:dataset.id,name:dataset.name}});
   }catch(error){return json({error:error instanceof Error?error.message:"SQL query could not be executed."},400);}
