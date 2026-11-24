@@ -114,3 +114,17 @@ test("supports DISTINCT projected values without splitting quoted OR text", () =
   assert.deepEqual(result.rows, [{ region: "North OR South" }, { region: "West" }]);
   assert.equal(result.rowCount, 2);
 });
+
+
+test("supports HAVING filters on aggregate expressions and SELECT aliases", () => {
+  const byExpression = runDatasetQuery("SELECT region, SUM(sales) AS total_sales FROM data GROUP BY region HAVING SUM(sales) >= 275 ORDER BY total_sales DESC", rows, columns);
+  assert.deepEqual(byExpression.rows, [{ region: "North", total_sales: 275 }]);
+  const byAlias = runDatasetQuery("SELECT region, COUNT(*) AS order_count FROM data GROUP BY region HAVING order_count > 1", rows, columns);
+  assert.deepEqual(byAlias.rows, [{ region: "North", order_count: 2 }]);
+});
+
+test("supports AND / OR in HAVING and rejects non-aggregate references", () => {
+  const result = runDatasetQuery("SELECT region, SUM(sales) AS total_sales, COUNT(*) AS n FROM data GROUP BY region HAVING total_sales >= 250 AND n > 1 OR total_sales = 250", rows, columns);
+  assert.deepEqual(result.rows, [{ region: "North", total_sales: 275, n: 2 }, { region: "South", total_sales: 250, n: 1 }]);
+  assert.throws(() => runDatasetQuery("SELECT region, SUM(sales) AS total_sales FROM data GROUP BY region HAVING region = 'North'", rows, columns), /aggregate expression/);
+});
