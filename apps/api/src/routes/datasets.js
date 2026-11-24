@@ -602,7 +602,7 @@ router.patch('/datasets/:datasetId/handoffs/:handoffId', async (req,res,next) =>
 router.get('/datasets/:datasetId/download', async (req,res,next) => {
   try {
     const [rows] = await pool.execute(
-      'SELECT id,name,organization_id,storage_path FROM datasets WHERE id=? LIMIT 1',
+      'SELECT id,name,organization_id FROM datasets WHERE id=? LIMIT 1',
       [req.params.datasetId]
     );
     if (!rows.length) return res.status(404).json({error:'Dataset not found.'});
@@ -611,12 +611,8 @@ router.get('/datasets/:datasetId/download', async (req,res,next) => {
       [rows[0].organization_id,req.user.id]
     );
     if (!members.length) return res.status(403).json({error:'Insufficient organization permissions.'});
-    if (members[0].role !== 'OWNER') {
-      await audit({orgId:rows[0].organization_id,actorId:req.user.id,action:'DATASET_EXPORT_DENIED',targetType:'DATASET',targetId:req.params.datasetId,metadata:{role:members[0].role},ip:req.ip});
-      return res.status(403).json({error:'Full dataset export is disabled for your role. Use the internal workspace and approved handoff outputs.'});
-    }
-    await audit({orgId:rows[0].organization_id,actorId:req.user.id,action:'DATASET_EXPORTED',targetType:'DATASET',targetId:req.params.datasetId,metadata:{scope:'FULL_SOURCE',ownerOnly:true},ip:req.ip});
-    res.download(rows[0].storage_path, path.basename(rows[0].name).replace(/[^a-z0-9-_]+/gi,'_')+'.csv');
+    await audit({orgId:rows[0].organization_id,actorId:req.user.id,action:'DATASET_EXPORT_DENIED',targetType:'DATASET',targetId:req.params.datasetId,metadata:{role:members[0].role,policy:'NO_DEVICE_DOWNLOADS'},ip:req.ip});
+    return res.status(403).json({error:'Device downloads are disabled for every role. Use private internal datasets and handoffs inside Vyron.'});
   } catch(e) { next(e); }
 });
 
