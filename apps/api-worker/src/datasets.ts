@@ -338,11 +338,11 @@ if(sub==="clean"&&req.method==="POST"){
   const q=(url.searchParams.get("q")||"").trim().slice(0,200).toLocaleLowerCase();
   const sort=(url.searchParams.get("sort")||"").trim(),direction=url.searchParams.get("direction")==="desc"?-1:1;
   if(sort&&!parsed.columns.includes(sort))return json({error:"Choose a valid dataset column to sort."},400);
-  let rows:Record<string,string>[]=parsed.records.map((row:any)=>Object.fromEntries(parsed.columns.map(c=>[c,String(row[c]??"")])));
-  if(q)rows=rows.filter(row=>parsed.columns.some(c=>String(row[c]??"").toLocaleLowerCase().includes(q)));
-  if(sort)rows.sort((a,b)=>String(a[sort]??"").localeCompare(String(b[sort]??""),undefined,{numeric:true,sensitivity:"base"})*direction);
-  const totalRows=rows.length,totalPages=Math.max(1,Math.ceil(totalRows/pageSize)),safePage=Math.min(page,totalPages),start=(safePage-1)*pageSize;
-  return json({datasetId:datasetId,page:safePage,pageSize,totalRows,totalPages,columns:parsed.columns,rows:rows.slice(start,start+pageSize)});
+  let rows=parsed.records.map((sourceRow:any,sourceIndex:number)=>({values:Object.fromEntries(parsed.columns.map(c=>[c,String(sourceRow[c]??"")])),sourceIndex}));
+  if(q)rows=rows.filter(item=>parsed.columns.some(c=>String(item.values[c]??"").toLocaleLowerCase().includes(q)));
+  if(sort)rows.sort((a,b)=>String(a.values[sort]??"").localeCompare(String(b.values[sort]??""),undefined,{numeric:true,sensitivity:"base"})*direction);
+  const totalRows=rows.length,totalPages=Math.max(1,Math.ceil(totalRows/pageSize)),safePage=Math.min(page,totalPages),start=(safePage-1)*pageSize,pageItems=rows.slice(start,start+pageSize);
+  return json({datasetId:datasetId,page:safePage,pageSize,totalRows,totalPages,columns:parsed.columns,rows:pageItems.map(item=>item.values),rowIndexes:pageItems.map(item=>item.sourceIndex)});
  }
  if(sub==="results"&&req.method==="POST"){
   if(!allowed(m.role))return json({error:"Only OWNER, LEADER and assigned ANALYST roles can save internal result datasets."},403);
