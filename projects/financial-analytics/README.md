@@ -36,7 +36,7 @@ python python/build_analytics.py
 python python/validate_exports.py
 ~~~
 
-The profiler prompts for the database user and password; it does not write them to disk. It runs SELECT-only queries and produces:
+The profiler prompts for the database user and password; it does not write them to disk. It runs SELECT-only queries. The complete workflow outputs below are produced by the profiler, the offline grouped-analytics builder, and the offline validator:
 
 | Output | Purpose |
 |---|---|

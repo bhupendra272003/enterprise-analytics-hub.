@@ -1,6 +1,6 @@
 # Power BI model guide — PKDD'99 Financial
 
-This guide defines a safe model for the profiler's exported source extracts. It does not claim that a PBIX has been created or refreshed.
+This guide defines a safe model for the Financial project's exported source extracts and offline descriptive summaries. It does not claim that a PBIX has been created or refreshed.
 
 ## Recommended imported tables
 
@@ -34,18 +34,22 @@ Use single-direction filtering from dimensions to facts where possible. Avoid ma
 
 ## Reproducible local outputs
 
-Run python python/profile_financial.py from this project directory after installing requirements.txt. It writes:
+Run python python/profile_financial.py from this project directory after installing requirements.txt. It writes the source inventory, data-quality exports, loan-grain extract, status summary, and target-free pre-loan features:
 
-- output/source_profile.json — exact source table counts, key checks, all-column missing counts, relationship checks, loan grain audit, transaction date-boundary audit and run timestamp.
+- output/source_profile.json — exact source table counts, key checks, all-column missing counts, relationship checks, loan grain and transaction date-boundary audits, and run timestamp.
 - output/data_quality_summary.csv — long-form metric/value rows suitable for a Power BI data-quality page.
 - output/missing_value_profile.csv — missing counts and percentages for all 55 source columns.
 - output/relationship_integrity.csv — orphan counts for documented foreign-key edges.
-- output/loan_analysis_extract.csv — loan-grain extract with loan_id and account_id retained.
-- output/loan_outcome_summary.csv — loan count, distinct account count, average amount/duration and share by observed status.
+- output/loan_analysis_extract.csv — loan-grain extract, retaining loan_id and account_id.
+- output/loan_outcome_summary.csv — loan count, distinct accounts, average amount/duration and share by observed status.
 - output/loan_prior_features.csv — pre-loan transaction aggregates, grouped by loan_id and observed transaction type; loan.status is excluded.
-- output/validation_report.json and output/validation_summary.csv — offline reconciliation, feature-grain, target-leakage and date-boundary checks.
 
-Run python python/validate_exports.py after profiling. It checks the output files without connecting to MariaDB.
+Then run python python/build_analytics.py. This offline step reads loan_analysis_extract.csv and writes:
+
+- output/loan_duration_outcome_summary.csv — descriptive counts, distinct accounts, average amount and overall loan share by duration and observed status.
+- output/loan_vintage_outcome_summary.csv — the same descriptive metrics by loan start month and observed status.
+
+Finally, run python python/validate_exports.py. The standard-library validator checks the complete artifact set offline, including exact reconciliation of both grouped summaries to the loan extract. None of these steps requires a live MariaDB connection after the source profiling/export step.
 
 ## Suggested report pages
 
@@ -94,7 +98,7 @@ If the report filters to completed target classes A/B, create an explicitly name
 
 ## Power BI implementation contract
 
-### Import only artifacts that exist in the current profiler output
+### Import only artifacts that exist in the current project workflow output
 
 After running `python python/build_analytics.py`, the current CSV workflow provides these tables:
 
