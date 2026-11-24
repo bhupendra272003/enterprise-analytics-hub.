@@ -15,7 +15,7 @@ export default function AnalyticsStudio(){
  const sqlStarter='-- Query the selected CSV dataset (read-only)\nSELECT *\nFROM data\nLIMIT 100;';
  const [pythonCode,setPythonCode]=useState(pythonStarter),[sqlCode,setSqlCode]=useState(sqlStarter);
  const [queryResult,setQueryResult]=useState<any>(null),[sqlBusy,setSqlBusy]=useState(false),[sqlJob,setSqlJob]=useState<any>(null);
- const [pythonOutput,setPythonOutput]=useState('Select a dataset, then run Python in your browser. The runtime loads from the Pyodide CDN.'),[pythonBusy,setPythonBusy]=useState(false);
+ const [pythonOutput,setPythonOutput]=useState('Secure server-side Python runner is not yet deployed. Browser/CDN execution is disabled.'),[pythonBusy,setPythonBusy]=useState(false);
  const [biX,setBiX]=useState(''),[biY,setBiY]=useState(''),[biFilter,setBiFilter]=useState(''),[dashboardTitle,setDashboardTitle]=useState(''),[savedDashboards,setSavedDashboards]=useState<any[]>([]),[biSummary,setBiSummary]=useState<any>(null),[biBusy,setBiBusy]=useState(false),[biJob,setBiJob]=useState<any>(null);
  const canAnalyze=['OWNER','LEADER','ANALYST'].includes(orgs.find(o=>o.id===org)?.role||'');
 
@@ -57,26 +57,8 @@ export default function AnalyticsStudio(){
   finally{setSqlBusy(false);}
  }
  async function runPython(){
-  if(!active||!canAnalyze||pythonBusy)return;
-  setPythonBusy(true);setPythonOutput('Preparing browser-local Python runtime…');
-  let worker:Worker|undefined,workerUrl='';
-  try{
-   const r=await fetch(API+'/api/datasets/'+active.id+'/download',{credentials:'include',headers:{'X-Hub-Request':'1'}});
-   if(!r.ok)throw new Error('Could not load the selected dataset for Python.');
-   const csv=await r.text();
-   const workerSource=`self.onmessage=async(event)=>{const {code,csv}=event.data;try{importScripts('https://cdn.jsdelivr.net/pyodide/v0.27.7/full/pyodide.js');const py=await loadPyodide({indexURL:'https://cdn.jsdelivr.net/pyodide/v0.27.7/full/'});await py.loadPackage(['pandas','numpy']);py.setStdout({batched:(text)=>self.postMessage({type:'stdout',text})});py.FS.writeFile('/home/pyodide/data.csv',csv);for(const [name,value] of Object.entries({fetch:()=>Promise.reject(new Error('Network access is disabled during Python execution.')),XMLHttpRequest:undefined,WebSocket:undefined,EventSource:undefined,Worker:undefined,SharedWorker:undefined,importScripts:()=>{throw new Error('Loading external scripts is disabled during Python execution.');}})){Object.defineProperty(self,name,{value,writable:false,configurable:false});}const result=await py.runPythonAsync(code);if(result!==undefined&&result!==null)self.postMessage({type:'result',text:String(result)});self.postMessage({type:'done'});}catch(error){self.postMessage({type:'error',text:String(error)});}};`;
-   workerUrl=URL.createObjectURL(new Blob([workerSource],{type:'text/javascript'}));worker=new Worker(workerUrl);
-   const output:string[]=[];
-   await new Promise<void>((resolve,reject)=>{
-    const timer=window.setTimeout(()=>{worker?.terminate();reject(new Error('Python execution exceeded 60 seconds and was stopped.'));},60000);
-    worker!.onmessage=(event)=>{const d=event.data;if(d.type==='stdout'||d.type==='result'){const remaining=100000-output.join('\\n').length;if(remaining<=0){window.clearTimeout(timer);worker?.terminate();reject(new Error('Python output exceeded the 100,000-character safety limit.'));return;}output.push(String(d.text).slice(0,remaining));setPythonOutput(output.join('\\n'));if(String(d.text).length>remaining){window.clearTimeout(timer);worker?.terminate();reject(new Error('Python output exceeded the 100,000-character safety limit.'));}}else if(d.type==='error'){window.clearTimeout(timer);reject(new Error(d.text));}else if(d.type==='done'){window.clearTimeout(timer);resolve();}};
-    worker!.onerror=(event)=>{window.clearTimeout(timer);reject(new Error(event.message||'Python worker failed.'));};
-    worker!.postMessage({code:pythonCode,csv});
-   });
-   setPythonOutput(output.join('\\n')||'Python finished successfully. No output was printed.');
-   setNotice('Python completed locally in your browser. Your code was not sent to the API.');
-  }catch(e){const message=e instanceof Error?e.message:'Python execution failed.';setPythonOutput(message);setNotice(message);}
-  finally{worker?.terminate();if(workerUrl)URL.revokeObjectURL(workerUrl);setPythonBusy(false);}
+  setPythonOutput('Secure server-side Python execution is not yet deployed. Browser/CDN execution and client-side source-file transfer are disabled to protect organization data.');
+  setNotice('Python execution is locked until the isolated internal runner is deployed.');
  }
  useEffect(()=>{if(!sqlJob?.id||!['QUEUED','RUNNING','RETRYING'].includes(sqlJob.status))return;let cancelled=false;const timer=window.setInterval(()=>{api('/api/dataset-jobs/'+sqlJob.id).then(d=>{if(!cancelled)setSqlJob(d.job);}).catch(e=>{if(!cancelled)setNotice(e instanceof Error?e.message:'Could not refresh SQL job status.');});},2000);return()=>{cancelled=true;window.clearInterval(timer);};},[sqlJob?.id,sqlJob?.status]);
  useEffect(()=>{if(sqlJob?.status==='COMPLETED'&&sqlJob.result){setQueryResult(sqlJob.result);setNotice('Background SQL query completed. '+Number(sqlJob.result.matchedRows||0).toLocaleString()+' rows matched.');}else if(sqlJob?.status==='FAILED'||sqlJob?.status==='CANCELLED'){setNotice(sqlJob.error?.message||'Background SQL query did not complete.');}},[sqlJob?.status]);
@@ -118,7 +100,7 @@ export default function AnalyticsStudio(){
   setNotice('SQL result rows exported. The export contains the rows returned by this query.');
  }
 
- const tools=[{id:'grid',name:'Spreadsheet Lab',tag:'GRID & CSV',desc:'Inspect, search, sort and export organization datasets.',state:'Available',icon:'▦'},{id:'python',name:'Python Lab',tag:'BROWSER RUNTIME',desc:'Run Python with pandas and NumPy in an browser worker with network restrictions.',state:'Available',icon:'Py'},{id:'sql',name:'SQL Studio',tag:'READ-ONLY SQL',desc:'Execute SELECT queries against the selected dataset with tenant-scoped access.',state:'Available',icon:'⌘'},{id:'bi',name:'BI Studio',tag:'CHART BUILDER',desc:'Build a live grouped chart, apply a category slicer and review quick insights.',state:'Available',icon:'▥'}] as const;
+ const tools=[{id:'grid',name:'Spreadsheet Lab',tag:'GRID & CSV',desc:'Inspect, search, sort and export organization datasets.',state:'Available',icon:'▦'},{id:'python',name:'Python Lab',tag:'BROWSER RUNTIME',desc:'Python editor · isolated internal runner pending security deployment.',state:'Secure runner pending',icon:'Py'},{id:'sql',name:'SQL Studio',tag:'READ-ONLY SQL',desc:'Execute SELECT queries against the selected dataset with tenant-scoped access.',state:'Available',icon:'⌘'},{id:'bi',name:'BI Studio',tag:'CHART BUILDER',desc:'Build a live grouped chart, apply a category slicer and review quick insights.',state:'Available',icon:'▥'}] as const;
  return <main className="team-shell"><aside className="team-sidebar"><a className="brand" href="/workspace"><span className="brand-mark">V</span><span>BHUPENDRA'S VYRON</span></a><div className="side-label">WORKSPACE</div><a className="side-link" href="/workspace">▦ Overview</a><a className="side-link" href="/workspace/data">◈ Data workspace</a><a className="side-link selected" href="/workspace/analytics">⌘ Analytics Studio</a><a className="side-link" href="/workspace/generator">✧ Data generator</a><a className="side-link" href="/workspace/projects">◫ Projects & tasks</a><a className="side-link" href="/workspace/reports">▤ Reports</a><div className="sidebar-footer"><span className="online-dot"/> INTERNAL WORKSPACE<br/><small>ANALYTICS STUDIO</small></div></aside>
  <section className="team-main"><header className="team-header"><div>BHUPENDRA'S VYRON / WORKSPACE / <b>ANALYTICS STUDIO</b></div><a className="back-link" href="/workspace">← Overview</a></header><div className="team-content">
  <div className="team-heading"><div><div className="eyebrow"><span/> INTERNAL ANALYTICS ENVIRONMENT</div><h1>Analytics <em>Studio.</em></h1><p>One governed workspace for datasets, analysis and business intelligence. No external database connection is required.</p></div><select value={org} onChange={e=>setOrg(e.target.value)} aria-label="Organization">{orgs.map(o=><option key={o.id} value={o.id}>{o.name} · {o.role}</option>)}</select></div>
