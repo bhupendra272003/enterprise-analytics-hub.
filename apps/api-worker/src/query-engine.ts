@@ -82,7 +82,7 @@ function parseHavingCondition(source: string, projections: ReturnType<typeof par
   const expression = match[1].trim().replace(/\s+/g, "").toLowerCase();
   const projection = projections.find(p => p.kind === "aggregate" && (
     p.alias.toLowerCase() === expression ||
-    ((p.fn + "(" + (p.distinct ? "distinct " : "") + p.column + ")").replace(/\\s+/g, "").toLowerCase() === expression)
+    ((p.fn + "(" + (p.distinct ? "distinct " : "") + p.column + ")").replace(/\s+/g, "").toLowerCase() === expression)
   ));
   if (!projection || projection.kind !== "aggregate") throw new Error("HAVING must reference an aggregate expression or its SELECT alias.");
   const value = match[3] !== undefined ? match[3].replace(/''/g, "'") : match[4] !== undefined ? match[4].slice(1,-1).replace(/""/g,'"') : Number(match[5]);
