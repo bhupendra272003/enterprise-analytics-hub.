@@ -44,7 +44,7 @@ function numeric(values: unknown[]): number[] {
 
 function criterionMatches(value: unknown, criterion: string): boolean {
   const raw = criterion.trim();
-  const op = raw.match(/^(>=|<=|<>|>|<|=)s*(.*)$/);
+  const op = raw.match(/^(>=|<=|<>|>|<|=)\\s*(.*)$/);
   if (!op) return String(value ?? "") === raw;
   const expected = op[2].replace(/^"|"$/g, "");
   const leftNumber = Number(value), rightNumber = Number(expected);
