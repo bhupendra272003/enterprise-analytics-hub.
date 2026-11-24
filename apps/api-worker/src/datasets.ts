@@ -427,15 +427,8 @@ if(sub==="clean"&&req.method==="POST"){
   return json({message:"Handoff updated.",status});
  }
  if(sub==="download"&&req.method==="GET"){
-  if(m.role!=="OWNER"){
-   await audit(env,dataset.organization_id,user.id,"DATASET_EXPORT_DENIED",datasetId,{role:m.role});
-   return json({error:"Full source downloads are disabled. Use the internal workspace and approved handoff outputs."},403);
-  }
-  const source=await readStored(env,dataset.storage_path);
-  if(!source)return json({error:"Stored dataset file is missing."},500);
-  await audit(env,dataset.organization_id,user.id,"DATASET_EXPORTED",datasetId,{exportType:"SOURCE_CSV",fileSize:Number(dataset.file_size),rowCount:Number(dataset.row_count),ownerOnly:true});
-  const safeName=(dataset.original_filename||dataset.name||"dataset.csv").replace(/[\\r\\n"]/g,"_").replace(/[\\/\\\\]/g,"_");
-  return new Response(await source.arrayBuffer(),{status:200,headers:{"content-type":"text/csv; charset=utf-8","content-disposition":'attachment; filename="'+safeName+'"',"cache-control":"private, no-store","x-content-type-options":"nosniff"}});
+  await audit(env,dataset.organization_id,user.id,"DATASET_EXPORT_DENIED",datasetId,{role:m.role,policy:"NO_DEVICE_DOWNLOADS"});
+  return json({error:"Device downloads are disabled for every role. Use private internal datasets and handoffs inside Vyron."},403);
  }
  if(sub==="preview"&&req.method==="GET")return json({dataset:{id:dataset.id,name:dataset.name,columns:JSON.parse(dataset.columns_json),preview:JSON.parse(dataset.preview_json)}});
  if(sub==="anomalies"&&req.method==="POST"){
