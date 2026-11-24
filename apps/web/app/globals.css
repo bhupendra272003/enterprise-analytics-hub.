@@ -546,3 +546,30 @@ body{background-image:radial-gradient(ellipse at 15% 48%,rgba(103,151,70,.08),tr
 .saved-dashboard-row b{font-size:12px;color:#e6dccb}
 .saved-dashboard-row small{font-size:10px;color:#8996a4}
 @media(max-width:620px){.saved-dashboard-row{align-items:flex-start;flex-direction:column}.saved-dashboard-row .project-actions{width:100%}}
+
+/* Print-ready BI report: hide workspace chrome and render a clean document. */
+#vyron-print-report{display:none}
+@media print{
+ @page{size:A4;margin:16mm}
+ html,body{background:#fff!important;color:#17212b!important}
+ body *{visibility:hidden!important}
+ #vyron-print-report,#vyron-print-report *{visibility:visible!important}
+ #vyron-print-report{display:block!important;position:absolute!important;inset:0!important;width:100%!important;background:#fff!important;color:#17212b!important;font:10pt/1.5 Arial,sans-serif!important}
+ #vyron-print-report .print-report-header{border-bottom:2px solid #9b8055;padding-bottom:14px;margin-bottom:18px}
+ #vyron-print-report .print-report-brand{font-size:12pt;font-weight:700;letter-spacing:2px;color:#6d542e}
+ #vyron-print-report .print-report-header>div:nth-child(2){font-size:8pt;letter-spacing:1.5px;color:#687481;margin-top:8px}
+ #vyron-print-report h1{font-size:23pt;margin:10px 0 4px;color:#17212b}
+ #vyron-print-report h2{font-size:13pt;margin:0 0 10px;color:#27394b}
+ #vyron-print-report p{color:#465363}
+ #vyron-print-report .print-report-section{margin:18px 0;break-inside:avoid}
+ #vyron-print-report .print-report-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}
+ #vyron-print-report .print-report-kpis>div{border:1px solid #d8dee5;padding:10px;border-radius:5px}
+ #vyron-print-report .print-report-kpis small{display:block;font-size:7pt;color:#667482}
+ #vyron-print-report .print-report-kpis strong{display:block;font-size:16pt;margin-top:4px}
+ #vyron-print-report table{width:100%;border-collapse:collapse;font-size:8.5pt}
+ #vyron-print-report th,#vyron-print-report td{border:1px solid #d8dee5;padding:6px 8px;text-align:left;overflow-wrap:anywhere}
+ #vyron-print-report th{background:#eef1f4;color:#243343}
+ #vyron-print-report ul{padding-left:20px}
+ #vyron-print-report li{margin:5px 0}
+ #vyron-print-report .print-report-footer{border-top:1px solid #d8dee5;padding-top:10px;margin-top:24px;color:#687481;font-size:8pt}
+}
