@@ -122,6 +122,60 @@ def validate_client_account_outputs(directory: Path) -> tuple[bool, str]:
     return passed, detail
 
 
+def validate_district_loan_outputs(directory: Path) -> tuple[bool, str]:
+    """Reconcile district loan summaries to the loan extract and unique account mappings."""
+    account_path = directory / "source_tables" / "account.csv"
+    output_path = directory / "loan_district_outcome_summary.csv"
+    if not account_path.is_file():
+        return True, "Optional account.csv is absent; district loan reconciliation skipped."
+    if not output_path.is_file():
+        return False, "account.csv exists but loan_district_outcome_summary.csv is missing."
+    with account_path.open("r", encoding="utf-8-sig", newline="") as handle:
+        reader = csv.DictReader(handle)
+        if not {"account_id", "district_id"} <= set(reader.fieldnames or []):
+            return False, "account.csv lacks account_id or district_id."
+        accounts = list(reader)
+    loans = read_csv(directory / "loan_analysis_extract.csv")
+    district_values: dict[str, set[str]] = {}
+    for row in accounts:
+        account_id = row.get("account_id", "").strip()
+        if account_id:
+            district_values.setdefault(account_id, set()).add(row.get("district_id", "").strip() or "<MISSING>")
+    mapping = {key: next(iter(values)) for key, values in district_values.items() if len(values) == 1}
+    expected: dict[tuple[str, str], list[dict[str, str]]] = {}
+    for loan in loans:
+        account_id = loan.get("account_id", "").strip()
+        district = ("<AMBIGUOUS_ACCOUNT_DISTRICT>" if account_id in district_values and len(district_values[account_id]) > 1
+                    else mapping.get(account_id, "<UNMAPPED>"))
+        status = loan.get("status", "").strip() or "<NULL>"
+        expected.setdefault((district, status), []).append(loan)
+    actual_rows = read_csv(output_path)
+    actual = {(r.get("district_id", ""), r.get("status", "")): r for r in actual_rows}
+    passed = len(actual) == len(actual_rows) and set(actual) == set(expected)
+    if passed:
+        for key, rows in expected.items():
+            row = actual[key]
+            accounts_in_group = {item.get("account_id", "").strip() for item in rows}
+            accounts_in_group.discard("")
+            amounts = []
+            for item in rows:
+                try:
+                    value = float(item.get("amount", ""))
+                    if value == value and abs(value) != float("inf"):
+                        amounts.append(value)
+                except (TypeError, ValueError):
+                    pass
+            average = f"{sum(amounts) / len(amounts):.2f}" if amounts else ""
+            share = f"{len(rows) * 100 / len(loans):.2f}" if loans else "0.00"
+            passed = (row.get("loan_count") == str(len(rows))
+                      and row.get("distinct_accounts") == str(len(accounts_in_group))
+                      and row.get("average_loan_amount") == average
+                      and row.get("share_pct") == share)
+            if not passed:
+                break
+    return passed, f"{len(loans)} loan rows reconciled across {len(expected)} district/status groups."
+
+
 def read_csv(path: Path) -> list[dict[str, str]]:
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
         return list(csv.DictReader(handle))
@@ -172,6 +226,8 @@ def validate_exports(directory: Path) -> dict:
     record("raw_source_table_exports", raw_ok, raw_detail)
     bridge_ok, bridge_detail = validate_client_account_outputs(directory)
     record("client_account_bridge_reconciliation", bridge_ok, bridge_detail)
+    district_ok, district_detail = validate_district_loan_outputs(directory)
+    record("district_loan_outcome_reconciliation", district_ok, district_detail)
     inventory = profile.get("inventory", [])
     record("source_inventory", len(inventory) == 8,
            f"Profiler reports {len(inventory)} of 8 expected source tables.")
