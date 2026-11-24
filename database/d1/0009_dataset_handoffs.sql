@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS dataset_handoffs (
   output_version INTEGER,
   handoff_note TEXT NOT NULL DEFAULT '',
   review_note TEXT,
+  result_json TEXT,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY(dataset_id,input_version) REFERENCES dataset_versions(dataset_id,version_number),
