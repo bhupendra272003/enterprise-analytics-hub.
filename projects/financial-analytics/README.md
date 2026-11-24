@@ -47,10 +47,13 @@ The profiler prompts for the database user and password; it does not write them 
 | output/loan_analysis_extract.csv | Loan-grain source extract, retaining loan_id and account_id |
 | output/loan_outcome_summary.csv | Loan count, distinct accounts, average amount/duration and share by observed status |
 | output/loan_duration_outcome_summary.csv | Descriptive loan counts, distinct accounts, average amount and overall share by duration and observed status |
-| output/loan_vintage_outcome_summary.csv | Descriptive loan counts, distinct accounts, average amount and overall share by loan month and observed status |\n| output/loan_scheduled_repayment_summary.csv | Scheduled installment and scheduled-total-to-principal metrics by duration/status; not actual repayments |
+| output/loan_vintage_outcome_summary.csv | Descriptive loan counts, distinct accounts, average amount and overall share by loan month and observed status |
+| output/loan_scheduled_repayment_summary.csv | Scheduled installment and scheduled-total-to-principal metrics by duration/status; not actual repayments |
 | output/loan_prior_features.csv | Transaction aggregates strictly before each loan date, without the target status |
 | output/source_tables/*.csv | Full raw-table extracts for all eight source tables, streamed in 10,000-row batches |
-| output/source_tables/manifest.json | Export completion marker with UTC timestamp, row counts, column counts and source column names for all eight tables |\n| output/source_tables/account_transaction_activity.csv | Account-by-observed-transaction-type counts and amount summaries; source labels are not reclassified as income/expense |\n| output/source_tables/district_account_summary.csv | Distinct account counts by source district identifier, when district_id is present in account.csv |
+| output/source_tables/manifest.json | Export completion marker with UTC timestamp, row counts, column counts and source column names for all eight tables |
+| output/source_tables/account_transaction_activity.csv | Account-by-observed-transaction-type counts and amount summaries; source labels are not reclassified as income/expense |
+| output/source_tables/district_account_summary.csv | Distinct account counts by source district identifier, when district_id is present in account.csv |
 | output/validation_report.json | Offline consistency, grain, target-leakage and temporal-boundary validation |
 | output/validation_summary.csv | One row per validator check |
 
