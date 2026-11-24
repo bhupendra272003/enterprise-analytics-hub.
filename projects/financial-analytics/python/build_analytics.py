@@ -352,7 +352,7 @@ def build_district_loan_outcomes(directory: Path, loans: list[dict[str, str]]) -
         "available": True, "loan_rows": total, "mapped_loan_rows": mapped_rows,
         "unmapped_loan_rows": total - mapped_rows - ambiguous_loan_rows,
         "ambiguous_account_district_loan_rows": ambiguous_loan_rows,
-        "duplicate_account_ids": sum(1 for key in district_values if len(district_values[key]) > 1),
+        "conflicting_account_district_ids": len(ambiguous_ids),
         "district_status_groups": len(output),
         "outputs": ["loan_district_outcome_summary.csv"],
     }
