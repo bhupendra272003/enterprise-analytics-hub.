@@ -6,7 +6,7 @@ import ts from "typescript";
 const source = await readFile(new URL("../src/query-engine.ts", import.meta.url), "utf8");
 const compiled = ts.transpile(source, { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 });
 const moduleUrl = "data:text/javascript;base64," + Buffer.from(compiled).toString("base64");
-const { runDatasetQuery } = await import(moduleUrl);
+const { runDatasetQuery, runDatasetJoinQuery } = await import(moduleUrl);
 const columns = ["id", "region", "sales"];
 const rows = [
   { id: "1", region: "North", sales: "100" },
@@ -72,7 +72,6 @@ test("supports grouped COUNT and numeric MIN/MAX", () => {
 
 
 test("supports tenant-scoped inner joins with qualified projections", () => {
-  const { runDatasetJoinQuery } = await import(moduleUrl);
   const customers = [{id:"1",name:"A"},{id:"2",name:"B"},{id:"3",name:"C"}];
   const orders = [{customer_id:"1",amount:"20"},{customer_id:"1",amount:"30"},{customer_id:"3",amount:"15"}];
   const result = runDatasetJoinQuery("SELECT c.name AS customer, o.amount FROM data c INNER JOIN dataset_0123456789abcdef0123456789abcdef o ON c.id = o.customer_id ORDER BY o.amount DESC LIMIT 10", customers, ["id","name"], orders, ["customer_id","amount"]);
@@ -80,7 +79,7 @@ test("supports tenant-scoped inner joins with qualified projections", () => {
   assert.deepEqual(result.rows[0],{customer:"A",o_amount:"30"});
 });
 
-test("supports left joins and enforces the result cap", async () => {
+test("supports left joins and enforces the result cap", () => {
   const { runDatasetJoinQuery } = await import(moduleUrl);
   const result = runDatasetJoinQuery("SELECT c.name, o.amount FROM data c LEFT JOIN dataset_0123456789abcdef0123456789abcdef o ON c.id = o.customer_id LIMIT 10", [{id:"1",name:"A"},{id:"2",name:"B"}], ["id","name"], [{customer_id:"1",amount:"20"}], ["customer_id","amount"]);
   assert.equal(result.rowCount,2);
