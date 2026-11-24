@@ -44,7 +44,7 @@ function numeric(values: unknown[]): number[] {
 
 function criterionMatches(value: unknown, criterion: string): boolean {
   const raw = criterion.trim();
-  const op = raw.match(/^(>=|<=|<>|>|<|=)\\s*(.*)$/);
+  const op = raw.match(/^(>=|<=|<>|>|<|=)\s*(.*)$/);
   if (!op) return String(value ?? "") === raw;
   const expected = op[2].replace(/^"|"$/g, "");
   const leftNumber = Number(value), rightNumber = Number(expected);
@@ -75,8 +75,8 @@ export function evaluateSpreadsheetFormula(formula: string, rows: SpreadsheetRow
     const value = arg.trim();
     if (/^".*"$/.test(value)) return value.slice(1, -1).replace(/""/g, '"');
     if (/^(TRUE|FALSE)$/i.test(value)) return value.toUpperCase() === "TRUE";
-    if (/^-?\\d+(?:\\.\\d+)?$/.test(value)) return Number(value);
-    if (/^\\$?[A-Z]{1,3}\\$?\\d+$/i.test(value)) return range(value)[0] ?? "";
+    if (/^-?\d+(?:\.\d+)?$/.test(value)) return Number(value);
+    if (/^\$?[A-Z]{1,3}\$?\d+$/i.test(value)) return range(value)[0] ?? "";
     throw new Error("Use a quoted text, number, boolean or single cell reference for this argument.");
   };
   if (["SUM","AVERAGE","COUNT","COUNTA","MIN","MAX"].includes(name)) {
@@ -103,7 +103,7 @@ export function evaluateSpreadsheetFormula(formula: string, rows: SpreadsheetRow
   }
   if (name === "IF") {
     if (args.length !== 3) throw new Error("IF expects a condition, true value and false value.");
-    const condition = args[0].trim().match(/^(.*?)\\s*(>=|<=|<>|>|<|=)\\s*(.*?)$/);
+    const condition = args[0].trim().match(/^(.*?)\s*(>=|<=|<>|>|<|=)\s*(.*?)$/);
     let passed: boolean;
     if (condition) passed = criterionMatches(scalar(condition[1]), condition[2] + String(scalar(condition[3])));
     else { const value = scalar(args[0]); passed = value === true || (typeof value === "number" && value !== 0) || (typeof value === "string" && value.length > 0); }
@@ -116,7 +116,7 @@ export function evaluateSpreadsheetFormula(formula: string, rows: SpreadsheetRow
     const count = args[1] ? Number(scalar(args[1])) : 1;
     if (!Number.isInteger(count) || count < 0 || count > 10000) throw new Error("Text length must be a whole number from 0 to 10000.");
     if (name === "LEN") return String(value.length);
-    if (name === "TRIM") return value.trim().replace(/\\s+/g, " ");
+    if (name === "TRIM") return value.trim().replace(/\s+/g, " ");
     return name === "LEFT" ? value.slice(0, count) : count === 0 ? "" : value.slice(-count);
   }
   if (name === "ROUND") {
