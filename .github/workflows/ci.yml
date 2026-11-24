@@ -56,13 +56,13 @@ jobs:
         run: |
           cd apps/api-worker
           npm install
-          npm audit --audit-level=high
+          npm audit --audit-level=moderate
           npm run typecheck
           node --test test/*.test.mjs
       - name: Build web application
         run: |
           cd apps/web
           npm install
-          npm audit --audit-level=high
+          npm audit --audit-level=moderate
           npm run build
           npm run cf:build
