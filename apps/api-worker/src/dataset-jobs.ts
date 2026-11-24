@@ -52,7 +52,7 @@ async function runProfile(msg:Msg,env:Env){
  try{
   const ds=await env.DB.prepare("SELECT name,storage_path,file_size FROM datasets WHERE id=? AND organization_id=?").bind(job.dataset_id,job.organization_id).first<any>();if(!ds)throw new Error("DATASET_NOT_FOUND");if(ds.file_size>10*1024*1024)throw new Error("DATASET_TOO_LARGE");
   const source=await env.DATASETS.get(ds.storage_path,"text");if(source===null)throw new Error("SOURCE_FILE_MISSING");
-  const {parse}=await import("csv-parse/sync");const rows=parse(source,{columns:true,skip_empty_lines:true,bom:true,trim:true,relax_column_count:false});if(!rows.length)throw new Error("EMPTY_DATASET");
+  const {parse}=await import("csv-parse/sync");const rows=parse(source,{columns:true,skip_empty_lines:true,bom:true,trim:true,relax_column_count:false}) as Record<string,unknown>[];if(!rows.length)throw new Error("EMPTY_DATASET");
   const columns=Object.keys(rows[0]);if(!columns.length||columns.length>200)throw new Error("INVALID_HEADERS");
   const profile=columns.map(name=>{const vals=rows.map((r:any)=>String(r[name]??"").trim()),present=vals.filter((v:string)=>v!==""),nums=present.map(Number).filter(Number.isFinite),numeric=present.length>0&&nums.length/present.length>=.9;return {name,type:!present.length?"EMPTY":numeric?"NUMERIC":"TEXT",total:vals.length,missing:vals.length-present.length,distinct:new Set(present).size,...(numeric?{min:Math.min(...nums),max:Math.max(...nums),mean:Number((nums.reduce((a:number,b:number)=>a+b,0)/nums.length).toFixed(3))}:{})};});
   const result={datasetId:job.dataset_id,name:ds.name,rowCount:rows.length,columnCount:columns.length,columns:profile};
