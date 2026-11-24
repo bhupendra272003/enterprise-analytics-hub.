@@ -16,9 +16,9 @@ const getUser=async(req:Request,env:Env):Promise<User|null>=>{
 };
 const membership=async(env:Env,orgId:string,userId:string)=>env.DB.prepare("SELECT role FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE'").bind(orgId,userId).first<{role:Role}>();
 const audit=(env:Env,orgId:string,userId:string,action:string,id:string,metadata?:unknown)=>env.DB.prepare("INSERT INTO audit_logs (organization_id,actor_user_id,action,target_type,target_id,metadata) VALUES (?,?,?,'DATASET',?,?)").bind(orgId,userId,action,id,metadata===undefined?null:JSON.stringify(metadata)).run();
-const parseCsv=(buffer:ArrayBuffer,maxBytes=MAX_SYNC_CSV_BYTES)=>{
+const parseCsv=(buffer:ArrayBuffer,maxBytes=MAX_SYNC_CSV_BYTES,trimValues=true)=>{
  if(buffer.byteLength>maxBytes)throw new Error("TOO_LARGE");
- const records=parse(new TextDecoder().decode(new Uint8Array(buffer)),{columns:true,skip_empty_lines:true,bom:true,trim:true,relax_column_count:false,skip_records_with_error:false}) as Record<string,unknown>[];
+ const records=parse(new TextDecoder().decode(new Uint8Array(buffer)),{columns:true,skip_empty_lines:true,bom:true,trim:trimValues,relax_column_count:false,skip_records_with_error:false}) as Record<string,unknown>[];
  if(!records.length)throw new Error("EMPTY");
  const columns=Object.keys(records[0]);
  if(!columns.length||columns.length>200||columns.some(c=>!c.trim()))throw new Error("HEADERS");
@@ -154,7 +154,7 @@ if(sub==="edits"&&req.method==="POST"){
   if(Number(dataset.file_size)>MAX_SYNC_CSV_BYTES)return syncLimitError();
   let body:any={};try{body=await req.json();}catch{return json({error:"Invalid cell edit request."},400);}
   const source=await readStored(env,dataset.storage_path);if(!source)return json({error:"Stored dataset file is missing."},500);
-  let parsed;try{parsed=parseCsv(await source.arrayBuffer());}catch{return json({error:"The stored CSV is invalid and cannot be edited."},400);}
+  let parsed;try{parsed=parseCsv(await source.arrayBuffer(),MAX_SYNC_CSV_BYTES,false);}catch{return json({error:"The stored CSV is invalid and cannot be edited."},400);}
   let edited;try{edited=applyDatasetCellEdits(parsed.records,parsed.columns,body.changes);}catch(e){return json({error:e instanceof Error?e.message:"Cell edits are invalid."},400);}
   const output=csvEncode(edited.rows,parsed.columns),bytes=new TextEncoder().encode(output);
   if(bytes.byteLength>MAX_SYNC_CSV_BYTES)return syncLimitError();
@@ -332,7 +332,7 @@ if(sub==="clean"&&req.method==="POST"){
   if(Number(dataset.file_size)>MAX_SYNC_CSV_BYTES)return syncLimitError();
   const source=await readStored(env,dataset.storage_path);
   if(!source)return json({error:"Stored dataset file is missing."},500);
-  let parsed;try{parsed=parseCsv(await source.arrayBuffer());}catch(e){return e instanceof Error&&e.message==="TOO_LARGE"?syncLimitError():json({error:"The stored CSV could not be read."},400);}
+  let parsed;try{parsed=parseCsv(await source.arrayBuffer(),MAX_SYNC_CSV_BYTES,false);}catch(e){return e instanceof Error&&e.message==="TOO_LARGE"?syncLimitError():json({error:"The stored CSV could not be read."},400);}
   const pageRaw=Number(url.searchParams.get("page")||1),sizeRaw=Number(url.searchParams.get("pageSize")||50);
   const page=Number.isInteger(pageRaw)?Math.max(1,pageRaw):1,pageSize=[25,50,100,200].includes(sizeRaw)?sizeRaw:50;
   const q=(url.searchParams.get("q")||"").trim().slice(0,200).toLocaleLowerCase();
