@@ -78,7 +78,7 @@ class BuildAnalyticsTests(unittest.TestCase):
         (source / "client.csv").write_text("client_id\n1\n2\n", encoding="utf-8")
         (source / "account.csv").write_text("account_id\n10\n20\n", encoding="utf-8")
         (source / "disp.csv").write_text(
-            "disp_id,client_id,account_id,type\n100,1,10,OWNER\n101,2,10,DISPONENT\n102,2,20,OWNER\n",
+            "disp_id,client_id,account_id,type\n100,1,10,OWNER\n101,2,10,DISPONENT\n102,2,20,OWNER\n103,1,10,OWNER\n",
             encoding="utf-8",
         )
         from build_analytics import build_client_account_relationships
@@ -89,11 +89,12 @@ class BuildAnalyticsTests(unittest.TestCase):
         self.assertEqual(result["accounts_with_clients"], 2)
         self.assertEqual(result["unmatched_client_ids"], 0)
         self.assertEqual(result["unmatched_account_ids"], 0)
+        self.assertEqual(result["disposition_rows"], 4)
         self.assertEqual(result["unique_client_account_pairs"], 3)
         with (source / "disposition_type_summary.csv").open(encoding="utf-8-sig", newline="") as handle:
             type_rows = list(csv.DictReader(handle))
         self.assertEqual({row["observed_disposition_type"]: row["relationship_count"] for row in type_rows},
-                         {"OWNER": "2", "DISPONENT": "1"})
+                         {"OWNER": "3", "DISPONENT": "1"})
         with (source / "account_client_coverage.csv").open(encoding="utf-8-sig", newline="") as handle:
             rows = list(csv.DictReader(handle))
         self.assertEqual({row["account_id"]: row["distinct_clients"] for row in rows}, {"10": "2", "20": "1"})
