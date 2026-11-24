@@ -155,11 +155,12 @@ export function runDatasetQuery(sql: string, sourceRows: QueryRow[], sourceColum
 }
 
 
+
 export function runDatasetJoinQuery(sql:string,leftRows:QueryRow[],leftColumns:string[],rightRows:QueryRow[],rightColumns:string[]){
  if(typeof sql!=="string"||!sql.trim()||sql.length>12000)throw new Error("Enter a SQL query up to 12,000 characters.");
- const statement=sql.replace(/--[^\\n\\r]*/g,"").trim().replace(/;\\s*$/,"").trim();
- if(statement.includes(";")||/\\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|REPLACE|ATTACH|DETACH|PRAGMA|VACUUM|INTO|UNION|WITH|RECURSIVE)\\b/i.test(statement))throw new Error("Only one read-only SELECT statement is allowed.");
- const match=statement.match(/^SELECT\\s+([\\s\\S]+?)\\s+FROM\\s+data\\s+(?:AS\\s+)?([a-zA-Z_]\\w*)\\s+(INNER|LEFT)\\s+JOIN\\s+dataset_([a-f0-9]{32})\\s+(?:AS\\s+)?([a-zA-Z_]\\w*)\\s+ON\\s+([a-zA-Z_]\\w*)\\.([\\w-]+)\\s*=\\s*([a-zA-Z_]\\w*)\\.([\\w-]+)(?:\\s+ORDER\\s+BY\\s+([a-zA-Z_]\\w*\\.[\\w-]+)(?:\\s+(ASC|DESC))?)?(?:\\s+LIMIT\\s+(\\d+))?$/i);
+ const statement=sql.replace(/--[^\n\r]*/g,"").trim().replace(/;\s*$/,"").trim();
+ if(statement.includes(";")||!/^SELECT\b/i.test(statement)||/\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|REPLACE|ATTACH|DETACH|PRAGMA|VACUUM|INTO|UNION|WITH|RECURSIVE)\b/i.test(statement))throw new Error("Only one read-only SELECT statement is allowed.");
+ const match=statement.match(/^SELECT\s+([\s\S]+?)\s+FROM\s+data\s+(?:AS\s+)?([a-zA-Z_]\w*)\s+(INNER|LEFT)\s+JOIN\s+dataset_([a-f0-9]{32})\s+(?:AS\s+)?([a-zA-Z_]\w*)\s+ON\s+([a-zA-Z_]\w*)\.([\w-]+)\s*=\s*([a-zA-Z_]\w*)\.([\w-]+)(?:\s+ORDER\s+BY\s+([a-zA-Z_]\w*\.[\w-]+)(?:\s+(ASC|DESC))?)?(?:\s+LIMIT\s+(\d+))?$/i);
  if(!match)throw new Error("JOIN syntax: SELECT c.name, o.amount FROM data c INNER JOIN dataset_<32-character-id> o ON c.id = o.customer_id LIMIT 100.");
  const [,projection,leftAlias,joinType,token,rightAlias,onAliasA,onColumnA,onAliasB,onColumnB,orderRef,orderDirection,limitRaw]=match;
  if(leftAlias.toLowerCase()===rightAlias.toLowerCase())throw new Error("Use different aliases for the two datasets.");
@@ -172,7 +173,7 @@ export function runDatasetJoinQuery(sql:string,leftRows:QueryRow[],leftColumns:s
    const includeLeft=item==="*"||item.toLowerCase()===leftAlias.toLowerCase()+".*",includeRight=item==="*"||item.toLowerCase()===rightAlias.toLowerCase()+".*";
    return [...(includeLeft?leftColumns.map(column=>({side:"L",column,output:leftAlias+"_"+column})):[]),...(includeRight?rightColumns.map(column=>({side:"R",column,output:rightAlias+"_"+column})):[])];
   }
-  const col=item.match(/^([a-zA-Z_]\\w*)\\.([\\w-]+)(?:\\s+AS\\s+([\\w-]+))?$/i);if(!col)throw new Error("JOIN projections must use qualified columns, such as c.customer_name AS customer.");
+  const col=item.match(/^([a-zA-Z_]\w*)\.([\w-]+)(?:\s+AS\s+([\w-]+))?$/i);if(!col)throw new Error("JOIN projections must use qualified columns, such as c.customer_name AS customer.");
   const side=resolve(col[1],col[2]);return [{side,column:col[2],output:col[3]||col[1]+"_"+col[2]}];
  });
  if(!selections.length||new Set(selections.map((s:any)=>s.output.toLowerCase())).size!==selections.length)throw new Error("Selected output columns must have unique names.");
@@ -181,5 +182,5 @@ export function runDatasetJoinQuery(sql:string,leftRows:QueryRow[],leftColumns:s
  for(const left of leftRows){const key=String(left[leftKey]??"");const matches=key===""?[]:(rightIndex.get(key)||[]);if(matches.length){for(const right of matches){matchedRows++;if(joined.length>=100000)throw new Error("JOIN result exceeds the 100,000-row safety cap. Filter the source datasets or use a more selective key.");joined.push(Object.fromEntries(selections.map((s:any)=>[s.output,(s.side==="L"?left:right)[s.column]??""])));}}else if(joinType.toUpperCase()==="LEFT"){if(joined.length>=100000)throw new Error("JOIN result exceeds the 100,000-row safety cap.");joined.push(Object.fromEntries(selections.map((s:any)=>[s.output,s.side==="L"?(left[s.column]??""):null])));}}
  const columns=selections.map((s:any)=>s.output);
  if(orderRef){const [alias,column]=orderRef.split(".");const selected=selections.find((s:any)=>s.side===(alias.toLowerCase()===leftAlias.toLowerCase()?"L":"R")&&s.column===column);if(!selected)throw new Error("ORDER BY must reference a selected qualified column.");const direction=orderDirection?.toUpperCase()==="DESC"?-1:1;joined.sort((a,b)=>{const av=a[selected.output]??"",bv=b[selected.output]??"",an=Number(av),bn=Number(bv);const cmp=String(av).trim()!==""&&String(bv).trim()!==""&&Number.isFinite(an)&&Number.isFinite(bn)?an-bn:String(av).localeCompare(String(bv));return direction*cmp;});}
- const rows=joined.slice(0,limit);return {columns,rows,rowCount:rows.length,matchedRows,truncated:joined.length>limit,engine:"Vyron read-only CSV JOIN engine",joinType:joinType.toUpperCase(),joinRows:joined.length};
+ const rows=joined.slice(0,limit);return {columns,rows,rowCount:rows.length,matchedRows,matchedJoinRows:matchedRows,truncated:joined.length>limit,engine:"Vyron read-only CSV JOIN engine",joinType:joinType.toUpperCase(),joinRows:joined.length};
 }
