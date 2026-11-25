@@ -40,13 +40,12 @@ class CleaningEngineTests(unittest.TestCase):
 
     def test_mean_fill_and_outlier_detection(self):
         report, rows = self.run_engine(
-            "value\n1\n2\n3\n4\n1000\n",
+            "value\\n1\\n2\\n3\\n4\\n5\\n1000\\n",
             {"trimWhitespace": True, "removeDuplicates": True, "fillMissing": "mean"}
         )
-        self.assertEqual(len(rows), 5)
-        self.assertIn("value", report["outliersByColumn"])
+        self.assertEqual(len(rows), 6)
         self.assertEqual(report["removedDuplicates"], 0)
-
+        self.assertEqual(report["outliersByColumn"].get("value"), 1)
 
     def test_outlier_quartiles_exclude_middle_value_for_odd_sample(self):
         report, rows = self.run_engine(
