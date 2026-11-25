@@ -109,6 +109,18 @@ export default function HandoffsPage(){
         <div className="team-heading"><div><div className="eyebrow"><span/> CONTROLLED COLLABORATION</div><h1>Work together, <em>securely.</em></h1><p>Assign cleaning, SQL review, dashboard preparation and reconciliation against private dataset versions.</p></div><select value={org} onChange={e=>setOrg(e.target.value)} aria-label="Organization">{orgs.map(item=><option key={item.id} value={item.id}>{item.name} · {item.role}</option>)}</select></div>
         <div className="team-stats"><article><small>DATASETS</small><strong>{datasets.length.toString().padStart(2,'0')}</strong><span>In this organization</span></article><article><small>ACTIVE HANDOFFS</small><strong>{handoffs.filter(h=>!['APPROVED'].includes(h.status)).length.toString().padStart(2,'0')}</strong><span>Assigned, working or awaiting review</span></article><article><small>YOUR ROLE</small><strong className="stat-text">{role}</strong><span>Server-enforced permissions</span></article></div>
         <section className="panel" style={{padding:22,marginBottom:18}}>
+          <div className="panel-title"><div><small>TOOL-TO-TOOL TRAINING FLOW</small><h2>Analyst pipeline</h2></div><span className="role-pill">Version-aware workflow</span></div>
+          <p className="upload-hint">Work in each studio, save a version, then assign the next stage against that version. This panel provides workflow navigation; it does not automatically move data or grant access.</p>
+          <div className="form-grid">
+            <a className="manage-team-link" href="/workspace/data">① Data intake & Excel Studio ↗</a>
+            <a className="manage-team-link" href="/workspace/tools">② SQL / MySQL Studio ↗</a>
+            <a className="manage-team-link" href="/workspace/tools">③ Python / VS Code Studio ↗</a>
+            <a className="manage-team-link" href="/workspace/analytics">④ BI / Power BI Studio ↗</a>
+            <a className="manage-team-link" href="/workspace/reports">⑤ Reports & review ↗</a>
+          </div>
+          <div className="upload-hint"><b>Recommended sequence:</b> Intake → Data quality & cleaning → SQL validation → Python analysis → BI report → Peer review → Owner sign-off. Analysts can request/assign follow-on stages through this handoff queue.</div>
+        </section>
+        <section className="panel" style={{padding:22,marginBottom:18}}>
           <div className="panel-title"><div><small>01 · PRIVATE DATASET</small><h2>Select shared dataset</h2></div><span className="role-pill">No file transfer</span></div>
           <label>DATASET<select value={dataset} onChange={e=>setDataset(e.target.value)}>{datasets.map(item=><option key={item.id} value={item.id}>{item.name} · {item.rowCount.toLocaleString()} rows</option>)}</select></label>
           <p className="upload-hint">Collaborators receive permission-checked references to versions stored by Vyron. Source files are not attached to handoffs.</p>
