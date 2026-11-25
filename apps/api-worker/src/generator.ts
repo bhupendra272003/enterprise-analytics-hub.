@@ -62,8 +62,13 @@ export async function handleGenerator(req:Request,env:Env,path:string):Promise<R
    if(rows>settings.per_job_row_cap||rows>settings.per_dataset_row_cap)return json({error:"Requested rows exceed the Owner-configured per-job or per-dataset limit."},400);
    const template=templates[industry];
    if(action==="preview"){
-    const preview=Array.from({length:Math.min(rows,5)},(_,i)=>rowFor(industry,i,typeof body.seed==="string"?body.seed:"vyron-preview")).map((r:any)=>Object.fromEntries(template.columns.map((k:string,i:number)=>[k,r[i]])));
-    return json({industry,datasetKey:template.key,datasetName:template.label,requestedRows:rows,limits:{perDatasetRowCap:settings.per_dataset_row_cap,perJobRowCap:settings.per_job_row_cap,platformHardCap:100000},estimatedBytes:rows*150,estimatedSeconds:Math.max(2,Math.ceil(rows/5000)),preview,association:{projectId:context.project_id,projectName:context.project_name,teamId:context.team_id,teamName:context.team_name},manualConfirmationRequired:true});
+    const sampleRows=Array.from({length:Math.min(rows,5)},(_,i)=>rowFor(industry,i,typeof body.seed==="string"?body.seed:"vyron-preview"));
+    const preview=sampleRows.map((r:any)=>Object.fromEntries(template.columns.map((k:string,i:number)=>[k,r[i]])));
+    const headerBytes=new TextEncoder().encode(template.columns.map(csv).join(",")).byteLength+1;
+    const sampleBytes=sampleRows.reduce((total,r)=>total+new TextEncoder().encode(r.map(csv).join(",")).byteLength,0);
+    const averageRowBytes=sampleRows.length?sampleBytes/sampleRows.length:0;
+    const estimatedBytes=Math.ceil(headerBytes+rows*(averageRowBytes+1)*1.1);
+    return json({industry,datasetKey:template.key,datasetName:template.label,requestedRows:rows,limits:{perDatasetRowCap:settings.per_dataset_row_cap,perJobRowCap:settings.per_job_row_cap,platformHardCap:100000},estimatedBytes,estimatedSeconds:Math.max(2,Math.ceil(rows/1000)*2),preview,association:{projectId:context.project_id,projectName:context.project_name,teamId:context.team_id,teamName:context.team_name},manualConfirmationRequired:true});
    }
    const idempotencyKey=typeof body.idempotencyKey==="string"?body.idempotencyKey:"";
    if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(idempotencyKey))return json({error:"A valid idempotency key is required. Please prepare a fresh preview."},400);
