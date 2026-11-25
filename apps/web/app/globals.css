@@ -698,3 +698,17 @@ body{background-image:radial-gradient(ellipse at 15% 48%,rgba(103,151,70,.08),tr
 .insight-panel{border-radius:9px}
 .saved-dashboard-row{transition:background .15s ease}
 .saved-dashboard-row:hover{background:rgba(255,255,255,.025)}
+
+
+/* Spreadsheet Lab: familiar sheet surface, formula controls and history */
+.preview-panel .upload-controls label{font-size:10px;letter-spacing:.45px;font-weight:700}
+.preview-panel .upload-controls input,.preview-panel .upload-controls select{font-family:'DM Mono',Consolas,monospace;font-size:12px}
+.preview-panel .preview-scroll{border:1px solid #35424d;border-radius:9px;background:#0f151b}
+.preview-panel .preview-table{border-collapse:separate;border-spacing:0;font-family:'DM Mono',Consolas,monospace;font-size:11px}
+.preview-panel .preview-table th{background:#202a34;color:#c5b58e;text-align:left;position:sticky;top:0;z-index:1;padding:10px 12px;border-bottom:1px solid #455462}
+.preview-panel .preview-table td{padding:8px 12px;border-right:1px solid rgba(255,255,255,.035);border-bottom:1px solid rgba(255,255,255,.055);white-space:nowrap;min-width:100px}
+.preview-panel .preview-table tbody tr:nth-child(even){background:rgba(255,255,255,.018)}
+.preview-panel .preview-table tbody tr:hover{background:rgba(117,153,188,.08)}
+.preview-panel .preview-table td:focus-within{outline:1px solid #b18b55;outline-offset:-1px}
+.preview-panel .insight-panel{border:1px solid #35424d;background:#121a22;border-radius:9px}
+.preview-panel .saved-dashboard-row{padding:10px;border-bottom:1px solid rgba(255,255,255,.05)}
