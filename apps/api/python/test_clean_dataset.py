@@ -47,7 +47,15 @@ class CleaningEngineTests(unittest.TestCase):
         self.assertIn("value", report["outliersByColumn"])
         self.assertEqual(report["removedDuplicates"], 0)
 
-    def test_rejects_empty_data(self):
+
+    def test_outlier_quartiles_exclude_middle_value_for_odd_sample(self):
+        report, rows = self.run_engine(
+            "value\\n1\\n2\\n3\\n4\\n5\\n100\\n",
+            {"trimWhitespace": True, "removeDuplicates": False, "fillMissing": "none"}
+        )
+        self.assertEqual(len(rows), 6)
+        self.assertEqual(report["outliersByColumn"].get("value"), 1)
+\n    def test_rejects_empty_data(self):
         with tempfile.TemporaryDirectory() as temp:
             source = os.path.join(temp, "source.csv")
             output = os.path.join(temp, "cleaned.csv")
