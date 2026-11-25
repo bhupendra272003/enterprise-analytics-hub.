@@ -7,7 +7,7 @@ export function aggregateCategoryRows(
   filter: string,
   aggregation: ChartAggregation,
 ) {
-  const groups = new Map<string, { sum: number; count: number; min: number; max: number }>();
+  if (!["SUM", "AVG", "COUNT", "MIN", "MAX"].includes(aggregation)) throw new Error("Unsupported chart aggregation.");\n  if (!category || !measure) throw new Error("Choose a category and measure column.");\n  const groups = new Map<string, { sum: number; count: number; min: number; max: number }>();
   for (const row of rows) {
     const label = String(row[category] ?? "").trim() || "(blank)";
     if (filter && !label.toLocaleLowerCase().includes(filter.toLocaleLowerCase())) continue;
@@ -35,7 +35,7 @@ export function aggregateCategoryRows(
       : aggregation === "MIN" ? stats.min
       : aggregation === "MAX" ? stats.max
       : stats.sum;
-    return { label, value: Number(value.toFixed(3)) };
+    return { label, value: Number.isFinite(value) ? Number(value.toFixed(3)) : 0 };
   }).sort((a, b) => b.value - a.value).slice(0, 20);
   return { chartRows, matchedGroups: groups.size };
 }
