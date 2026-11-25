@@ -88,7 +88,7 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
   const grant=await env.DB.prepare("SELECT id FROM dataset_handoffs WHERE dataset_id=? AND assigned_to=? AND status<>'REVOKED' LIMIT 1").bind(datasetId,user.id).first();
   if(!grant)return json({error:"This dataset has not been assigned to you. Ask the Owner or your Team Leader for access."},403);
  }else if(m.role==="LEADER"){
-  const grant=await env.DB.prepare("SELECT h.id FROM dataset_handoffs h JOIN team_members tm ON tm.user_id=h.assigned_to JOIN teams t ON t.id=tm.team_id WHERE h.dataset_id=? AND h.status<>'REVOKED' AND t.organization_id=? AND t.leader_user_id=? LIMIT 1").bind(datasetId,dataset.organization_id,user.id).first();
+  const grant=await env.DB.prepare("SELECT h.id FROM dataset_handoffs h WHERE h.dataset_id=? AND h.status<>'REVOKED' AND (h.assigned_to=? OR EXISTS (SELECT 1 FROM team_members tm JOIN teams t ON t.id=tm.team_id WHERE tm.user_id=h.assigned_to AND t.organization_id=? AND t.leader_user_id=?)) LIMIT 1").bind(datasetId,user.id,dataset.organization_id,user.id).first();
   if(!grant)return json({error:"This dataset is outside your assigned team scope."},403);
  }
  if(["clean","edits","profile","validate","anomalies","quality-dashboard","compare","insights","query"].includes(sub)&&Number(dataset.file_size)>MAX_SYNC_CSV_BYTES)return syncLimitError();
