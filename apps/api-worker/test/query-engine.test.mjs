@@ -178,3 +178,6 @@ test("rejects unknown aliases in JOIN ORDER BY", () => {
   const orders = [{customer_id:"1",amount:"20"}];
   assert.throws(() => runDatasetJoinQuery("SELECT c.name, o.amount FROM data c INNER JOIN dataset_0123456789abcdef0123456789abcdef o ON c.id = o.customer_id ORDER BY x.amount", customers, ["id","name"], orders, ["customer_id","amount"]), /Unknown table alias/);
 });
+
+
+test("resolves JOIN aliases and column names case-insensitively", () => {\n  const customers = [{ID:"1",Name:"A"}];\n  const orders = [{Customer_ID:"1",Amount:"20"}];\n  const result = runDatasetJoinQuery("SELECT C.NAME AS customer, O.amount FROM data C INNER JOIN dataset_0123456789abcdef0123456789abcdef O ON C.id = O.customer_id ORDER BY O.amount DESC", customers, ["ID","Name"], orders, ["Customer_ID","Amount"]);\n  assert.deepEqual(result.rows, [{customer:"A",o_amount:"20"}]);\n});\n
