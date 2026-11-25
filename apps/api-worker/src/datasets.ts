@@ -52,7 +52,7 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
   let sql="SELECT d.id,d.name,d.original_filename AS originalFilename,d.file_size AS fileSize,d.row_count AS rowCount,d.column_count AS columnCount,d.created_at AS createdAt,u.full_name AS uploadedBy FROM datasets d JOIN users u ON u.id=d.uploaded_by WHERE d.organization_id=?";
   const params:unknown[]=[orgId];
   if(m.role==="ANALYST"){sql+=" AND EXISTS (SELECT 1 FROM dataset_handoffs h WHERE h.dataset_id=d.id AND h.assigned_to=? AND h.status<>'REVOKED')";params.push(user.id);}
-  else if(m.role==="LEADER"){sql+=" AND EXISTS (SELECT 1 FROM dataset_handoffs h JOIN team_members tm ON tm.user_id=h.assigned_to JOIN teams t ON t.id=tm.team_id WHERE h.dataset_id=d.id AND h.status<>'REVOKED' AND t.organization_id=d.organization_id AND t.leader_user_id=?)";params.push(user.id);}
+  else if(m.role==="LEADER"){sql+=" AND EXISTS (SELECT 1 FROM dataset_handoffs h WHERE h.dataset_id=d.id AND h.status<>\'REVOKED\' AND (h.assigned_to=? OR EXISTS (SELECT 1 FROM team_members tm JOIN teams t ON t.id=tm.team_id WHERE tm.user_id=h.assigned_to AND t.organization_id=d.organization_id AND t.leader_user_id=?)))";params.push(user.id,user.id);}
   sql+=" ORDER BY d.created_at DESC";
   const {results}=await env.DB.prepare(sql).bind(...params).all();
   return json({datasets:results});
