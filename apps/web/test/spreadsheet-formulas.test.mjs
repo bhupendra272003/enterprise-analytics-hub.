@@ -64,3 +64,12 @@ test("supports multi-criteria SUMIFS, COUNTIFS and AVERAGEIFS", () => {
   assert.equal(calc('=COUNTIFS(A2:A5,"North",C2:C5,">2")'), "1");
   assert.equal(calc('=AVERAGEIFS(B2:B5,A2:A5,"North",C2:C5,">2")'), "300");
 });
+
+
+test("COUNTIF and COUNTIFS count matched blank cells", () => {
+  const blankRows = [{Region:"North",Sales:""},{Region:"",Sales:"10"},{Region:"North",Sales:"20"}];
+  const blankCalc = (formula) => evaluateSpreadsheetFormula(formula, blankRows, ["Region","Sales"]);
+  assert.equal(blankCalc('=COUNTIF(B2:B4,"")'), "1");
+  assert.equal(blankCalc('=COUNTIF(A2:A4,"North")'), "2");
+  assert.equal(blankCalc('=COUNTIFS(A2:A4,"",B2:B4,">0")'), "1");
+});
