@@ -27,3 +27,13 @@ test("rejects invalid, duplicate, unknown and oversized edits", () => {
   assert.throws(() => applyDatasetCellEdits(source, ["id", "name", "amount"], [{ rowIndex: 0, column: "name", value: "x" }, { rowIndex: 0, column: "name", value: "y" }]), /more than once/);
   assert.throws(() => applyDatasetCellEdits(source, ["id", "name", "amount"], [{ rowIndex: 0, column: "name", value: "x".repeat(10001) }]), /10000 characters/);
 });
+
+
+test("safely edits special property names and rejects duplicate column metadata", () => {
+  const special = [{ "__proto__": "initial", safe: "x" }];
+  const result = applyDatasetCellEdits(special, ["__proto__", "safe"], [{ rowIndex: 0, column: "__proto__", value: "changed" }]);
+  assert.equal(Object.hasOwn(result.rows[0], "__proto__"), true);
+  assert.equal(result.rows[0]["__proto__"], "changed");
+  assert.equal(Object.getPrototypeOf(result.rows[0]), Object.prototype);
+  assert.throws(() => applyDatasetCellEdits(source, ["id", "id"], [{ rowIndex: 0, column: "id", value: "x" }]), /unique/);
+});
