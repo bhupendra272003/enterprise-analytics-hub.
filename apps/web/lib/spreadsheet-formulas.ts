@@ -118,7 +118,7 @@ export function evaluateSpreadsheetFormula(formula: string, rows: SpreadsheetRow
     const targetValues = args[2] ? range(args[2]) : criteriaValues;
     if (targetValues.length !== criteriaValues.length) throw new Error("Criteria and value ranges must have the same number of cells.");
     const selected = targetValues.filter((_,i)=>criterionMatches(criteriaValues[i],criterion));
-    if (name === "COUNTIF") return String(selected.filter(v=>v!==null&&v!==undefined&&String(v).trim()!=="").length);
+    if (name === "COUNTIF") return String(criteriaValues.filter(v=>criterionMatches(v,criterion)).length);
     const nums = numeric(selected);
     if (name === "SUMIF") return String(nums.reduce((a,b)=>a+b,0));
     return nums.length ? String(nums.reduce((a,b)=>a+b,0)/nums.length) : "0";
@@ -157,7 +157,7 @@ export function evaluateSpreadsheetFormula(formula: string, rows: SpreadsheetRow
     const criteriaPairs = args.slice(offset).reduce((pairs, arg, i, list) => { if (i % 2 === 0) pairs.push([range(arg), list[i+1]?.replace(/^"|"$/g, "")]); return pairs; }, [] as [unknown[], string][]);
     if (criteriaPairs.some(([values]) => values.length !== target.length)) throw new Error("All criteria ranges must have the same number of cells as the target range.");
     const filtered = target.filter((_,i)=>criteriaPairs.every(([values,criterion])=>criterionMatches(values[i],criterion)));
-    if (name === "COUNTIFS") return String(filtered.filter(v=>v!==null&&v!==undefined&&String(v).trim()!=="").length);
+    if (name === "COUNTIFS") return String(target.filter((_,i)=>criteriaPairs.every(([values,criterion])=>criterionMatches(values[i],criterion))).length);
     const nums = numeric(filtered);
     if (name === "SUMIFS") return String(nums.reduce((a,b)=>a+b,0));
     return nums.length ? String(nums.reduce((a,b)=>a+b,0)/nums.length) : "0";
