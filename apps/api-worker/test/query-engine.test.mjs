@@ -214,3 +214,12 @@ test("JOIN preserves left rows when blank join keys and unmatched keys are prese
   const result = runDatasetJoinQuery("SELECT c.name, o.amount FROM data c LEFT JOIN dataset_0123456789abcdef0123456789abcdef o ON c.id = o.customer_id LIMIT 10", [{id:"",name:"Blank"},{id:"2",name:"No match"}], ["id","name"], [{customer_id:"",amount:"99"}], ["customer_id","amount"]);
   assert.deepEqual(result.rows, [{c_name:"Blank",o_amount:null},{c_name:"No match",o_amount:null}]);
 });
+
+
+test("supports MIN and MAX over text columns", () => {
+  const sample = [{id:"1",region:"Beta",sales:""},{id:"2",region:"alpha",sales:""},{id:"3",region:"Gamma",sales:""}];
+  const result = runDatasetQuery("SELECT MIN(region) AS first_region, MAX(region) AS last_region FROM data", sample, columns);
+  assert.deepEqual(result.rows, [{first_region:"alpha",last_region:"Gamma"}]);
+  const empty = runDatasetQuery("SELECT MIN(region) AS first_region, MAX(region) AS last_region FROM data WHERE id = 'missing'", sample, columns);
+  assert.deepEqual(empty.rows, [{first_region:null,last_region:null}]);
+});
