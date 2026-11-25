@@ -172,3 +172,9 @@ test("preserves SQL comment markers inside quoted literals", () => {
   assert.deepEqual(runDatasetQuery("SELECT id FROM data WHERE region = 'North -- coast'", sample, columns).rows, [{ id: "1" }]);
   assert.deepEqual(runDatasetQuery("SELECT id FROM data -- remove this line\nWHERE id = '2'", sample, columns).rows, [{ id: "2" }]);
 });
+
+test("rejects unknown aliases in JOIN ORDER BY", () => {
+  const customers = [{id:"1",name:"A"}];
+  const orders = [{customer_id:"1",amount:"20"}];
+  assert.throws(() => runDatasetJoinQuery("SELECT c.name, o.amount FROM data c INNER JOIN dataset_0123456789abcdef0123456789abcdef o ON c.id = o.customer_id ORDER BY x.amount", customers, ["id","name"], orders, ["customer_id","amount"]), /Unknown table alias/);
+});
