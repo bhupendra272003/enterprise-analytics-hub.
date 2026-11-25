@@ -415,6 +415,7 @@ if(sub==="clean"&&req.method==="POST"){
   let resultJson:string|null=null;
   if(body.result!==undefined){if(!body.result||typeof body.result!=="object"||Array.isArray(body.result))return json({error:"The shared result must be a JSON object."},400);resultJson=JSON.stringify(body.result);if(resultJson.length>50000)return json({error:"Shared query results are limited to 50 KB. Reduce rows or columns."},413);const columns=body.result.columns,rows=body.result.rows;if(!Array.isArray(columns)||columns.length>50||!Array.isArray(rows)||rows.length>100||columns.some((v:any)=>typeof v!=="string"||v.length>200))return json({error:"Shared results may contain up to 50 columns and 100 rows."},400);}
   if(!["IN_PROGRESS","SUBMITTED","APPROVED","RETURNED","REVOKED"].includes(status)||reviewNote.length>1000)return json({error:"Choose a valid status and review note."},400);
+  if((status==="APPROVED"||status==="RETURNED")&&!reviewNote)return json({error:status==="APPROVED"?"A review note is required to approve this handoff.":"A review note is required to return this handoff."},400);
   const handoff=await env.DB.prepare("SELECT * FROM dataset_handoffs WHERE id=? AND dataset_id=?").bind(handoffMatch[1],datasetId).first<any>();
   if(!handoff)return json({error:"Handoff not found."},404);
   if(status==="REVOKED"){
