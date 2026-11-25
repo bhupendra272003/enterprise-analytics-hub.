@@ -186,3 +186,10 @@ test("resolves JOIN aliases and column names case-insensitively", () => {
   const result = runDatasetJoinQuery("SELECT C.NAME AS customer, O.amount FROM data C INNER JOIN dataset_0123456789abcdef0123456789abcdef O ON C.id = O.customer_id ORDER BY O.amount DESC", customers, ["ID","Name"], orders, ["Customer_ID","Amount"]);
   assert.deepEqual(result.rows, [{customer:"A",O_amount:"20"}]);
 });
+
+test("ORDER BY aliases resolve case-insensitively", () => {
+  const grouped = runDatasetQuery("SELECT region, SUM(sales) AS Total_Sales FROM data GROUP BY region ORDER BY total_sales DESC", rows, columns);
+  assert.deepEqual(grouped.rows.map(r=>r.region), ["South","North"]);
+  const projected = runDatasetQuery("SELECT region AS Zone FROM data ORDER BY zone ASC", rows, columns);
+  assert.deepEqual(projected.rows.map(r=>r.Zone), ["North","North","South"]);
+});
