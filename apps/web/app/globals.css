@@ -683,3 +683,18 @@ body{background-image:radial-gradient(ellipse at 15% 48%,rgba(103,151,70,.08),tr
 .python-workspace .python-metrics article{border-radius:8px;background:#121b24}
 .python-workspace .python-run{border-radius:7px}
 @media(max-width:620px){.python-workspace .python-code-toolbar .project-actions{display:flex;flex-wrap:wrap}}
+
+
+/* BI Studio report-builder surface polish */
+.bi-visual-toolbar label{font-family:'DM Mono',Consolas,monospace;font-size:10px;letter-spacing:.45px}
+.bi-visual-toolbar select{background:#101821;border-color:#354553;color:#d8e2eb;border-radius:6px}
+.bi-data-table{border-color:#34414d;border-radius:8px}
+.bi-data-table th{position:sticky;top:0;background:#202b36;color:#c9b58e;letter-spacing:.35px}
+.bi-data-table tr:last-child td{border-bottom:0}
+.bi-data-table tbody tr:nth-child(even){background:rgba(255,255,255,.02)}
+.bi-data-table tbody tr:hover{background:rgba(190,155,101,.07)}
+.bi-line-wrap{border-radius:8px;background:#101821}
+.bi-chart .bi-placeholder{border-radius:8px;background:#111923}
+.insight-panel{border-radius:9px}
+.saved-dashboard-row{transition:background .15s ease}
+.saved-dashboard-row:hover{background:rgba(255,255,255,.025)}
