@@ -193,3 +193,10 @@ test("ORDER BY aliases resolve case-insensitively", () => {
   const projected = runDatasetQuery("SELECT region AS Zone FROM data ORDER BY zone ASC", rows, columns);
   assert.deepEqual(projected.rows.map(r=>r.Zone), ["North","North","South"]);
 });
+
+
+test("SQL aggregate SUM and AVG safely return null on overflow", () => {
+  const extreme = [{id:"1",region:"X",sales:"1e308"},{id:"2",region:"X",sales:"1e308"}];
+  const result = runDatasetQuery("SELECT SUM(sales) AS total, AVG(sales) AS average FROM data",extreme,columns);
+  assert.deepEqual(result.rows,[{total:null,average:null}]);
+});
