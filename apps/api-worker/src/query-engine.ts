@@ -96,8 +96,14 @@ function aggregateValue(fn: string, column: string, rows: QueryRow[], distinct=f
   if (fn === "COUNT") return values.length;
   if (fn === "SUM") { const total = nums.reduce((a,b)=>a+b,0); return Number.isFinite(total) ? total : null; }
   if (fn === "AVG") { const total = nums.reduce((a,b)=>a+b,0); return nums.length && Number.isFinite(total) ? total/nums.length : null; }
-  if (fn === "MIN") return nums.length ? nums.reduce((a,b)=>Math.min(a,b),Infinity) : null;
-  if (fn === "MAX") return nums.length ? nums.reduce((a,b)=>Math.max(a,b),-Infinity) : null;
+  if (fn === "MIN" || fn === "MAX") {
+    if (!values.length) return null;
+    const numeric = values.every(value => String(value).trim() !== "" && Number.isFinite(Number(value)));
+    const candidates = numeric ? values.map(Number) : values.map(value => String(value));
+    const compare = (a: string | number, b: string | number) => numeric ? Number(a)-Number(b) : String(a).localeCompare(String(b), undefined, { sensitivity: "base" });
+    const chosen = candidates.reduce((best,value) => fn === "MIN" ? (compare(value,best)<0?value:best) : (compare(value,best)>0?value:best));
+    return chosen;
+  }
   return null;
 }
 export function runDatasetQuery(sql: string, sourceRows: QueryRow[], sourceColumns: string[]) {
