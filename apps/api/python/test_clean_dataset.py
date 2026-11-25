@@ -55,7 +55,8 @@ class CleaningEngineTests(unittest.TestCase):
         )
         self.assertEqual(len(rows), 6)
         self.assertEqual(report["outliersByColumn"].get("value"), 1)
-\n    def test_rejects_empty_data(self):
+
+    def test_rejects_empty_data(self):
         with tempfile.TemporaryDirectory() as temp:
             source = os.path.join(temp, "source.csv")
             output = os.path.join(temp, "cleaned.csv")
