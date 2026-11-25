@@ -184,7 +184,7 @@ export function runDatasetJoinQuery(sql:string,leftRows:QueryRow[],leftColumns:s
  if(!match)throw new Error("JOIN syntax: SELECT c.name, o.amount FROM data c INNER JOIN dataset_<32-character-id> o ON c.id = o.customer_id LIMIT 100.");
  const [,projection,leftAlias,joinType,token,rightAlias,onAliasA,onColumnA,onAliasB,onColumnB,orderRef,orderDirection,limitRaw]=match;
  if(leftAlias.toLowerCase()===rightAlias.toLowerCase())throw new Error("Use different aliases for the two datasets.");
- const resolve=(alias:string,column:string)=>{const isLeft=alias.toLowerCase()===leftAlias.toLowerCase(),isRight=alias.toLowerCase()===rightAlias.toLowerCase();if(!isLeft&&!isRight)throw new Error("Unknown table alias: "+alias);const cols=isLeft?leftColumns:rightColumns;if(!cols.includes(column))throw new Error("Unknown column: "+alias+"."+column);return isLeft?"L":"R";};
+ const resolve=(alias:string,column:string)=>{const isLeft=alias.toLowerCase()===leftAlias.toLowerCase(),isRight=alias.toLowerCase()===rightAlias.toLowerCase();if(!isLeft&&!isRight)throw new Error("Unknown table alias: "+alias);const cols=isLeft?leftColumns:rightColumns;const actual=cols.find(c=>c.toLowerCase()===column.toLowerCase());if(!actual)throw new Error("Unknown column: "+alias+"."+column);return isLeft?"L":"R";};
  const aSide=resolve(onAliasA,onColumnA),bSide=resolve(onAliasB,onColumnB);if(aSide===bSide)throw new Error("JOIN must compare one column from each dataset.");
  const leftKey=aSide==="L"?onColumnA:onColumnB,rightKey=aSide==="R"?onColumnA:onColumnB;
  const limit=limitRaw?Number(limitRaw):100;if(!Number.isInteger(limit)||limit<1||limit>500)throw new Error("LIMIT must be between 1 and 500.");
