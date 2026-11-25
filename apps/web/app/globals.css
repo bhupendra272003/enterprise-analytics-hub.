@@ -712,3 +712,19 @@ body{background-image:radial-gradient(ellipse at 15% 48%,rgba(103,151,70,.08),tr
 .preview-panel .preview-table td:focus-within{outline:1px solid #b18b55;outline-offset:-1px}
 .preview-panel .insight-panel{border:1px solid #35424d;background:#121a22;border-radius:9px}
 .preview-panel .saved-dashboard-row{padding:10px;border-bottom:1px solid rgba(255,255,255,.05)}
+
+/* VYRON landing cinematic network backdrop */
+.landing-shell{position:relative;isolation:isolate;overflow:hidden;background:linear-gradient(145deg,#04040a,#080812 58%,#0a0a12)}
+.landing-shell:before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(ellipse at 68% 38%,rgba(139,92,246,.14),transparent 45%),radial-gradient(ellipse at 12% 70%,rgba(34,211,238,.08),transparent 38%),linear-gradient(90deg,rgba(4,4,10,.94),rgba(4,4,10,.38));}
+.landing-shell:after{content:"";position:absolute;inset:0;z-index:4;pointer-events:none;background:radial-gradient(ellipse at center,transparent 45%,rgba(0,0,0,.45)),linear-gradient(115deg,transparent 40%,rgba(255,255,255,.025) 47%,transparent 51%);mix-blend-mode:screen;}
+.neural-canvas{position:absolute;inset:0;width:100%;height:100%;z-index:-1;pointer-events:none;opacity:.8}.landing-content{position:relative;z-index:5;width:100%}
+.landing-shell .auth-card{background:rgba(255,255,255,.045);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid transparent;background-clip:padding-box;box-shadow:0 30px 80px rgba(0,0,0,.45),0 0 35px rgba(139,92,246,.08);position:relative;transition:transform .25s,box-shadow .25s}
+.landing-shell .auth-card:before{content:"";position:absolute;inset:-1px;border-radius:inherit;padding:1px;background:linear-gradient(135deg,rgba(34,211,238,.5),rgba(139,92,246,.38),rgba(244,114,182,.18));-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
+.landing-shell .auth-card:hover{box-shadow:0 30px 90px rgba(0,0,0,.5),0 0 35px rgba(34,211,238,.09)}
+.landing-shell .hero h1 em{background:linear-gradient(90deg,#22d3ee,#8b5cf6,#f472b6,#22d3ee);background-size:220% auto;background-clip:text;color:transparent;animation:vyron-shimmer 8s linear infinite}
+.landing-shell input{background:rgba(7,10,18,.7);border-color:rgba(255,255,255,.12)}.landing-shell input:focus{border-color:#22d3ee;box-shadow:0 0 0 3px rgba(34,211,238,.12),0 0 20px rgba(139,92,246,.14)}
+.landing-shell .submit{background:linear-gradient(110deg,#22d3ee,#8b5cf6);color:#050710;position:relative;overflow:hidden}.landing-shell .submit:hover{background:linear-gradient(110deg,#67e8f9,#a78bfa)}
+.landing-shell .submit:after{content:"";position:absolute;width:35%;height:100%;top:0;left:-50%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.55),transparent);transform:skewX(-20deg);transition:left .6s}.landing-shell .submit:hover:after{left:130%}
+.landing-shell .feature-icon{border-color:rgba(34,211,238,.24);color:#22d3ee}.landing-shell .eyebrow{color:#22d3ee}.landing-shell .status-dot,.landing-shell .eyebrow span{background:#22d3ee;box-shadow:0 0 12px #22d3ee}.landing-shell .brand-mark{border-color:#8b5cf6;color:#22d3ee}.landing-shell .auth-action-link{color:#22d3ee}.landing-shell .tabs button.active{color:#22d3ee;border-color:#22d3ee}
+@keyframes vyron-shimmer{to{background-position:220% center}}
+@media(prefers-reduced-motion:reduce){.landing-shell .hero h1 em{animation:none}.landing-shell *{transition:none!important}}
