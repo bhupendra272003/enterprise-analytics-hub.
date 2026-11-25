@@ -639,3 +639,24 @@ body{background-image:radial-gradient(ellipse at 15% 48%,rgba(103,151,70,.08),tr
 .bi-line-labels{display:flex;justify-content:space-between;gap:8px;overflow:hidden;color:#9aa6b2;font-size:10px}
 .bi-line-labels span{max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media(max-width:600px){.bi-visual-toolbar{align-items:flex-start;flex-direction:column}.bi-line-wrap svg{height:180px}.bi-line-labels span:nth-child(even){display:none}}
+
+
+/* VYRON familiar-tool interface refinement */
+.analytics-tool-grid{gap:10px;margin:18px 0 24px}
+.analytics-tool{position:relative;min-height:168px;border-radius:10px;padding:16px 18px;gap:8px;box-shadow:none}
+.analytics-tool.tool-active{border-color:#b99a67;background:linear-gradient(180deg,#252b32,#171e26);box-shadow:inset 0 2px 0 #b99a67}
+.analytics-tool-icon{border-radius:8px;width:38px;height:38px;font-size:16px}
+.analytics-tool>small{font-size:9px;font-weight:700;letter-spacing:1px}
+.analytics-tool>b{font-size:15px;letter-spacing:.1px}
+.analytics-tool>p{font-size:11px;line-height:1.5}
+.preview-panel,.panel:has(.sql-editor),.panel:has(.bi-chart){border-radius:10px}
+.preview-table{font-family:'DM Mono',monospace;font-size:11px}
+.preview-table th{position:sticky;top:0}
+.editor-toolbar{border-radius:8px 8px 0 0;min-height:44px}
+.analytics-editor{font-family:'DM Mono',Consolas,monospace;tab-size:4;border-radius:0 0 8px 8px}
+.sql-editor{background:#0c1117;line-height:1.7}
+.bi-chart{border-radius:10px;background:#111820;border-color:#303c48}
+.bi-visual-toolbar{background:#121a23;border-radius:8px}
+.result-toolbar{border-radius:8px}
+.dataset-row{border-radius:8px}
+@media(max-width:620px){.analytics-tool{min-height:145px;padding:14px}.analytics-tool-grid{gap:8px}}
