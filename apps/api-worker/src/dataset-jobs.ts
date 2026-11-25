@@ -75,6 +75,7 @@ export async function handleDatasetJobs(req:Request,env:Env,path:string):Promise
  const job=await env.DB.prepare("SELECT * FROM dataset_jobs WHERE id=?").bind(match[1]).first<any>();if(!job)return json({error:"Dataset job not found."},404);
  const m=await env.DB.prepare("SELECT role FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE'").bind(job.organization_id,user.id).first<{role:Role}>();
  if(!m)return json({error:"Insufficient organization permissions."},403);
+ if(!await hasDatasetAccess(env,job.dataset_id,job.organization_id,user.id,m.role))return json({error:"This dataset is outside your assigned workspace scope."},403);
  if(!match[2]&&req.method==="GET")return json({job:view(job)});
  if(match[2]==="cancel"&&req.method==="POST"){
   if(!canCancelDatasetJob(m.role,job.requested_by,user.id))return json({error:"You cannot cancel this job."},403);
