@@ -184,9 +184,9 @@ export function runDatasetJoinQuery(sql:string,leftRows:QueryRow[],leftColumns:s
  if(!match)throw new Error("JOIN syntax: SELECT c.name, o.amount FROM data c INNER JOIN dataset_<32-character-id> o ON c.id = o.customer_id LIMIT 100.");
  const [,projection,leftAlias,joinType,token,rightAlias,onAliasA,onColumnA,onAliasB,onColumnB,orderRef,orderDirection,limitRaw]=match;
  if(leftAlias.toLowerCase()===rightAlias.toLowerCase())throw new Error("Use different aliases for the two datasets.");
- const resolve=(alias:string,column:string)=>{const isLeft=alias.toLowerCase()===leftAlias.toLowerCase(),isRight=alias.toLowerCase()===rightAlias.toLowerCase();if(!isLeft&&!isRight)throw new Error("Unknown table alias: "+alias);const cols=isLeft?leftColumns:rightColumns;const actual=cols.find(c=>c.toLowerCase()===column.toLowerCase());if(!actual)throw new Error("Unknown column: "+alias+"."+column);return isLeft?"L":"R";};
+ const resolve=(alias:string,column:string)=>{const isLeft=alias.toLowerCase()===leftAlias.toLowerCase(),isRight=alias.toLowerCase()===rightAlias.toLowerCase();if(!isLeft&&!isRight)throw new Error("Unknown table alias: "+alias);const cols=isLeft?leftColumns:rightColumns;const actual=cols.find(c=>c.toLowerCase()===column.toLowerCase());if(!actual)throw new Error("Unknown column: "+alias+"."+column);return isLeft?"L":"R";};const canonical=(alias:string,column:string)=>{const cols=alias.toLowerCase()===leftAlias.toLowerCase()?leftColumns:rightColumns;return cols.find(c=>c.toLowerCase()===column.toLowerCase())||column;};
  const aSide=resolve(onAliasA,onColumnA),bSide=resolve(onAliasB,onColumnB);if(aSide===bSide)throw new Error("JOIN must compare one column from each dataset.");
- const leftKey=aSide==="L"?onColumnA:onColumnB,rightKey=aSide==="R"?onColumnA:onColumnB;
+ const leftKey=canonical(leftAlias,aSide==="L"?onColumnA:onColumnB),rightKey=canonical(rightAlias,aSide==="R"?onColumnA:onColumnB);
  const limit=limitRaw?Number(limitRaw):100;if(!Number.isInteger(limit)||limit<1||limit>500)throw new Error("LIMIT must be between 1 and 500.");
  const selections=projection.split(",").map((item:string)=>item.trim()).flatMap((item:string)=>{
   if(item==="*"||item.toLowerCase()===leftAlias.toLowerCase()+".*"||item.toLowerCase()===rightAlias.toLowerCase()+".*"){
@@ -194,7 +194,7 @@ export function runDatasetJoinQuery(sql:string,leftRows:QueryRow[],leftColumns:s
    return [...(includeLeft?leftColumns.map(column=>({side:"L",column,output:leftAlias+"_"+column})):[]),...(includeRight?rightColumns.map(column=>({side:"R",column,output:rightAlias+"_"+column})):[])];
   }
   const col=item.match(/^([a-zA-Z_]\w*)\.([\w-]+)(?:\s+AS\s+([\w-]+))?$/i);if(!col)throw new Error("JOIN projections must use qualified columns, such as c.customer_name AS customer.");
-  const side=resolve(col[1],col[2]);return [{side,column:col[2],output:col[3]||col[1]+"_"+col[2]}];
+  const side=resolve(col[1],col[2]);return [{side,column:canonical(col[1],col[2]),output:col[3]||col[1]+"_"+col[2]}];
  });
  if(!selections.length||new Set(selections.map((s:any)=>s.output.toLowerCase())).size!==selections.length)throw new Error("Selected output columns must have unique names.");
  const rightIndex=new Map<string,QueryRow[]>();for(const row of rightRows){const key=String(row[rightKey]??"");const bucket=rightIndex.get(key)||[];bucket.push(row);rightIndex.set(key,bucket);}
