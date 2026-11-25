@@ -50,7 +50,7 @@ class CleaningEngineTests(unittest.TestCase):
 
     def test_outlier_quartiles_exclude_middle_value_for_odd_sample(self):
         report, rows = self.run_engine(
-            "value\\n1\\n2\\n3\\n4\\n5\\n100\\n",
+            "value\\n1\\n2\\n3\\n4\\n5\\n6\\n100\\n",
             {"trimWhitespace": True, "removeDuplicates": False, "fillMissing": "none"}
         )
         self.assertEqual(len(rows), 6)
