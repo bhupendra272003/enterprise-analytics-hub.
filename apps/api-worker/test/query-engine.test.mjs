@@ -170,5 +170,5 @@ test("supports escaped quote literals and case-insensitive string matching", () 
 test("preserves SQL comment markers inside quoted literals", () => {
   const sample = [{ id: "1", region: "North -- coast", sales: "10" }, { id: "2", region: "South", sales: "20" }];
   assert.deepEqual(runDatasetQuery("SELECT id FROM data WHERE region = 'North -- coast'", sample, columns).rows, [{ id: "1" }]);
-  assert.deepEqual(runDatasetQuery("SELECT id FROM data -- remove this line\\nWHERE id = '2'", sample, columns).rows, [{ id: "2" }]);
+  assert.deepEqual(runDatasetQuery("SELECT id FROM data -- remove this line\nWHERE id = '2'", sample, columns).rows, [{ id: "2" }]);
 });
