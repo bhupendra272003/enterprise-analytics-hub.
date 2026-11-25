@@ -2,6 +2,7 @@ export type QueryRow = Record<string, string | number | null>;
 export function extractJoinDatasetToken(sql:string):string|null { return sql.match(/\bJOIN\s+dataset_([a-f0-9]{32})\b/i)?.[1]?.toLowerCase()||null; }
 type Condition = { column: string; operator: string; value?: string | number };
 const cleanIdentifier = (value: string) => value.replace(/^[`"\[]|[`"\]]$/g, "");
+function stripSqlComments(sql:string){let out="",quote="",i=0;while(i<sql.length){const ch=sql[i];if(quote){out+=ch;if(ch===quote){if(sql[i+1]===quote){out+=sql[i+1];i+=2;continue;}quote="";}i++;continue;}if(ch==="'"||ch==='"'){quote=ch;out+=ch;i++;continue;}if(ch==="-"&&sql[i+1]==="-"){while(i<sql.length&&sql[i]!=="\n"&&sql[i]!=="\r")i++;continue;}out+=ch;i++;}return out;}
 const splitLogical = (value: string, operator: "AND" | "OR") => {
   const parts: string[] = [];
   let start=0,quote="",depth=0,i=0;
@@ -101,8 +102,7 @@ function aggregateValue(fn: string, column: string, rows: QueryRow[], distinct=f
 }
 export function runDatasetQuery(sql: string, sourceRows: QueryRow[], sourceColumns: string[]) {
   if (typeof sql !== "string" || !sql.trim() || sql.length > 12000) throw new Error("Enter a SQL query up to 12,000 characters.");
-  function stripSqlComments(sql:string){let out="",quote="",i=0;while(i<sql.length){const ch=sql[i];if(quote){out+=ch;if(ch===quote){if(sql[i+1]===quote){out+=sql[i+1];i+=2;continue;}quote="";}i++;continue;}if(ch==="'"||ch==='"'){quote=ch;out+=ch;i++;continue;}if(ch==="-"&&sql[i+1]==="-"){while(i<sql.length&&sql[i]!=="\n"&&sql[i]!=="\r")i++;continue;}out+=ch;i++;}return out;}
-const statement = stripSqlComments(sql).trim().replace(/;\s*$/, "").trim();
+  const statement = stripSqlComments(sql).trim().replace(/;\s*$/, "").trim();
   if (statement.includes(";") || !/^SELECT\b/i.test(statement)) throw new Error("Only one read-only SELECT statement is allowed.");
   if (/\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|REPLACE|ATTACH|DETACH|PRAGMA|VACUUM|INTO|UNION|WITH|RECURSIVE)\b/i.test(statement)) throw new Error("This SQL Studio supports read-only SELECT queries only.");
   const match = statement.match(/^SELECT\s+([\s\S]+?)\s+FROM\s+([\w-]+)(?:\s+WHERE\s+([\s\S]+?))?(?:\s+GROUP\s+BY\s+([\w."`\[\]-]+(?:\s*,\s*[\w."`\[\]-]+)*))?(?:\s+HAVING\s+([\s\S]+?))?(?:\s+ORDER\s+BY\s+([\w."`\[\]-]+)(?:\s+(ASC|DESC))?)?(?:\s+LIMIT\s+(\d+))?$/i);
