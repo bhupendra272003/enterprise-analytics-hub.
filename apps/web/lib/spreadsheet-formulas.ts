@@ -151,9 +151,9 @@ export function evaluateSpreadsheetFormula(formula: string, rows: SpreadsheetRow
     return String(rounded / factor);
   }
   if (["SUMIFS","COUNTIFS","AVERAGEIFS"].includes(name)) {
-    if (args.length < 3 || (args.length - 1) % 2 !== 0) throw new Error(name + " expects a value range (SUMIFS/AVERAGEIFS) or criteria range (COUNTIFS), followed by criteria-range/criteria pairs.");
+    if (name === "COUNTIFS" ? args.length < 2 || args.length % 2 !== 0 : args.length < 3 || args.length % 2 !== 1) throw new Error(name + " expects criteria range/criteria pairs and a target range where required.");
     const target = name === "COUNTIFS" ? range(args[0]) : range(args[0]);
-    const offset = name === "COUNTIFS" ? 1 : 1;
+    const offset = name === "COUNTIFS" ? 0 : 1;
     const criteriaPairs = args.slice(offset).reduce((pairs, arg, i, list) => { if (i % 2 === 0) pairs.push([range(arg), list[i+1]?.replace(/^"|"$/g, "")]); return pairs; }, [] as [unknown[], string][]);
     if (criteriaPairs.some(([values]) => values.length !== target.length)) throw new Error("All criteria ranges must have the same number of cells as the target range.");
     const filtered = target.filter((_,i)=>criteriaPairs.every(([values,criterion])=>criterionMatches(values[i],criterion)));
