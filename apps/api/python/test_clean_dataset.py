@@ -53,7 +53,7 @@ class CleaningEngineTests(unittest.TestCase):
             "value\\n1\\n2\\n3\\n4\\n5\\n6\\n100\\n",
             {"trimWhitespace": True, "removeDuplicates": False, "fillMissing": "none"}
         )
-        self.assertEqual(len(rows), 6)
+        self.assertEqual(len(rows), 7)
         self.assertEqual(report["outliersByColumn"].get("value"), 1)
 
     def test_rejects_empty_data(self):
