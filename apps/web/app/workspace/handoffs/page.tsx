@@ -85,6 +85,7 @@ export default function HandoffsPage(){
     finally{setBusy(false);}
   }
   async function update(handoff:Handoff,status:string){
+    if((status==='APPROVED'||status==='RETURNED')&&!reviewNotes[handoff.id]?.trim()){setNotice(status==='APPROVED'?'Add a review note before approving this handoff.':'Add a review note explaining what needs revision.');return;}
     setBusy(true);
     try{
       const body:any={status,reviewNote:reviewNotes[handoff.id]||''};
