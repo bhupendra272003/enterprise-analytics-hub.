@@ -160,8 +160,8 @@ export function runDatasetQuery(sql: string, sourceRows: QueryRow[], sourceColum
   if(having.length)result=result.filter(row=>having.some(group=>group.every(condition=>compareCondition(row,condition))));
   const orderBy = match[6] ? cleanIdentifier(match[6]) : "";
   if (orderBy) {
-    const projection = projections.find(p=>p.kind==="column"&&(p.alias===orderBy||p.column===orderBy)||p.kind==="aggregate"&&p.alias===orderBy);
-    const outputKey = resultColumns.includes(orderBy) ? orderBy : projection?.kind==="column" ? projection.alias : "";
+    const projection = projections.find(p=>p.kind==="column"&&(p.alias.toLowerCase()===orderBy.toLowerCase()||p.column.toLowerCase()===orderBy.toLowerCase())||p.kind==="aggregate"&&p.alias.toLowerCase()===orderBy.toLowerCase());
+    const outputKey = resultColumns.find(c=>c.toLowerCase()===orderBy.toLowerCase()) || (projection?.kind==="column"||projection?.kind==="aggregate"?projection.alias:"");
     if (!outputKey) throw new Error("Unknown ORDER BY column: " + orderBy);
     const direction = match[7]?.toUpperCase()==="DESC" ? -1 : 1;
     result = result.slice().sort((a,b)=>{
