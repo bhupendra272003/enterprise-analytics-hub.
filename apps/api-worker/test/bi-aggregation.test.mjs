@@ -32,3 +32,22 @@ test("applies category filters and ignores empty or invalid measure values", () 
   assert.deepEqual(result.chartRows, [{ label: "North", value: 30 }]);
   assert.equal(result.matchedGroups, 1);
 });
+
+
+test("COUNT counts nonblank measure values including text while numeric aggregations reject text", () => {
+  const mixed = [
+    { region: "West", sales: "12" },
+    { region: "West", sales: "unknown" },
+    { region: "West", sales: "  " },
+    { region: "West", sales: null },
+    { region: "West", sales: "0" },
+  ];
+  assert.deepEqual(aggregateCategoryRows(mixed, "region", "sales", "", "COUNT").chartRows, [{ label: "West", value: 3 }]);
+  assert.deepEqual(aggregateCategoryRows(mixed, "region", "sales", "", "SUM").chartRows, [{ label: "West", value: 12 }]);
+});
+
+test("handles missing category values and case-insensitive category filters", () => {
+  const missing = [{ sales: "3" }, { region: "  ", sales: "7" }, { region: "north", sales: "2" }];
+  assert.deepEqual(aggregateCategoryRows(missing, "region", "sales", "NORTH", "SUM").chartRows, [{ label: "north", value: 2 }]);
+  assert.deepEqual(aggregateCategoryRows(missing, "region", "sales", "", "SUM").chartRows, [{ label: "(blank)", value: 10 }]);
+});
