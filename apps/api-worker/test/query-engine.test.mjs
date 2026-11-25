@@ -139,3 +139,29 @@ test("supports COUNT DISTINCT for global and grouped aggregates", () => {
   assert.deepEqual(having.rows, [{ region: "North", unique_sales: 2 }]);
   assert.throws(() => runDatasetQuery("SELECT SUM(DISTINCT sales) FROM data", sample, columns), /only with COUNT/);
 });
+
+
+test("handles empty filtered aggregate results and NULL checks", () => {
+  const sample = [
+    { id: "1", region: "North", sales: "100" },
+    { id: "2", region: "South", sales: null },
+    { id: "3", region: "East", sales: "" }
+  ];
+  const empty = runDatasetQuery("SELECT COUNT(*) AS n, SUM(sales) AS total, AVG(sales) AS average FROM data WHERE region = 'Missing'", sample, columns);
+  assert.deepEqual(empty.rows, [{ n: 0, total: 0, average: null }]);
+  assert.equal(runDatasetQuery("SELECT COUNT(*) AS n FROM data WHERE sales IS NULL", sample, columns).rows[0].n, 2);
+  assert.equal(runDatasetQuery("SELECT COUNT(*) AS n FROM data WHERE sales IS NOT NULL", sample, columns).rows[0].n, 1);
+});
+
+test("enforces LIMIT boundaries and rejects unsafe SELECT clauses", () => {
+  assert.throws(() => runDatasetQuery("SELECT * FROM data LIMIT 0", rows, columns), /LIMIT/);
+  assert.throws(() => runDatasetQuery("SELECT * FROM data LIMIT 501", rows, columns), /LIMIT/);
+  assert.throws(() => runDatasetQuery("SELECT * FROM data UNION SELECT * FROM data", rows, columns), /read-only SELECT/);
+  assert.throws(() => runDatasetQuery("SELECT * FROM data WHERE region = 'North'; SELECT * FROM data", rows, columns), /one read-only SELECT/);
+});
+
+test("supports escaped quote literals and case-insensitive string matching", () => {
+  const sample = [{ id: "1", region: "O'Brien", sales: "10" }, { id: "2", region: "north", sales: "20" }];
+  assert.deepEqual(runDatasetQuery("SELECT id FROM data WHERE region = 'O''Brien'", sample, columns).rows, [{ id: "1" }]);
+  assert.deepEqual(runDatasetQuery("SELECT id FROM data WHERE region = 'NORTH'", sample, columns).rows, [{ id: "2" }]);
+});
