@@ -48,12 +48,13 @@ Then run python python/build_analytics.py. This offline step reads loan_analysis
 
 - output/loan_duration_outcome_summary.csv — descriptive counts, distinct accounts, average amount and overall loan share by duration and observed status.
 - output/loan_vintage_outcome_summary.csv — the same descriptive metrics by loan start month and observed status.
+- output/loan_amount_outcome_summary.csv — loan counts, distinct accounts, average principal and share by fixed principal band and observed status, including visible non-positive/missing/invalid groups.
 
 Finally, run python python/validate_exports.py. The standard-library validator checks the complete artifact set offline, including exact reconciliation of both grouped summaries to the loan extract. None of these steps requires a live MariaDB connection after the source profiling/export step.
 
 ## Suggested report pages
 
-1. **Loan outcomes** — loan count and share by status, loan amount and duration distributions, duration-by-status comparisons, and monthly loan-vintage trends. The grouped summary files are descriptive views, not model features. Clearly distinguish finished target classes A/B from unfinished C/D outcomes.
+1. **Loan outcomes** — loan count and share by status, loan amount and duration distributions, duration-by-status comparisons, monthly loan-vintage trends, and principal-band comparisons by observed status. The grouped summary files are descriptive views, not model features. Clearly distinguish finished target classes A/B from unfinished C/D outcomes.
 2. **Borrower and district profile** — demographic and district attributes after checking the source data dictionary and privacy implications.
 3. **Account activity** — use `source_tables/account_transaction_activity.csv` for transaction counts and amount summaries by account and observed transaction type. Do not label transaction types as income/expense until their meanings are confirmed. Use `source_tables/district_account_summary.csv` for district-level account coverage where available.
 4. **Data quality** — missing values, duplicate-key exceptions, orphan references, loan grain audit and transaction date-boundary checks.

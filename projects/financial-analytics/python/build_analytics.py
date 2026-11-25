@@ -25,6 +25,10 @@ VINTAGE_COLUMNS = (
     "loan_month", "status", "loan_count", "distinct_accounts",
     "average_loan_amount", "share_pct",
 )
+AMOUNT_BAND_COLUMNS = (
+    "loan_amount_band", "status", "loan_count", "distinct_accounts",
+    "average_loan_amount", "share_pct",
+)
 
 
 def _decimal(value: str | None) -> Decimal | None:
@@ -59,17 +63,38 @@ def _status(value: str | None) -> str:
     return value.strip() if value and value.strip() else "<NULL>"
 
 
+def normalize_loan_amount_band(value: str | None) -> str:
+    """Assign transparent fixed bands; missing, invalid, and non-positive values remain visible."""
+    if value is None or not value.strip():
+        return "<MISSING>"
+    parsed = _decimal(value)
+    if parsed is None:
+        return "<INVALID>"
+    if parsed <= 0:
+        return "<NONPOSITIVE>"
+    if parsed <= Decimal("50000"):
+        return "0 < amount <= 50,000"
+    if parsed <= Decimal("100000"):
+        return "50,000 < amount <= 100,000"
+    if parsed <= Decimal("150000"):
+        return "100,000 < amount <= 150,000"
+    if parsed <= Decimal("250000"):
+        return "150,000 < amount <= 250,000"
+    return "amount > 250,000"
+
+
 def summarize_loans(rows: list[dict[str, str]], dimension: str) -> list[dict[str, str]]:
     """Aggregate one row per dimension/status with shares over all loan rows."""
-    if dimension not in {"duration_months", "loan_month"}:
-        raise ValueError("dimension must be duration_months or loan_month")
+    if dimension not in {"duration_months", "loan_month", "loan_amount_band"}:
+        raise ValueError("dimension must be duration_months, loan_month, or loan_amount_band")
     grouped: dict[tuple[str, str], list[dict[str, str]]] = defaultdict(list)
     for row in rows:
-        group_value = (
-            normalize_duration(row.get("duration"))
-            if dimension == "duration_months"
-            else normalize_month(row.get("date"))
-        )
+        if dimension == "duration_months":
+            group_value = normalize_duration(row.get("duration"))
+        elif dimension == "loan_month":
+            group_value = normalize_month(row.get("date"))
+        else:
+            group_value = normalize_loan_amount_band(row.get("amount"))
         grouped[(group_value, _status(row.get("status")))].append(row)
 
     def sort_key(item: tuple[str, str]):
@@ -77,8 +102,20 @@ def summarize_loans(rows: list[dict[str, str]], dimension: str) -> list[dict[str
         if dimension == "duration_months":
             numeric_value = _decimal(group_value)
             group_sort = (0, numeric_value) if numeric_value is not None else (1, group_value)
-        else:
+        elif dimension == "loan_month":
             group_sort = (0, group_value) if len(group_value) == 7 and group_value[4:5] == "-" else (1, group_value)
+        else:
+            amount_band_order = {
+                "<NONPOSITIVE>": 0,
+                "0 < amount <= 50,000": 1,
+                "50,000 < amount <= 100,000": 2,
+                "100,000 < amount <= 150,000": 3,
+                "150,000 < amount <= 250,000": 4,
+                "amount > 250,000": 5,
+                "<MISSING>": 6,
+                "<INVALID>": 7,
+            }
+            group_sort = (0, amount_band_order.get(group_value, 99), group_value)
         return group_sort, status
 
     output = []
@@ -174,6 +211,7 @@ def build_analytics(directory: Path) -> dict:
 
     duration_rows = summarize_loans(loans, "duration_months")
     vintage_rows = summarize_loans(loans, "loan_month")
+    amount_band_rows = summarize_loans(loans, "loan_amount_band")
     repayment_rows = summarize_scheduled_repayments(loans)
     account_activity = build_account_activity(directory)
     relationship_analysis = build_client_account_relationships(directory)
@@ -181,16 +219,19 @@ def build_analytics(directory: Path) -> dict:
     directory.mkdir(parents=True, exist_ok=True)
     _write_csv(directory / "loan_duration_outcome_summary.csv", SUMMARY_COLUMNS, duration_rows)
     _write_csv(directory / "loan_vintage_outcome_summary.csv", VINTAGE_COLUMNS, vintage_rows)
+    _write_csv(directory / "loan_amount_outcome_summary.csv", AMOUNT_BAND_COLUMNS, amount_band_rows)
     _write_csv(directory / "loan_scheduled_repayment_summary.csv", REPAYMENT_COLUMNS, repayment_rows)
     return {
         "source_file": source.name,
         "loan_rows": len(loans),
         "duration_groups": len(duration_rows),
         "vintage_groups": len(vintage_rows),
+        "amount_band_groups": len(amount_band_rows),
         "scheduled_repayment_groups": len(repayment_rows),
         "outputs": [
             "loan_duration_outcome_summary.csv",
             "loan_vintage_outcome_summary.csv",
+            "loan_amount_outcome_summary.csv",
             "loan_scheduled_repayment_summary.csv",
         ],
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
