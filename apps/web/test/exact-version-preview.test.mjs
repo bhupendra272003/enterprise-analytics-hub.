@@ -7,4 +7,6 @@ test("Data Studio supports selecting and loading immutable dataset versions",()=
  assert.ok(source.includes("get('version')"));
  assert.ok(source.includes('VIEW SAVED VERSION'));
  assert.ok(source.includes('preview(requested,requestedVersion>0?requestedVersion:undefined)'));
+ assert.ok(source.includes('setViewedVersion(versionNumber||0)'));
+ assert.ok(source.includes("value={selected?String(viewedVersion||''):''}"));
 });
