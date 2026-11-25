@@ -51,3 +51,11 @@ test("handles missing category values and case-insensitive category filters", ()
   assert.deepEqual(aggregateCategoryRows(missing, "region", "sales", "NORTH", "SUM").chartRows, [{ label: "north", value: 2 }]);
   assert.deepEqual(aggregateCategoryRows(missing, "region", "sales", "", "SUM").chartRows, [{ label: "(blank)", value: 10 }, { label: "north", value: 2 }]);
 });
+
+
+test("rejects missing chart fields and safely handles extreme numeric values", () => {
+  assert.throws(() => aggregateCategoryRows(rows, "", "sales", "", "SUM"), /category and measure/);
+  const extreme = [{region:"X",sales:"1e308"},{region:"X",sales:"1e308"}];
+  const result = aggregateCategoryRows(extreme,"region","sales","","SUM");
+  assert.deepEqual(result.chartRows,[{label:"X",value:0}]);
+});
