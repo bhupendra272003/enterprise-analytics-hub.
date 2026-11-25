@@ -1,6 +1,8 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
+
+function NeuralBackdrop() {\n  const canvasRef = useRef<HTMLCanvasElement>(null);\n  useEffect(() => {\n    const canvas = canvasRef.current; if (!canvas) return;\n    const ctx = canvas.getContext('2d'); if (!ctx) return;\n    let raf = 0, width = 0, height = 0, scroll = 0, mx = 0, my = 0, hidden = document.hidden;\n    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;\n    const nodes: {x:number;y:number;z:number;phase:number}[] = [];\n    const resize=()=>{width=canvas.clientWidth;height=canvas.clientHeight;canvas.width=Math.round(width*Math.min(devicePixelRatio||1,2));canvas.height=Math.round(height*Math.min(devicePixelRatio||1,2));ctx.setTransform(canvas.width/width,0,0,canvas.height/height,0,0);nodes.length=0;const count=width<650?36:76;for(let i=0;i<count;i++)nodes.push({x:Math.random()*width,y:Math.random()*height,z:Math.random(),phase:Math.random()*6.28});};\n    const move=(e:MouseEvent)=>{mx=(e.clientX/innerWidth-.5)*22;my=(e.clientY/innerHeight-.5)*18;};\n    const scrollMove=()=>{scroll=window.scrollY*.08;};\n    const visibility=()=>{hidden=document.hidden;};\n    resize();window.addEventListener('resize',resize);window.addEventListener('mousemove',move);window.addEventListener('scroll',scrollMove,{passive:true});document.addEventListener('visibilitychange',visibility);\n    let time=0;const draw=()=>{if(hidden){raf=requestAnimationFrame(draw);return;}time+=reduced?0:.006;ctx.clearRect(0,0,width,height);\n      const pts=nodes.map(n=>({x:n.x+mx*(1-n.z)+Math.sin(time+n.phase)*8,y:(n.y-scroll*(1-n.z)+my*(1-n.z)+height)%height,z:n.z}));\n      for(let i=0;i<pts.length;i++)for(let j=i+1;j<pts.length;j++){const a=pts[i],b=pts[j],d=Math.hypot(a.x-b.x,a.y-b.y);if(d<width*.16){ctx.strokeStyle='rgba(34,211,238,'+(0.12*(1-d/(width*.16)))+')';ctx.lineWidth=.6;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();}}\n      pts.forEach((p,i)=>{ctx.fillStyle=i%5===0?'rgba(244,114,182,.75)':'rgba(34,211,238,.75)';ctx.shadowColor=ctx.fillStyle;ctx.shadowBlur=8;ctx.beginPath();ctx.arc(p.x,p.y,1.4+p.z*1.8,0,Math.PI*2);ctx.fill();});ctx.shadowBlur=0;\n      if(!reduced){ctx.strokeStyle='rgba(139,92,246,.12)';ctx.lineWidth=1;const horizon=height*.72;ctx.beginPath();ctx.moveTo(0,horizon);ctx.lineTo(width,horizon);for(let i=0;i<24;i++){const x=i*width/23;ctx.moveTo(x,horizon);ctx.lineTo(width/2+(x-width/2)*2,horizon+height*.32);}for(let y=0;y<12;y++){const yy=horizon+Math.pow(y/11,2)*height*.3;ctx.moveTo(0,yy);ctx.lineTo(width,yy);}ctx.stroke();}\n      raf=requestAnimationFrame(draw);};draw();return()=>{cancelAnimationFrame(raf);window.removeEventListener('resize',resize);window.removeEventListener('mousemove',move);window.removeEventListener('scroll',scrollMove);document.removeEventListener('visibilitychange',visibility);};\n  },[]);\n  return <canvas ref={canvasRef} aria-hidden="true" className="neural-canvas"/>;\n}\n
 
 // Production requests use the same-origin Next.js rewrite to avoid browser CORS.
 const API = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:4000';
@@ -51,7 +53,7 @@ export default function Home() {
   }
 
   return (
-    <main className="shell">
+    <main className="shell landing-shell"><NeuralBackdrop/><div className="landing-content">
       <nav className="topbar">
         <a className="brand" href="#"><span className="brand-mark">V</span><span>BHUPENDRA'S VYRON</span></a>
         <div className="top-meta"><span className="status-dot" /> SECURE WORKSPACE <span className="top-divider" /> V 0.1</div>
@@ -95,6 +97,6 @@ export default function Home() {
         </div>
       </section>
       <footer><span>© 2026 BHUPENDRA'S VYRON</span><span>DATA • PEOPLE • PROGRESS</span><span>DESIGNED FOR BETTER DECISIONS</span></footer>
-    </main>
+    </div></main>
   );
 }
