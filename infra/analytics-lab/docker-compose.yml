@@ -1,0 +1,36 @@
+# Standalone proof-of-concept: real Linux desktop in an isolated container.
+# This is not yet connected to VYRON auth/control plane. Never expose the port publicly
+# without a reverse proxy, TLS, strong authentication and network restrictions.
+services:
+  analyst-desktop:
+    image: lscr.io/linuxserver/webtop:ubuntu-xfce
+    container_name: vyron-analyst-desktop
+    environment:
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
+      TZ: ${TZ:-Asia/Kolkata}
+      CUSTOM_USER: ${LAB_USER:?Set LAB_USER}
+      PASSWORD: ${LAB_PASSWORD:?Set LAB_PASSWORD}
+      TITLE: VYRON Analytics Lab
+      # Container capabilities intentionally kept minimal.
+    volumes:
+      - ./workspace:/config/workspace
+    ports:
+      # Bind locally; front with a protected reverse proxy or tunnel.
+      - "127.0.0.1:3001:3000"
+    shm_size: "1gb"
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETUID
+      - SETGID
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - NET_BIND_SERVICE
+    pids_limit: 256
+    mem_limit: 2g
+    cpus: 2
