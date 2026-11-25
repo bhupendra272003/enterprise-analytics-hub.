@@ -49,6 +49,10 @@ class ExportValidatorTests(unittest.TestCase):
             {"loan_month": "1994-01", "status": "A", "loan_count": "1", "distinct_accounts": "1", "average_loan_amount": "1000.00", "share_pct": "50.00"},
             {"loan_month": "1994-02", "status": "B", "loan_count": "1", "distinct_accounts": "1", "average_loan_amount": "2000.00", "share_pct": "50.00"},
         ])
+        self.write_csv("loan_amount_outcome_summary.csv", [
+            {"loan_amount_band": "0 < amount <= 50,000", "status": "A", "loan_count": "1", "distinct_accounts": "1", "average_loan_amount": "1000.00", "share_pct": "50.00"},
+            {"loan_amount_band": "0 < amount <= 50,000", "status": "B", "loan_count": "1", "distinct_accounts": "1", "average_loan_amount": "2000.00", "share_pct": "50.00"},
+        ])
         self.write_csv("loan_scheduled_repayment_summary.csv", [
             {"duration_months": "12", "status": "A", "loan_count": "1", "valid_schedule_rows": "1", "valid_ratio_rows": "1", "average_monthly_installment": "100.00", "average_scheduled_total": "1200.00", "average_scheduled_to_principal_ratio": "1.20"},
             {"duration_months": "24", "status": "B", "loan_count": "1", "valid_schedule_rows": "1", "valid_ratio_rows": "1", "average_monthly_installment": "100.00", "average_scheduled_total": "2400.00", "average_scheduled_to_principal_ratio": "1.20"},
@@ -113,6 +117,14 @@ class ExportValidatorTests(unittest.TestCase):
         ])
         report = validate_exports(self.directory)
         self.assertIn("duration_outcome_summary_reconciliation", {item["check"] for item in report["errors"]})
+
+    def test_amount_band_summary_mismatch_fails(self):
+        self.write_csv("loan_amount_outcome_summary.csv", [
+            {"loan_amount_band": "0 < amount <= 50,000", "status": "A", "loan_count": "9", "distinct_accounts": "1", "average_loan_amount": "1000.00", "share_pct": "50.00"},
+            {"loan_amount_band": "0 < amount <= 50,000", "status": "B", "loan_count": "1", "distinct_accounts": "1", "average_loan_amount": "2000.00", "share_pct": "50.00"},
+        ])
+        report = validate_exports(self.directory)
+        self.assertIn("amount_band_outcome_summary_reconciliation", {item["check"] for item in report["errors"]})
 
     def test_missing_required_export_fails(self):
         (self.directory / "loan_prior_features.csv").unlink()
