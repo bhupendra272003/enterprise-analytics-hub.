@@ -134,7 +134,7 @@ export async function handleDatasets(req:Request,env:Env,path:string,url:URL):Pr
    const right=await env.DB.prepare("SELECT id,storage_path,file_size FROM datasets WHERE replace(id,'-','')=? AND organization_id=?").bind(joinToken,dataset.organization_id).first<any>();
    if(!right)return json({error:"The JOIN dataset must exist in the same organization."},404);
     if(m.role==="ANALYST"&&!await env.DB.prepare("SELECT id FROM dataset_handoffs WHERE dataset_id=? AND assigned_to=? LIMIT 1").bind(right.id,user.id).first())return json({error:"You do not have access to the joined dataset."},403);
-    if(m.role==="LEADER"&&!await env.DB.prepare("SELECT h.id FROM dataset_handoffs h JOIN team_members tm ON tm.user_id=h.assigned_to JOIN teams t ON t.id=tm.team_id WHERE h.dataset_id=? AND t.organization_id=? AND t.leader_user_id=? LIMIT 1").bind(right.id,dataset.organization_id,user.id).first())return json({error:"The joined dataset is outside your assigned team scope."},403);
+    if(m.role==="LEADER"&&!await env.DB.prepare("SELECT h.id FROM dataset_handoffs h WHERE h.dataset_id=? AND h.status<>\'REVOKED\' AND (h.assigned_to=? OR EXISTS (SELECT 1 FROM team_members tm JOIN teams t ON t.id=tm.team_id WHERE tm.user_id=h.assigned_to AND t.organization_id=? AND t.leader_user_id=?)) LIMIT 1").bind(right.id,user.id,dataset.organization_id,user.id).first())return json({error:"The joined dataset is outside your assigned team scope."},403);
    if(right.id===dataset.id)return json({error:"JOIN requires a second dataset."},400);
    if(Number(right.file_size)>MAX_SYNC_CSV_BYTES)return syncLimitError();
    const rightSource=await readStored(env,right.storage_path);if(!rightSource)return json({error:"Joined dataset file is missing."},500);
