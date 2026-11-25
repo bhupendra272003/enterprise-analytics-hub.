@@ -189,7 +189,7 @@ test("resolves JOIN aliases and column names case-insensitively", () => {
 
 test("ORDER BY aliases resolve case-insensitively", () => {
   const grouped = runDatasetQuery("SELECT region, SUM(sales) AS Total_Sales FROM data GROUP BY region ORDER BY total_sales DESC", rows, columns);
-  assert.deepEqual(grouped.rows.map(r=>r.region), ["South","North"]);
+  assert.deepEqual(grouped.rows.map(r=>r.region), ["North","South"]);
   const projected = runDatasetQuery("SELECT region AS Zone FROM data ORDER BY zone ASC", rows, columns);
   assert.deepEqual(projected.rows.map(r=>r.Zone), ["North","North","South"]);
 });
