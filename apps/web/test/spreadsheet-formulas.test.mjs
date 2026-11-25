@@ -57,3 +57,10 @@ test("supports blank counting, text case and additional numeric functions", () =
   assert.equal(calc("=ROUNDUP(12.341,2)"), "12.35");
   assert.equal(calc("=ROUNDDOWN(12.349,2)"), "12.34");
 });
+
+
+test("supports multi-criteria SUMIFS, COUNTIFS and AVERAGEIFS", () => {
+  assert.equal(calc('=SUMIFS(B2:B5,A2:A5,"North",C2:C5,">2")'), "300");
+  assert.equal(calc('=COUNTIFS(A2:A5,"North",C2:C5,">2")'), "1");
+  assert.equal(calc('=AVERAGEIFS(B2:B5,A2:A5,"North",C2:C5,">2")'), "300");
+});
