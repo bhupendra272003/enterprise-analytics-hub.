@@ -136,7 +136,7 @@ export default function HandoffsPage(){
             <div className="report-brand">{stages.find(s=>s.value===item.stage)?.label||item.stage}<span>{item.status}</span></div>
             <h2>{item.assigneeName}</h2><p>Input version {item.inputVersion}{item.outputVersion?' · Output version '+item.outputVersion:''}</p>
             <small>Assigned by {item.assignedByName} · {new Date(item.createdAt).toLocaleString()}</small>
-            {item.handoffNote&&<p>{item.handoffNote}</p>}
+            {item.handoffNote&&<p>{item.handoffNote}</p>}<a className="manage-team-link" href={'/workspace/data?dataset='+encodeURIComponent(dataset)+'&version='+encodeURIComponent(String(item.inputVersion))}>Open assigned input version v{item.inputVersion} ↗</a>
             {item.reviewNote&&<p className="upload-hint">Review: {item.reviewNote}</p>}
             {item.canUpdate&&(item.stage==='SQL_REVIEW'||item.stage==='RECONCILIATION')&&<label>INTERNAL QUERY / QA RESULT JSON<textarea rows={5} value={resultDrafts[item.id]||''} onChange={e=>setResultDrafts(old=>({...old,[item.id]:e.target.value}))} placeholder={'Paste the SQL/QA result JSON here. Example: {"columns":["region","total"],"rows":[{"region":"North","total":120}],"rowCount":1,"matchedRows":1}'} /></label>}
             {item.result?.datasetId&&<a className="manage-team-link" href={'/workspace/data?dataset='+encodeURIComponent(item.result.datasetId)}>Open saved internal result dataset ↗</a>}{item.result&&<div className="upload-hint"><b>Shared internal result</b><pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere',maxHeight:220,overflow:'auto'}}>{JSON.stringify(item.result,null,2)}</pre></div>}
