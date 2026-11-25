@@ -101,7 +101,8 @@ function aggregateValue(fn: string, column: string, rows: QueryRow[], distinct=f
 }
 export function runDatasetQuery(sql: string, sourceRows: QueryRow[], sourceColumns: string[]) {
   if (typeof sql !== "string" || !sql.trim() || sql.length > 12000) throw new Error("Enter a SQL query up to 12,000 characters.");
-  const statement = sql.replace(/--[^\n\r]*/g, "").trim().replace(/;\s*$/, "").trim();
+  function stripSqlComments(sql:string){let out="",quote="",i=0;while(i<sql.length){const ch=sql[i];if(quote){out+=ch;if(ch===quote){if(sql[i+1]===quote){out+=sql[i+1];i+=2;continue;}quote="";}i++;continue;}if(ch==="'"||ch==='"'){quote=ch;out+=ch;i++;continue;}if(ch==="-"&&sql[i+1]==="-"){while(i<sql.length&&sql[i]!=="\n"&&sql[i]!=="\r")i++;continue;}out+=ch;i++;}return out;}
+const statement = stripSqlComments(sql).trim().replace(/;\s*$/, "").trim();
   if (statement.includes(";") || !/^SELECT\b/i.test(statement)) throw new Error("Only one read-only SELECT statement is allowed.");
   if (/\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|REPLACE|ATTACH|DETACH|PRAGMA|VACUUM|INTO|UNION|WITH|RECURSIVE)\b/i.test(statement)) throw new Error("This SQL Studio supports read-only SELECT queries only.");
   const match = statement.match(/^SELECT\s+([\s\S]+?)\s+FROM\s+([\w-]+)(?:\s+WHERE\s+([\s\S]+?))?(?:\s+GROUP\s+BY\s+([\w."`\[\]-]+(?:\s*,\s*[\w."`\[\]-]+)*))?(?:\s+HAVING\s+([\s\S]+?))?(?:\s+ORDER\s+BY\s+([\w."`\[\]-]+)(?:\s+(ASC|DESC))?)?(?:\s+LIMIT\s+(\d+))?$/i);
@@ -177,7 +178,7 @@ export function runDatasetQuery(sql: string, sourceRows: QueryRow[], sourceColum
 
 export function runDatasetJoinQuery(sql:string,leftRows:QueryRow[],leftColumns:string[],rightRows:QueryRow[],rightColumns:string[]){
  if(typeof sql!=="string"||!sql.trim()||sql.length>12000)throw new Error("Enter a SQL query up to 12,000 characters.");
- const statement=sql.replace(/--[^\n\r]*/g,"").trim().replace(/;\s*$/,"").trim();
+ const statement=stripSqlComments(sql).trim().replace(/;\s*$/,"").trim();
  if(statement.includes(";")||!/^SELECT\b/i.test(statement)||/\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|REPLACE|ATTACH|DETACH|PRAGMA|VACUUM|INTO|UNION|WITH|RECURSIVE)\b/i.test(statement))throw new Error("Only one read-only SELECT statement is allowed.");
  const match=statement.match(/^SELECT\s+([\s\S]+?)\s+FROM\s+data\s+(?:AS\s+)?([a-zA-Z_]\w*)\s+(INNER|LEFT)\s+JOIN\s+dataset_([a-f0-9]{32})\s+(?:AS\s+)?([a-zA-Z_]\w*)\s+ON\s+([a-zA-Z_]\w*)\.([\w-]+)\s*=\s*([a-zA-Z_]\w*)\.([\w-]+)(?:\s+ORDER\s+BY\s+([a-zA-Z_]\w*\.[\w-]+)(?:\s+(ASC|DESC))?)?(?:\s+LIMIT\s+(\d+))?$/i);
  if(!match)throw new Error("JOIN syntax: SELECT c.name, o.amount FROM data c INNER JOIN dataset_<32-character-id> o ON c.id = o.customer_id LIMIT 100.");
