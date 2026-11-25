@@ -94,8 +94,8 @@ function aggregateValue(fn: string, column: string, rows: QueryRow[], distinct=f
   if (distinct) values = [...new Map(values.map(value => [String(value), value])).values()];
   const nums = values.map(Number).filter(Number.isFinite);
   if (fn === "COUNT") return values.length;
-  if (fn === "SUM") return nums.reduce((a,b)=>a+b,0);
-  if (fn === "AVG") return nums.length ? nums.reduce((a,b)=>a+b,0)/nums.length : null;
+  if (fn === "SUM") { const total = nums.reduce((a,b)=>a+b,0); return Number.isFinite(total) ? total : null; }
+  if (fn === "AVG") { const total = nums.reduce((a,b)=>a+b,0); return nums.length && Number.isFinite(total) ? total/nums.length : null; }
   if (fn === "MIN") return nums.length ? nums.reduce((a,b)=>Math.min(a,b),Infinity) : null;
   if (fn === "MAX") return nums.length ? nums.reduce((a,b)=>Math.max(a,b),-Infinity) : null;
   return null;
