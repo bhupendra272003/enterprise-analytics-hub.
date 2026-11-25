@@ -200,3 +200,17 @@ test("SQL aggregate SUM and AVG safely return null on overflow", () => {
   const result = runDatasetQuery("SELECT SUM(sales) AS total, AVG(sales) AS average FROM data",extreme,columns);
   assert.deepEqual(result.rows,[{total:null,average:null}]);
 });
+
+
+test("JOIN handles reversed ON operands and ignores blank-key matches", () => {
+  const customers = [{id:"",name:"Blank"},{id:"1",name:"A"}];
+  const orders = [{customer_id:"",amount:"99"},{customer_id:"1",amount:"20"}];
+  const result = runDatasetJoinQuery("SELECT c.name, o.amount FROM data c INNER JOIN dataset_0123456789abcdef0123456789abcdef o ON o.customer_id = c.id LIMIT 10", customers, ["id","name"], orders, ["customer_id","amount"]);
+  assert.deepEqual(result.rows, [{c_name:"A",o_amount:"20"}]);
+  assert.equal(result.matchedJoinRows,1);
+});
+
+test("JOIN preserves left rows when blank join keys and unmatched keys are present", () => {
+  const result = runDatasetJoinQuery("SELECT c.name, o.amount FROM data c LEFT JOIN dataset_0123456789abcdef0123456789abcdef o ON c.id = o.customer_id LIMIT 10", [{id:"",name:"Blank"},{id:"2",name:"No match"}], ["id","name"], [{customer_id:"",amount:"99"}], ["customer_id","amount"]);
+  assert.deepEqual(result.rows, [{c_name:"Blank",o_amount:null},{c_name:"No match",o_amount:null}]);
+});
