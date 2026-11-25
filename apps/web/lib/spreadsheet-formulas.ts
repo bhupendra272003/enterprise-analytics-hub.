@@ -150,5 +150,17 @@ export function evaluateSpreadsheetFormula(formula: string, rows: SpreadsheetRow
     const rounded = name === "ROUNDUP" ? Math.sign(scaled) * Math.ceil(Math.abs(scaled)) : name === "ROUNDDOWN" ? Math.trunc(scaled) : Math.round(scaled + Number.EPSILON);
     return String(rounded / factor);
   }
+  if (["SUMIFS","COUNTIFS","AVERAGEIFS"].includes(name)) {
+    if (args.length < 3 || (args.length - 1) % 2 !== 0) throw new Error(name + " expects a value range (SUMIFS/AVERAGEIFS) or criteria range (COUNTIFS), followed by criteria-range/criteria pairs.");
+    const target = name === "COUNTIFS" ? range(args[0]) : range(args[0]);
+    const offset = name === "COUNTIFS" ? 1 : 1;
+    const criteriaPairs = args.slice(offset).reduce((pairs, arg, i, list) => { if (i % 2 === 0) pairs.push([range(arg), list[i+1]?.replace(/^"|"$/g, "")]); return pairs; }, [] as [unknown[], string][]);
+    if (criteriaPairs.some(([values]) => values.length !== target.length)) throw new Error("All criteria ranges must have the same number of cells as the target range.");
+    const filtered = target.filter((_,i)=>criteriaPairs.every(([values,criterion])=>criterionMatches(values[i],criterion)));
+    if (name === "COUNTIFS") return String(filtered.filter(v=>v!==null&&v!==undefined&&String(v).trim()!=="").length);
+    const nums = numeric(filtered);
+    if (name === "SUMIFS") return String(nums.reduce((a,b)=>a+b,0));
+    return nums.length ? String(nums.reduce((a,b)=>a+b,0)/nums.length) : "0";
+  }
   throw new Error("This formula is not supported yet.");
 }
