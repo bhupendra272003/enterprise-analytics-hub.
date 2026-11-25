@@ -670,3 +670,16 @@ body{background-image:radial-gradient(ellipse at 15% 48%,rgba(103,151,70,.08),tr
 .code-workspace:has(.sql-editor) .editor-footer span:first-child i{background:#82c89a}
 .code-workspace:has(.sql-editor) .result-toolbar{font-family:'DM Mono',monospace}
 .code-workspace:has(.sql-editor) .result-toolbar b{font-weight:700}
+
+
+/* Python workbench: notebook/editor and terminal-inspired visual hierarchy */
+.python-workspace{overflow:hidden}
+.python-workspace .python-intro{border-radius:8px;border-left:3px solid #82c89a;background:linear-gradient(100deg,rgba(70,120,90,.12),rgba(18,25,34,.45))}
+.python-workspace .python-options{align-items:stretch}
+.python-workspace .python-option{border-radius:8px;min-height:74px}
+.python-workspace .python-code-toolbar{background:#151c24;border-left:3px solid #82c89a}
+.python-workspace .analytics-editor{background:#0d141b;color:#d6e2ed;border-color:#33424f;caret-color:#82c89a}
+.python-workspace .analytics-code{background:#080d12;border-color:#293643;color:#c2d1de;font-family:'DM Mono',Consolas,monospace}
+.python-workspace .python-metrics article{border-radius:8px;background:#121b24}
+.python-workspace .python-run{border-radius:7px}
+@media(max-width:620px){.python-workspace .python-code-toolbar .project-actions{display:flex;flex-wrap:wrap}}
