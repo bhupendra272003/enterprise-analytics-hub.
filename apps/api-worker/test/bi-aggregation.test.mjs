@@ -49,5 +49,5 @@ test("COUNT counts nonblank measure values including text while numeric aggregat
 test("handles missing category values and case-insensitive category filters", () => {
   const missing = [{ sales: "3" }, { region: "  ", sales: "7" }, { region: "north", sales: "2" }];
   assert.deepEqual(aggregateCategoryRows(missing, "region", "sales", "NORTH", "SUM").chartRows, [{ label: "north", value: 2 }]);
-  assert.deepEqual(aggregateCategoryRows(missing, "region", "sales", "", "SUM").chartRows, [{ label: "(blank)", value: 10 }]);
+  assert.deepEqual(aggregateCategoryRows(missing, "region", "sales", "", "SUM").chartRows, [{ label: "(blank)", value: 10 }, { label: "north", value: 2 }]);
 });
