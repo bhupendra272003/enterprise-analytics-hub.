@@ -96,8 +96,11 @@ def main():
         values = [float(row[key]) for row in rows if is_number(row[key])]
         if len(values) >= 4 and len(values) / max(1, sum(1 for row in rows if row[key].strip())) >= 0.9:
             ordered = sorted(values)
-            q1 = statistics.median(ordered[:(len(ordered)+1)//2])
-            q3 = statistics.median(ordered[len(ordered)//2:])
+            middle = len(ordered) // 2
+            lower = ordered[:middle] if len(ordered) % 2 else ordered[:middle]
+            upper = ordered[middle+1:] if len(ordered) % 2 else ordered[middle:]
+            q1 = statistics.median(lower)
+            q3 = statistics.median(upper)
             spread = q3 - q1
             count = sum(1 for value in values if value < q1 - 1.5 * spread or value > q3 + 1.5 * spread)
             if count:
