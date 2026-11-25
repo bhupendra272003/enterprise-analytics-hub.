@@ -660,3 +660,13 @@ body{background-image:radial-gradient(ellipse at 15% 48%,rgba(103,151,70,.08),tr
 .result-toolbar{border-radius:8px}
 .dataset-row{border-radius:8px}
 @media(max-width:620px){.analytics-tool{min-height:145px;padding:14px}.analytics-tool-grid{gap:8px}}
+
+
+/* SQL Studio editor affordances */
+.sql-editor{font-variant-ligatures:none;caret-color:#8ecb9a;letter-spacing:.15px;scrollbar-color:#344451 #0c1117}
+.sql-editor::selection{background:rgba(106,151,196,.3)}
+.code-workspace:has(.sql-editor) .editor-toolbar{border-left:3px solid #6c9c7a}
+.code-workspace:has(.sql-editor) .editor-footer span:first-child{color:#9fc8a8}
+.code-workspace:has(.sql-editor) .editor-footer span:first-child i{background:#82c89a}
+.code-workspace:has(.sql-editor) .result-toolbar{font-family:'DM Mono',monospace}
+.code-workspace:has(.sql-editor) .result-toolbar b{font-weight:700}
