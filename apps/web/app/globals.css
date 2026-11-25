@@ -728,3 +728,34 @@ body{background-image:radial-gradient(ellipse at 15% 48%,rgba(103,151,70,.08),tr
 .landing-shell .feature-icon{border-color:rgba(34,211,238,.24);color:#22d3ee}.landing-shell .eyebrow{color:#22d3ee}.landing-shell .status-dot,.landing-shell .eyebrow span{background:#22d3ee;box-shadow:0 0 12px #22d3ee}.landing-shell .brand-mark{border-color:#8b5cf6;color:#22d3ee}.landing-shell .auth-action-link{color:#22d3ee}.landing-shell .tabs button.active{color:#22d3ee;border-color:#22d3ee}
 @keyframes vyron-shimmer{to{background-position:220% center}}
 @media(prefers-reduced-motion:reduce){.landing-shell .hero h1 em{animation:none}.landing-shell *{transition:none!important}}
+
+/* VYRON Analytics Studio — cohesive desktop-tool workbench */
+.analytics-tool-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:24px 0 20px}
+.analytics-tool{min-height:182px;padding:18px 18px 16px;border:1px solid #2b3744;border-radius:12px;background:#121a23;box-shadow:0 8px 20px rgba(0,0,0,.18);transition:background .16s,border-color .16s,transform .16s}
+.analytics-tool:hover{transform:translateY(-2px);border-color:#516477;background:#18232e}
+.analytics-tool.tool-active{border-color:#7b9d61;background:linear-gradient(160deg,#1c2a21,#141d26);box-shadow:inset 0 3px 0 #b7f36b,0 8px 22px rgba(0,0,0,.2)}
+.analytics-tool-icon{width:42px;height:42px;background:#202d3a;border:1px solid #354657;color:#d9e7f4;border-radius:10px}
+.analytics-tool.tool-active .analytics-tool-icon{background:#293b2b;color:#b7f36b;border-color:#526d44}
+.analytics-tool>small{font:10px 'DM Mono',monospace;letter-spacing:1.1px;color:#91a3b5}
+.analytics-tool>b{font:600 16px Manrope,sans-serif;color:#edf3f8}
+.analytics-tool>p{font-size:12px;line-height:1.55;color:#93a2b1}
+.analytics-tool .tool-state{font:9px 'DM Mono',monospace;color:#9fb4c5;border:1px solid #344454;padding:5px 8px;border-radius:20px}
+.team-content:has(.analytics-tool-grid){max-width:1220px}
+.team-content:has(.analytics-tool-grid) .team-heading{align-items:center}
+.team-content:has(.analytics-tool-grid) .panel{background:#111922;border-color:#2a3745;border-radius:12px}
+.team-content:has(.analytics-tool-grid) .dataset-panel{padding:20px}
+.team-content:has(.analytics-tool-grid) .dataset-row{border-top:1px solid #263542;padding:15px 12px}
+.team-content:has(.analytics-tool-grid) .dataset-row:hover{background:#18232e}
+.team-content:has(.analytics-tool-grid) .dataset-row.active{background:#182b21;border-color:#526d44}
+.team-content:has(.analytics-tool-grid) .dataset-icon{background:#202d3a;color:#a9c6df;border:1px solid #344657}
+.team-content:has(.analytics-tool-grid) .preview-panel,.team-content:has(.analytics-tool-grid) .code-workspace,.team-content:has(.analytics-tool-grid) .panel:has(.bi-chart){border:1px solid #2a3745;background:#111922;border-radius:12px;padding:20px}
+.team-content:has(.analytics-tool-grid) .preview-scroll{background:#0b1219;border:1px solid #2b3a48;border-radius:8px}
+.team-content:has(.analytics-tool-grid) .preview-table th{background:#1b2936;color:#d0e1ee;font:10px 'DM Mono',monospace}
+.team-content:has(.analytics-tool-grid) .preview-table td{color:#d2dce6}
+.team-content:has(.analytics-tool-grid) .editor-toolbar{background:#18232e;border-color:#344454}
+.team-content:has(.analytics-tool-grid) .analytics-editor{background:#0a1118;border-color:#344454;color:#d9e5f0}
+.team-content:has(.analytics-tool-grid) .panel-title small{color:#9aabba}
+.team-content:has(.analytics-tool-grid) .small-action{border-color:#3a4b5c;background:#1a2733;color:#d8e3ed}
+.team-content:has(.analytics-tool-grid) .small-action:hover{border-color:#7b9d61;color:#dff4cc}
+@media(max-width:1000px){.analytics-tool-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:620px){.analytics-tool-grid{grid-template-columns:1fr}.analytics-tool{min-height:155px}.team-content:has(.analytics-tool-grid) .preview-panel,.team-content:has(.analytics-tool-grid) .code-workspace,.team-content:has(.analytics-tool-grid) .panel:has(.bi-chart){padding:14px}}
