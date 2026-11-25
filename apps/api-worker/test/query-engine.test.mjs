@@ -184,5 +184,5 @@ test("resolves JOIN aliases and column names case-insensitively", () => {
   const customers = [{ID:"1",Name:"A"}];
   const orders = [{Customer_ID:"1",Amount:"20"}];
   const result = runDatasetJoinQuery("SELECT C.NAME AS customer, O.amount FROM data C INNER JOIN dataset_0123456789abcdef0123456789abcdef O ON C.id = O.customer_id ORDER BY O.amount DESC", customers, ["ID","Name"], orders, ["Customer_ID","Amount"]);
-  assert.deepEqual(result.rows, [{customer:"A",o_amount:"20"}]);
+  assert.deepEqual(result.rows, [{customer:"A",O_amount:"20"}]);
 });
