@@ -55,7 +55,7 @@ export default function AnalyticsStudio(){
   async function saveDashboard(){
   if(!active||!canAnalyze)return;
   const title=dashboardTitle.trim()||active.name+' dashboard';
-  try{const d=await api('/api/datasets/'+active.id+'/dashboards',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,config:{categoryColumn:biX||active.columns[0],measureColumn:biY||active.columns.find((c:string)=>pageRows.some(r=>String(r[c]??'').trim()!==''&&Number.isFinite(Number(r[c]))))||active.columns[0],filter:biFilter,aggregation:biAggregation}})});setSavedDashboards(v=>[{...d.dashboard,canDelete:true},...v]);setDashboardTitle('');setNotice('Dashboard saved to this organization and dataset.');}
+  try{const d=await api('/api/datasets/'+active.id+'/dashboards',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,config:{categoryColumn:biX||active.columns[0],measureColumn:biY||active.columns.find((c:string)=>pageRows.some(r=>String(r[c]??'').trim()!==''&&Number.isFinite(Number(r[c]))))||active.columns[0],filter:biFilter,aggregation:biAggregation,visualType:biChartType,sortOrder:biSortOrder}})});setSavedDashboards(v=>[{...d.dashboard,canDelete:true},...v]);setDashboardTitle('');setNotice('Dashboard saved to this organization and dataset.');}
   catch(e){setNotice(e instanceof Error?e.message:'Could not save dashboard.');}
  }
  async function deleteDashboard(id:string){
@@ -63,7 +63,7 @@ export default function AnalyticsStudio(){
   try{await api('/api/datasets/'+active.id+'/dashboards/'+id,{method:'DELETE'});setSavedDashboards(v=>v.filter(d=>d.id!==id));setNotice('Saved dashboard deleted.');}
   catch(e){setNotice(e instanceof Error?e.message:'Could not delete dashboard.');}
  }
- function applyDashboard(d:any){setBiX(d.config.categoryColumn);setBiY(d.config.measureColumn);setBiFilter(d.config.filter||'');setBiAggregation(d.config.aggregation||'SUM');setTab('bi');setNotice('Saved dashboard configuration loaded.');}
+ function applyDashboard(d:any){setBiX(d.config.categoryColumn);setBiY(d.config.measureColumn);setBiFilter(d.config.filter||'');setBiAggregation(d.config.aggregation||'SUM');setBiChartType(d.config.visualType||'BAR');setBiSortOrder(d.config.sortOrder||'DESC');setTab('bi');setNotice('Saved dashboard configuration loaded.');}
  async function runSql(){
   if(!active||!canAnalyze||!sqlCode.trim())return;
   setSqlBusy(true);setQueryResult(null);setSqlJob(null);setNotice('Running a read-only query against the selected dataset…');
