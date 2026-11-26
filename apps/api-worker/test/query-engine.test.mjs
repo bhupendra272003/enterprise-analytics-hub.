@@ -295,3 +295,13 @@ test("COUNT DISTINCT excludes NULL while preserving blank-string values", () => 
   const result = runDatasetQuery("SELECT COUNT(DISTINCT region) AS unique_regions FROM data", sample, columns);
   assert.equal(result.rows[0].unique_regions, 3);
 });
+
+
+test("GROUP BY preserves NULL distinct from empty-string values in projected results", () => {
+  const sample = [{id:"1",region:null,sales:"10"},{id:"2",region:"",sales:"20"},{id:"3",region:null,sales:"30"}];
+  const result = runDatasetQuery("SELECT region, COUNT(*) AS n FROM data GROUP BY region ORDER BY n DESC", sample, columns);
+  assert.equal(result.rows.length,2);
+  assert.deepEqual(result.rows.map(r=>r.n),[2,1]);
+  assert.equal(result.rows.find(r=>r.n===2).region,null);
+  assert.equal(result.rows.find(r=>r.n===1).region,"");
+});
