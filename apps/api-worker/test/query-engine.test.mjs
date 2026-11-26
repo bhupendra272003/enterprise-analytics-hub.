@@ -228,3 +228,9 @@ test("rejects duplicate SELECT output aliases case-insensitively", () => {
   assert.throws(() => runDatasetQuery("SELECT id AS value, region AS VALUE FROM data", rows, columns), /output aliases must be unique/);
   assert.throws(() => runDatasetQuery("SELECT COUNT(*) AS total, SUM(sales) AS TOTAL FROM data", rows, columns), /output aliases must be unique/);
 });
+
+test("strips block comments without altering quoted comment markers and rejects unterminated comments", () => {
+  assert.deepEqual(runDatasetQuery("SELECT id FROM data /* filter note */ WHERE id = '1'", rows, columns).rows, [{ id: "1" }]);
+  assert.deepEqual(runDatasetQuery("SELECT id FROM data WHERE region = 'North /* literal */' /* trailing */", [{id:"1",region:"North /* literal */",sales:"10"}], columns).rows, [{ id: "1" }]);
+  assert.throws(() => runDatasetQuery("SELECT id FROM data /* unfinished", rows, columns), /Unterminated SQL block comment/);
+});
