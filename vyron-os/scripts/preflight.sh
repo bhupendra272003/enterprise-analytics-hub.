@@ -3,22 +3,30 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LIST="$ROOT/config/packages.list"
 HOOKS="$ROOT/config/hooks/live"
-fail=0
-[[ -s "$LIST" ]] || { echo "FAIL: package list missing/empty"; exit 1; }
-[[ -d "$HOOKS" ]] || { echo "FAIL: hooks directory missing"; exit 1; }
-[[ -s "$ROOT/desktop/branding/lion-mark.svg" ]] || { echo "FAIL: lion emblem missing"; exit 1; }
-[[ -s "$ROOT/desktop/branding/wallpaper.svg" ]] || { echo "FAIL: wallpaper missing"; exit 1; }
-if grep -Eq '^(#.*|[[:space:]]*)$' "$LIST"; then :; fi
-echo "Checking package names against apt cache (host cache may be incomplete)..."
-if command -v apt-cache >/dev/null 2>&1; then
-  while IFS= read -r pkg; do
-    [[ -z "$pkg" || "$pkg" =~ ^# ]] && continue
-    if ! apt-cache show "$pkg" >/dev/null 2>&1; then echo "WARN: package not found in current apt cache: $pkg"; fail=1; fi
-  done < "$LIST"
-else echo "WARN: apt-cache not available; skipping package validation"; fi
-for h in "$HOOKS"/*.hook.chroot; do
-  [[ -e "$h" ]] || { echo "FAIL: no chroot hooks found"; exit 1; }
-  if ! grep -q '^#!/' "$h"; then echo "WARN: hook lacks shebang: $h"; fail=1; fi
+errors=0
+[[ -s "$LIST" ]] || { echo "ERROR: package list missing or empty"; exit 1; }
+[[ -d "$HOOKS" ]] || { echo "ERROR: hooks directory missing"; exit 1; }
+for asset in lion-mark.svg wallpaper.svg; do
+ [[ -s "$ROOT/desktop/branding/$asset" ]] || { echo "ERROR: missing asset $asset"; errors=$((errors+1)); }
 done
-echo "Preflight completed. Warnings indicate items to review; host apt cache is not proof of Ubuntu 24.04 ISO compatibility."
-exit "$fail"
+# Duplicate detection, excluding comments and blank lines.
+dupes="$(sed 's/[[:space:]]//g' "$LIST" | grep -vE '^(#|$)' | sort | uniq -d || true)"
+if [[ -n "$dupes" ]]; then echo "ERROR: duplicate packages: $dupes"; errors=$((errors+1)); fi
+# Require hook scripts to be shell files with shebangs and reject missing glob matches.
+shopt -s nullglob
+hooks=("$HOOKS"/*.hook.chroot)
+(( ${#hooks[@]} > 0 )) || { echo "ERROR: no chroot hooks found"; exit 1; }
+for h in "${hooks[@]}"; do
+ [[ -s "$h" ]] || { echo "ERROR: empty hook: $h"; errors=$((errors+1)); continue; }
+ if ! grep -q '^#!/' "$h"; then echo "ERROR: hook lacks shebang: $h"; errors=$((errors+1)); fi
+ if ! bash -n "$h" 2>/dev/null; then echo "ERROR: hook syntax check failed: $h"; errors=$((errors+1)); fi
+done
+if command -v apt-cache >/dev/null 2>&1; then
+ echo "Package cache validation (best-effort, depends on host repositories):"
+ while IFS= read -r pkg; do
+  [[ -z "$pkg" || "$pkg" =~ ^# ]] && continue
+  if ! apt-cache show "$pkg" >/dev/null 2>&1; then echo "WARN: unavailable in host cache: $pkg"; fi
+ done < "$LIST"
+else echo "WARN: apt-cache unavailable; skipping package check"; fi
+if (( errors > 0 )); then echo "Preflight FAILED: $errors structural errors."; exit 1; fi
+echo "Preflight PASSED structural checks. Package cache checks are advisory, not Noble build proof."
