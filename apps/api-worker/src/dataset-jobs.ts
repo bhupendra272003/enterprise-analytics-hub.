@@ -114,7 +114,7 @@ async function runSqlJob(msg:Msg,env:Env){
   if(completed.meta.changes)await env.DB.prepare("INSERT INTO notifications (id,user_id,organization_id,type,title,message,href) VALUES (?,?,?,'DATASET_JOB','SQL query completed',?,?)").bind(crypto.randomUUID(),job.requested_by,job.organization_id,"Background SQL query for "+ds.name+" is ready.","/workspace/analytics").run();
  }catch(e){
   const code=e instanceof Error?e.message:"SQL_PROCESSING_FAILED";const latest=await env.DB.prepare("SELECT attempt_count,max_attempts,status FROM dataset_jobs WHERE id=?").bind(job.id).first<any>();if(latest?.status==="CANCELLED")return;
-  const retry=!!latest&&latest.attempt_count<latest.max_attempts;await env.DB.prepare("UPDATE dataset_jobs SET status=?,stage=?,error_code=?,error_message=?,updated_at=CURRENT_TIMESTAMP,completed_at=? WHERE id=?").bind(retry?"RETRYING":"FAILED",retry?"RETRYING":"FAILED",code,"The background SQL job could not be completed.",retry?null:new Date().toISOString(),job.id).run();if(retry)throw e;
+  const retry=!!latest&&latest.attempt_count<latest.max_attempts;await env.DB.prepare("UPDATE dataset_jobs SET status=?,stage=?,error_code=?,error_message=?,updated_at=CURRENT_TIMESTAMP,completed_at=? WHERE id=? AND status='RUNNING' AND status='RUNNING'").bind(retry?"RETRYING":"FAILED",retry?"RETRYING":"FAILED",code,"The background SQL job could not be completed.",retry?null:new Date().toISOString(),job.id).run();if(retry)throw e;
  }
 }
 async function runProfile(msg:Msg,env:Env){
