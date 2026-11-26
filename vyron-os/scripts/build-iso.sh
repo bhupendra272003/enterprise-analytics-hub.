@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# EXPERIMENTAL Debian live-build prototype; not the approved Ubuntu installer pipeline.
+if [[ "${VYRON_ALLOW_EXPERIMENTAL_LB:-0}" != "1" ]]; then
+  echo "BLOCKED: generic live-build prototype is not approved for producing a Ubuntu installer ISO."
+  echo "Use the verified Ubuntu base-ISO customization workflow when implemented."
+  echo "To run this prototype anyway, set VYRON_ALLOW_EXPERIMENTAL_LB=1 (not recommended)."
+  exit 2
+fi
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD_DIR="${VYRON_BUILD_DIR:-$ROOT/build}"
 if [[ "${EUID}" -eq 0 ]]; then echo "Run build as a normal user, not root; lb handles privileged steps." >&2; exit 1; fi
