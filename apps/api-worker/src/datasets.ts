@@ -161,7 +161,7 @@ if(sub==="edits"&&req.method==="POST"){
   let edited;try{edited=applyDatasetCellEdits(parsed.records,parsed.columns,body.changes);}catch(e){return json({error:e instanceof Error?e.message:"Cell edits are invalid."},400);}
   const output=csvEncode(edited.rows,parsed.columns),bytes=new TextEncoder().encode(output);
   if(bytes.byteLength>MAX_SYNC_CSV_BYTES)return syncLimitError();
-  const latest=await env.DB.prepare("SELECT COALESCE(MAX(version_number),0) AS v FROM dataset_versions WHERE dataset_id=?").bind(datasetId).first<{v:number}>(),version=Number(latest?.v||0)+1,key=dataset.organization_id+"/"+datasetId+"/v"+version+"-edited.csv";
+  const latest=await env.DB.prepare("SELECT COALESCE(MAX(version_number),0) AS v FROM dataset_versions WHERE dataset_id=?").bind(datasetId).first<{v:number}>(),version=Number(latest?.v||0)+1,key=dataset.organization_id+"/"+datasetId+"/v"+version+"-edited-"+crypto.randomUUID()+".csv";
   const preview=edited.rows.slice(0,10).map(row=>Object.fromEntries(parsed.columns.map(column=>[column,String(row[column]??"").slice(0,500)])));
   await env.DATASETS.put(key,bytes);
   try{await env.DB.batch([
