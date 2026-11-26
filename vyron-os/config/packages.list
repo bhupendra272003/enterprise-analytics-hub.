@@ -1,5 +1,6 @@
 # Vyron OS base package selection for Ubuntu 24.04 live-build
-# Debian/Ubuntu repository packages only; vendor apps are handled separately.
+# Ubuntu repository packages only. Vendor apps (e.g. MySQL Workbench) are provisioned separately.
+# MySQL Workbench is intentionally excluded: it is not listed in Ubuntu Noble's package index.
 xfce4
 xfce4-goodies
 lightdm
@@ -24,7 +25,6 @@ python3-jupyter
 python3-notebook
 mysql-server
 mysql-client
-mysql-workbench
 git
 git-lfs
 curl
