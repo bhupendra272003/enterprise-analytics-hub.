@@ -2,7 +2,7 @@ export type QueryRow = Record<string, string | number | null>;
 export function extractJoinDatasetToken(sql:string):string|null { return sql.match(/\bJOIN\s+dataset_([a-f0-9]{32})\b/i)?.[1]?.toLowerCase()||null; }
 type Condition = { column: string; operator: string; value?: string | number };
 const cleanIdentifier = (value: string) => value.replace(/^[`"\[]|[`"\]]$/g, "");
-function stripSqlComments(sql:string){let out="",quote="",i=0;while(i<sql.length){const ch=sql[i];if(quote){out+=ch;if(ch===quote){if(sql[i+1]===quote){out+=sql[i+1];i+=2;continue;}quote="";}i++;continue;}if(ch==="'"||ch==='"'){quote=ch;out+=ch;i++;continue;}if(ch==="-"&&sql[i+1]==="-"){while(i<sql.length&&sql[i]!=="\\n"&&sql[i]!=="\\r")i++;continue;}if(ch==="/"&&sql[i+1]==="*"){const end=sql.indexOf("*/",i+2);if(end===-1)throw new Error("Unterminated SQL block comment.");i=end+2;out+=" ";continue;}out+=ch;i++;}return out;}
+function stripSqlComments(sql:string){let out="",quote="",i=0;while(i<sql.length){const ch=sql[i];if(quote){out+=ch;if(ch===quote){if(sql[i+1]===quote){out+=sql[i+1];i+=2;continue;}quote="";}i++;continue;}if(ch==="'"||ch==='"'){quote=ch;out+=ch;i++;continue;}if(ch==="-"&&sql[i+1]==="-"){while(i<sql.length&&sql[i]!=="\n"&&sql[i]!=="\r")i++;continue;}if(ch==="/"&&sql[i+1]==="*"){const end=sql.indexOf("*/",i+2);if(end===-1)throw new Error("Unterminated SQL block comment.");i=end+2;out+=" ";continue;}out+=ch;i++;}return out;}
 const splitLogical = (value: string, operator: "AND" | "OR") => {
   const parts: string[] = [];
   let start=0,quote="",depth=0,i=0;
