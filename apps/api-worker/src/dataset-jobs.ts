@@ -103,6 +103,7 @@ async function runSqlJob(msg:Msg,env:Env){
   if(!parsed.length)throw new Error("EMPTY_DATASET");
   const columns=Object.keys(parsed[0]);if(!columns.length||columns.length>200)throw new Error("INVALID_HEADERS");
   const rows=parsed.map(row=>Object.fromEntries(columns.map(column=>[column,String(row[column]??"")])));
+  await revalidateJobAccess(env,job,payload.joinDatasetId);
   await env.DB.prepare("UPDATE dataset_jobs SET progress=45,stage='EXECUTING_SQL',updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='RUNNING'").bind(job.id).run();
   let result:any;
   if(payload.joinDatasetId){
@@ -133,6 +134,7 @@ async function runProfile(msg:Msg,env:Env){
   const source=await env.DATASETS.get(ds.storage_path,"text");if(source===null)throw new Error("SOURCE_FILE_MISSING");
   const {parse}=await import("csv-parse/sync");const rows=parse(source,{columns:true,skip_empty_lines:true,bom:true,trim:true,relax_column_count:false}) as Record<string,unknown>[];if(!rows.length)throw new Error("EMPTY_DATASET");
   const columns=Object.keys(rows[0]);if(!columns.length||columns.length>200)throw new Error("INVALID_HEADERS");
+  await revalidateJobAccess(env,job);
   const profile=columns.map(name=>{const vals=rows.map((r:any)=>String(r[name]??"").trim()),present=vals.filter((v:string)=>v!==""),nums=present.map(Number).filter(Number.isFinite),numeric=present.length>0&&nums.length/present.length>=.9,sum=nums.reduce((a:number,b:number)=>a+b,0);return {name,type:!present.length?"EMPTY":numeric?"NUMERIC":"TEXT",total:vals.length,missing:vals.length-present.length,distinct:new Set(present).size,...(numeric?{count:nums.length,sum:Number(sum.toFixed(3)),min:nums.reduce((a:number,b:number)=>Math.min(a,b),Infinity),max:nums.reduce((a:number,b:number)=>Math.max(a,b),-Infinity),mean:Number((sum/nums.length).toFixed(3))}:{})};});
   let missingCells=0,duplicateRows=0;const seen=new Set<string>();
   for(const item of profile)missingCells+=item.missing;
