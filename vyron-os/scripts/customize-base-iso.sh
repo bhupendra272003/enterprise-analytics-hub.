@@ -19,6 +19,8 @@ if (( free_gb < 60 )); then echo "ERROR: at least 60 GiB free recommended for th
 echo "Source ISO SHA256:"
 sha256sum "$SOURCE"
 echo "WARNING: verify source ISO checksum/signature against official Ubuntu publication before proceeding."
+echo "WARNING: LiveFS Editor primarily targets Ubuntu live/server installer images; desktop ISO compatibility is not assured."
+echo "Review the action YAML carefully. A test output is not a release image until VM-validated."
 echo "Action YAML is user-reviewed and executes installer filesystem modifications."
 read -r -p "Type CUSTOMIZE to continue: " confirm
 [[ "$confirm" == "CUSTOMIZE" ]] || { echo "Cancelled."; exit 1; }
