@@ -145,7 +145,7 @@ export function runDatasetQuery(sql: string, sourceRows: QueryRow[], sourceColum
     result = [...groups.values()].map(group => {
       const output: QueryRow = {};
       for (const p of projections) {
-        if (p.kind === "column") output[p.alias] = group[0][p.column] ?? "";
+        if (p.kind === "column") output[p.alias] = group[0][p.column] ?? null;
         else if (p.kind === "aggregate") output[p.alias] = aggregateValue(p.fn,p.column,group,p.distinct);
       }
       return output;
