@@ -1,0 +1,11 @@
+#!/bin/sh
+set -eu
+mkdir -p /etc/default/grub.d
+cat > /etc/default/grub.d/99-vyronos-branding.cfg <<'EOF'
+GRUB_TIMEOUT=8
+GRUB_TIMEOUT_STYLE=menu
+GRUB_TERMINAL=console
+GRUB_DISABLE_RECOVERY=true
+GRUB_DISABLE_SUBMENU=y
+EOF
+# GRUB theme is optional; do not run update-grub in live-build chroot.
