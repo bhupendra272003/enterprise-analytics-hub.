@@ -1,0 +1,12 @@
+#!/bin/bash
+set -e
+mkdir -p /etc/skel/Desktop
+cat >/etc/skel/Desktop/README-VyronOS.txt <<'TXT'
+Welcome to Bhupendra's Workstation
+
+Operating system: Bhupendra VyronOS
+Desktop: XFCE
+Brand: Bhupendra
+
+This is an initial workstation image. Confirm software configuration and security policies before storing sensitive data.
+TXT
