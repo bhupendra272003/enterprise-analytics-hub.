@@ -37,8 +37,8 @@ function parseCondition(source: string, columns: string[]): Condition {
 }
 function compareCondition(row: QueryRow, condition: Condition): boolean {
   const raw = row[condition.column];
-  if (condition.operator === "IS NULL") return raw === null || raw === undefined || raw === "";
-  if (condition.operator === "IS NOT NULL") return raw !== null && raw !== undefined && raw !== "";
+  if (condition.operator === "IS NULL") return raw === null || raw === undefined;
+  if (condition.operator === "IS NOT NULL") return raw !== null && raw !== undefined;
   const left = raw === null || raw === undefined ? "" : raw;
   const right = condition.value ?? "";
   const ln = Number(left), rn = Number(right);
