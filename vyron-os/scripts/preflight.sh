@@ -9,9 +9,14 @@ errors=0
 for asset in lion-mark.svg wallpaper.svg; do
  [[ -s "$ROOT/desktop/branding/$asset" ]] || { echo "ERROR: missing asset $asset"; errors=$((errors+1)); }
 done
-# Duplicate detection, excluding comments and blank lines.
-dupes="$(sed 's/[[:space:]]//g' "$LIST" | grep -vE '^(#|$)' | sort | uniq -d || true)"
+# Normalize manifest whitespace and validate package-name syntax.
+normalized="$(sed 's/[[:space:]]//g' "$LIST" | grep -vE '^(#|$)' || true)"
+dupes="$(printf '%s\\n' "$normalized" | sort | uniq -d || true)"
 if [[ -n "$dupes" ]]; then echo "ERROR: duplicate packages: $dupes"; errors=$((errors+1)); fi
+while IFS= read -r pkg; do
+ [[ -z "$pkg" ]] && continue
+ if [[ ! "$pkg" =~ ^[a-z0-9][a-z0-9+.-]*$ ]]; then echo "ERROR: invalid package token: $pkg"; errors=$((errors+1)); fi
+done <<< "$normalized"
 # Require hook scripts to be shell files with shebangs and reject missing glob matches.
 shopt -s nullglob
 hooks=("$HOOKS"/*.hook.chroot)
