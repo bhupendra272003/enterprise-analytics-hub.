@@ -39,4 +39,50 @@ router.post('/organizations/:orgId/labs',async(req,res,next)=>{
   res.status(201).json({lab:{id,name:input.name,template:input.template,status:'REQUESTED',provider:'pending'},message:'Request recorded. Runtime provisioning is not yet connected.'});
  }catch(e){next(e);}
 });
+
+router.get('/labs/:labId',async(req,res,next)=>{
+ try{
+  const [rows]=await pool.execute('SELECT l.*,l.lab_name AS name,l.project_id AS projectId,l.task_id AS taskId,l.owner_user_id AS ownerUserId,l.created_at AS createdAt,l.updated_at AS updatedAt FROM analytics_labs l WHERE l.id=? LIMIT 1',[req.params.labId]);
+  if(!rows.length)return res.status(404).json({error:'Lab not found.'});
+  const lab=rows[0];
+  const [members]=await pool.execute("SELECT role FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE' LIMIT 1",[lab.organization_id,req.user.id]);
+  if(!members.length)return res.status(403).json({error:'Active organization membership required.'});
+  const role=members[0].role;
+  let allowed=['OWNER','MANAGER','ADMIN'].includes(role);
+  if(role==='ANALYST'){
+    const [access]=await pool.execute('SELECT 1 FROM analytics_lab_access WHERE lab_id=? AND user_id=? AND revoked_at IS NULL LIMIT 1',[lab.id,req.user.id]);
+    allowed=lab.ownerUserId===req.user.id||access.length>0;
+  }
+  if(role==='LEADER'){
+    const [scope]=await pool.execute('SELECT 1 FROM tasks t JOIN teams tm ON tm.id=t.team_id WHERE t.id=? AND tm.organization_id=? AND tm.leader_user_id=? LIMIT 1',[lab.task_id,lab.organization_id,req.user.id]);
+    allowed=scope.length>0;
+  }
+  if(!allowed)return res.status(403).json({error:'Insufficient permissions.'});
+  delete lab.provider_instance_id;delete lab.storage_ref;delete lab.resource_policy_json;
+  res.json({lab});
+ }catch(e){next(e);}
+});
+
+router.get('/labs/:labId/events',async(req,res,next)=>{
+ try{
+  const [labs]=await pool.execute('SELECT id,organization_id,owner_user_id,task_id FROM analytics_labs WHERE id=? LIMIT 1',[req.params.labId]);
+  if(!labs.length)return res.status(404).json({error:'Lab not found.'});
+  const lab=labs[0];
+  const [members]=await pool.execute("SELECT role FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE' LIMIT 1",[lab.organization_id,req.user.id]);
+  if(!members.length)return res.status(403).json({error:'Active organization membership required.'});
+  const role=members[0].role;let allowed=['OWNER','MANAGER','ADMIN'].includes(role);
+  if(role==='ANALYST'){
+   const [access]=await pool.execute('SELECT 1 FROM analytics_lab_access WHERE lab_id=? AND user_id=? AND revoked_at IS NULL LIMIT 1',[lab.id,req.user.id]);
+   allowed=lab.owner_user_id===req.user.id||access.length>0;
+  }
+  if(role==='LEADER'){
+   const [scope]=await pool.execute('SELECT 1 FROM tasks t JOIN teams tm ON tm.id=t.team_id WHERE t.id=? AND tm.organization_id=? AND tm.leader_user_id=? LIMIT 1',[lab.task_id,lab.organization_id,req.user.id]);
+   allowed=scope.length>0;
+  }
+  if(!allowed)return res.status(403).json({error:'Insufficient permissions.'});
+  const [events]=await pool.execute('SELECT event_type AS eventType,details_json AS details,created_at AS createdAt FROM analytics_lab_events WHERE lab_id=? ORDER BY created_at DESC LIMIT 100',[lab.id]);
+  res.json({events});
+ }catch(e){next(e);}
+});
+
 export default router;
