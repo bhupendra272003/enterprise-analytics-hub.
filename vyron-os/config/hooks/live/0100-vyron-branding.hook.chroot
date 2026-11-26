@@ -1,0 +1,29 @@
+#!/bin/bash
+set -e
+# live-build chroot hook: branding files are copied into the image filesystem.
+mkdir -p /etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml
+cat >/etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml <<'XML'
+<?xml version="1.0" encoding="UTF-8"?>
+<channel name="xsettings" version="1.0">
+ <property name="Net" type="empty">
+  <property name="ThemeName" type="string" value="Adwaita-dark"/>
+  <property name="IconThemeName" type="string" value="Papirus-Dark"/>
+ </property>
+</channel>
+XML
+# Ensure LightDM uses GTK greeter, while avoiding custom-user/password creation.
+if [[ -d /etc/lightdm/lightdm.conf.d ]]; then
+ cat >/etc/lightdm/lightdm.conf.d/50-vyron.conf <<'CONF'
+[Seat:*]
+greeter-session=lightdm-gtk-greeter
+CONF
+fi
+if [[ -f /etc/lightdm/lightdm-gtk-greeter.conf ]]; then
+ cp /etc/lightdm/lightdm-gtk-greeter.conf /etc/lightdm/lightdm-gtk-greeter.conf.vyron-backup
+ cat >/etc/lightdm/lightdm-gtk-greeter.conf <<'CONF'
+[ greeter ]
+theme-name = Adwaita-dark
+icon-theme-name = Papirus-Dark
+font-name = Sans 11
+CONF
+fi
