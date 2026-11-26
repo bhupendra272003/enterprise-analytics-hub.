@@ -25,7 +25,8 @@ if [[ -d "$BUILD_DIR" ]]; then
 fi
 if command -v apt-cache >/dev/null 2>&1; then
  for pkg in live-build xorriso debootstrap squashfs-tools grub-pc-bin grub-efi-amd64-bin; do
-  if apt-cache policy "$pkg" | grep -q 'Candidate: (none)'; then warn "No package candidate in host cache: $pkg"; fi
+  policy="$(apt-cache policy "$pkg" 2>/dev/null || true)"
+  if [[ "$policy" == *"Candidate: (none)"* ]]; then warn "No package candidate in host cache: $pkg"; fi
  done
 fi
 say "Errors: $errors; warnings: $warnings"
