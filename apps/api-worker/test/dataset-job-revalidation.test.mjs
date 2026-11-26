@@ -24,3 +24,10 @@ test("rechecks access immediately before SQL and profile analysis", () => {
   assert.match(sqlBody, /await revalidateJobAccess\(env,job,payload\.joinDatasetId\);\s*await env\.DB\.prepare\("UPDATE dataset_jobs SET progress=45/);
   assert.match(profileBody, /await revalidateJobAccess\(env,job\);\s*const profile=columns\.map/);
 });
+
+
+test("profiling job failure transition cannot overwrite a cancellation", () => {
+  const profileStart = source.indexOf("async function runProfile");
+  const profileBody = source.slice(profileStart);
+  assert.match(profileBody, /WHERE id=\? AND status='RUNNING'/);
+});
