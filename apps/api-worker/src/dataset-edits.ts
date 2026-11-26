@@ -5,7 +5,7 @@ export function applyDatasetCellEdits(
   columns: string[],
   rawChanges: unknown,
 ): { rows: Record<string, string>[]; applied: number } {
-  if (!Array.isArray(rawChanges) || rawChanges.length < 1 || rawChanges.length > 1000) {
+  if (!Array.isArray(sourceRows) || sourceRows.some((row) => !row || typeof row !== "object" || Array.isArray(row))) {\n    throw new Error("Dataset rows must be objects.");\n  }\n  if (!Array.isArray(rawChanges) || rawChanges.length < 1 || rawChanges.length > 1000) {
     throw new Error("Submit between 1 and 1000 cell changes.");
   }
   if (!Array.isArray(columns) || columns.length === 0 || columns.some((column) => typeof column !== "string" || !column.trim()) || new Set(columns).size !== columns.length) {
