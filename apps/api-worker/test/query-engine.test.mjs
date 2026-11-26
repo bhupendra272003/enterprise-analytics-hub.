@@ -248,3 +248,6 @@ test("allows SQL keywords and semicolons inside quoted literal values", () => {
   assert.deepEqual(runDatasetQuery("SELECT id FROM data WHERE region = 'UNION; DELETE'", sample, columns).rows, [{ id: "1" }]);
   assert.deepEqual(runDatasetQuery("SELECT id FROM data WHERE region = 'SELECT'", sample, columns).rows, [{ id: "2" }]);
 });
+
+
+test("JOIN treats whitespace-only keys as blank and never matches them", () => {\n  const result = runDatasetJoinQuery("SELECT c.name, o.amount FROM data c LEFT JOIN dataset_0123456789abcdef0123456789abcdef o ON c.id = o.customer_id LIMIT 10", [{id:"   ",name:"Whitespace"},{id:"1",name:"Valid"}], ["id","name"], [{customer_id:"\\t",amount:"999"},{customer_id:"1",amount:"20"}], ["customer_id","amount"]);\n  assert.deepEqual(result.rows, [{c_name:"Whitespace",o_amount:null},{c_name:"Valid",o_amount:"20"}]);\n  assert.equal(result.matchedJoinRows,1);\n});\n
