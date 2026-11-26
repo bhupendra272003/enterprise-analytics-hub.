@@ -6,7 +6,8 @@ Use a dedicated Ubuntu 24.04 machine or VM with sufficient disk space and RAM. T
 1. Clone this repository and check out `vyron-os-foundation`.
 2. From the repository root, prepare packages on the Ubuntu build host:
    `sudo bash vyron-os/scripts/prepare-host.sh`
-3. Review the package list and live-build options. Build script runs live-build in a new build directory:
+3. Run the preflight checks: `bash vyron-os/scripts/preflight.sh` (this checks against your host apt cache, not a guaranteed Noble repository mirror).
+4. Review the package list and live-build options. Build script runs live-build in a new build directory:
    `bash vyron-os/scripts/build-iso.sh`
 
 ## Status and caveats
