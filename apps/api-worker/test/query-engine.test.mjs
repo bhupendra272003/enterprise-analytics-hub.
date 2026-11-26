@@ -59,7 +59,9 @@ test("supports LIKE and NULL predicates", () => {
     { id: "3", region: null, sales: "175" }
   ];
   assert.equal(runDatasetQuery("SELECT COUNT(*) AS total FROM data WHERE region LIKE 'South%' ", sample, columns).rows[0].total, 1);
-  assert.equal(runDatasetQuery("SELECT COUNT(*) AS total FROM data WHERE sales IS NULL", sample, columns).rows[0].total, 1);
+  assert.equal(runDatasetQuery("SELECT COUNT(*) AS total FROM data WHERE sales IS NULL", sample, columns).rows[0].total, 0);
+  assert.equal(runDatasetQuery("SELECT COUNT(*) AS total FROM data WHERE region IS NULL", sample, columns).rows[0].total, 1);
+  assert.equal(runDatasetQuery("SELECT COUNT(*) AS total FROM data WHERE sales IS NOT NULL", sample, columns).rows[0].total, 3);
 });
 
 test("supports grouped COUNT and numeric MIN/MAX", () => {
