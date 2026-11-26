@@ -10,7 +10,7 @@ const canRun=(r:Role)=>canAnalyzeDataset(r);
 const hasDatasetAccess=async(env:Env,datasetId:string,orgId:string,userId:string,role:Role)=>{
  if(role==="OWNER"||role==="MANAGER")return true;
  if(role==="ANALYST")return !!(await env.DB.prepare("SELECT id FROM dataset_handoffs WHERE dataset_id=? AND assigned_to=? AND status<>'REVOKED' LIMIT 1").bind(datasetId,userId).first());
- if(role==="LEADER")return !!(await env.DB.prepare("SELECT h.id FROM dataset_handoffs h JOIN team_members tm ON tm.user_id=h.assigned_to JOIN teams t ON t.id=tm.team_id WHERE h.dataset_id=? AND h.status<>'REVOKED' AND t.organization_id=? AND t.leader_user_id=? LIMIT 1").bind(datasetId,orgId,userId).first());
+ if(role==="LEADER")return !!(await env.DB.prepare("SELECT h.id FROM dataset_handoffs h WHERE h.dataset_id=? AND h.status<>'REVOKED' AND (h.assigned_to=? OR EXISTS (SELECT 1 FROM team_members tm JOIN teams t ON t.id=tm.team_id WHERE tm.user_id=h.assigned_to AND t.organization_id=? AND t.leader_user_id=?)) LIMIT 1").bind(datasetId,userId,orgId,userId).first());
  return false;
 };
 const view=(r:any)=>({id:r.id,datasetId:r.dataset_id,type:r.job_type,status:r.status,progress:r.progress,stage:r.stage,result:r.result_json?JSON.parse(r.result_json):null,error:r.error_code?{code:r.error_code,message:r.error_message}:null,attemptCount:r.attempt_count,createdAt:r.created_at,updatedAt:r.updated_at,completedAt:r.completed_at});
