@@ -234,3 +234,10 @@ test("strips block comments without altering quoted comment markers and rejects 
   assert.deepEqual(runDatasetQuery("SELECT id FROM data WHERE region = 'North /* literal */' /* trailing */", [{id:"1",region:"North /* literal */",sales:"10"}], columns).rows, [{ id: "1" }]);
   assert.throws(() => runDatasetQuery("SELECT id FROM data /* unfinished", rows, columns), /Unterminated SQL block comment/);
 });
+
+
+test("allows reserved SQL keywords and semicolons inside quoted literals", () => {
+  const sample = [{ id: "1", region: "UNION; DROP", sales: "10" }];
+  assert.deepEqual(runDatasetQuery("SELECT id FROM data WHERE region = 'UNION; DROP'", sample, columns).rows, [{ id: "1" }]);
+  assert.deepEqual(runDatasetQuery("SELECT id FROM data WHERE region = 'UNION'", [{id:"1",region:"UNION",sales:"1"}], columns).rows, [{ id: "1" }]);
+});
