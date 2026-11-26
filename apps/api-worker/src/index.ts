@@ -9,6 +9,7 @@ import { handleTeams } from "./teams";
 import { handlePerformance } from "./performance";
 import { handleGenerator } from "./generator";
 import generationJobs from "./generator-jobs";
+import { handleWorkspaceFiles } from "./workspace-files";
 
 interface Env {
   DB: D1Database;
@@ -281,7 +282,7 @@ export default {
       return new Response(null, { status: 204, headers: {
         "access-control-allow-origin": allowedOrigin,
         "access-control-allow-credentials": "true",
-        "access-control-allow-methods": "GET,POST,PUT,PATCH,OPTIONS",
+        "access-control-allow-methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
         "access-control-allow-headers": "Content-Type, X-Hub-Request",
         "access-control-max-age": "86400",
         "vary": "Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
