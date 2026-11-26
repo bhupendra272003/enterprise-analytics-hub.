@@ -37,8 +37,8 @@ export function aggregateCategoryRows(
       : aggregation === "MIN" ? stats.min
       : aggregation === "MAX" ? stats.max
       : stats.sum;
-    return { label, value: Number.isFinite(value) ? Number(value.toFixed(3)) : 0 };
+    if (!Number.isFinite(value)) throw new Error("Chart aggregation overflowed numeric range.");
+    return { label, value: Number(value.toFixed(3)) };
   }).sort((a, b) => b.value - a.value).slice(0, 20);
-  if (chartRows.some((row) => !Number.isFinite(row.value))) throw new Error("Chart aggregation overflowed numeric range.");
   return { chartRows, matchedGroups: groups.size };
 }
