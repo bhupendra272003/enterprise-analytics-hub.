@@ -116,7 +116,7 @@ export async function handleWorkspaceFiles(request: Request, env: Env, path: str
     if(node.node_type!=="FILE")return json({error:"Folder copy is not supported yet. Copy files only."},400);
     let body:any={};try{body=await request.json();}catch{return json({error:"Invalid JSON body."},400);}
     const name=cleanName(body?.name)||cleanName(node.name+" (copy)");
-    const parentId=typeof body?.parentId==="string"&&body.parentId?body.parentId:node.parent_id;
+    const parentId=body?.parentId===undefined?node.parent_id:(typeof body.parentId==="string"&&body.parentId?body.parentId:null);
     if(!name||name==="."||name===".."||name.length>255)return json({error:"Invalid copy name."},400);
     if(!await validParent(env,node.organization_id,parentId))return json({error:"Parent folder not found."},404);
     const bytes=await env.DATASETS.get(node.storage_key!,"arrayBuffer");if(!bytes)return json({error:"Stored file is unavailable."},410);
