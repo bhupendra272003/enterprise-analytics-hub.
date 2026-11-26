@@ -37,3 +37,17 @@ done < "$ROOT/config/packages.list"
 echo "No candidate/unknown: $missing; invalid names: $invalid (advisory)"
 (( invalid == 0 )) || exit 1
 echo "CI structural checks passed (not an ISO build or boot test)."
+
+# Smoke-test checksum helper against a temporary fixture (no real ISO required).
+helper="$ROOT/scripts/verify-iso-checksum.sh"
+tmpdir="$(mktemp -d)"
+trap 'rm -rf "$tmpdir"' EXIT
+printf 'fixture ISO data\n' > "$tmpdir/test.iso"
+sha256sum "$tmpdir/test.iso" > "$tmpdir/SHA256SUMS"
+bash "$helper" "$tmpdir/test.iso" "$tmpdir/SHA256SUMS"
+# Negative test: a modified checksum must be rejected.
+printf '0000000000000000000000000000000000000000000000000000000000000000  test.iso\n' > "$tmpdir/bad-sums"
+if bash "$helper" "$tmpdir/test.iso" "$tmpdir/bad-sums" >/dev/null 2>&1; then
+ echo "ERROR: checksum helper accepted an incorrect hash"; exit 1
+fi
+echo "Checksum helper positive and negative smoke tests passed."
