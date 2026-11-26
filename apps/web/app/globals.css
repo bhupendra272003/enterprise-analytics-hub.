@@ -759,3 +759,24 @@ body{background-image:radial-gradient(ellipse at 15% 48%,rgba(103,151,70,.08),tr
 .team-content:has(.analytics-tool-grid) .small-action:hover{border-color:#7b9d61;color:#dff4cc}
 @media(max-width:1000px){.analytics-tool-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:620px){.analytics-tool-grid{grid-template-columns:1fr}.analytics-tool{min-height:155px}.team-content:has(.analytics-tool-grid) .preview-panel,.team-content:has(.analytics-tool-grid) .code-workspace,.team-content:has(.analytics-tool-grid) .panel:has(.bi-chart){padding:14px}}
+
+/* VYRON signature environment: living black-forest atmosphere */
+:root{--bg:#050807;--panel:rgba(10,16,14,.82);--line:rgba(183,205,181,.16);--accent:#d6b66d;--accent2:#f1d99a}
+html,body{background:#050807}
+body{position:relative;isolation:isolate;background-color:#050807;background-image:radial-gradient(ellipse at 78% 18%,rgba(89,119,78,.20),transparent 35%),radial-gradient(ellipse at 12% 82%,rgba(30,76,54,.18),transparent 38%),linear-gradient(115deg,#030605 0%,#09110d 48%,#050807 100%);background-attachment:fixed}
+body:before{content:"";position:fixed;inset:0;z-index:-2;pointer-events:none;opacity:.62;background-image:radial-gradient(ellipse at 50% 100%,transparent 25%,rgba(0,0,0,.78) 100%),linear-gradient(180deg,rgba(2,6,4,.12),rgba(1,4,3,.82)),repeating-linear-gradient(82deg,transparent 0 8%,rgba(20,44,29,.10) 8.2% 8.5%,transparent 8.8% 16%),radial-gradient(ellipse at 18% 80%,rgba(26,62,39,.48),transparent 30%),radial-gradient(ellipse at 82% 75%,rgba(36,72,43,.40),transparent 32%);background-size:auto,auto,100% 100%,auto,auto;animation:vyronForestBreath 18s ease-in-out infinite alternate}
+body:after{content:"";position:fixed;inset:-25%;z-index:-1;pointer-events:none;opacity:.28;background:linear-gradient(112deg,transparent 35%,rgba(193,168,112,.07) 48%,transparent 58%),radial-gradient(ellipse at 50% 42%,rgba(114,148,99,.13),transparent 48%);transform:translateX(-8%);animation:vyronMoonlight 24s ease-in-out infinite alternate}
+@keyframes vyronForestBreath{from{filter:brightness(.78);transform:scale(1)}to{filter:brightness(1.12);transform:scale(1.025)}}
+@keyframes vyronMoonlight{from{transform:translate3d(-3%,0,0) rotate(-2deg);opacity:.16}to{transform:translate3d(3%,1%,0) rotate(2deg);opacity:.34}}
+.brand{letter-spacing:1.8px;text-shadow:0 2px 22px rgba(214,182,109,.16)}
+.brand span:last-child{background:linear-gradient(100deg,#f2e7c8 0%,#c8a65d 45%,#fff2d1 72%,#ad8a49 100%);background-clip:text;-webkit-background-clip:text;color:transparent}
+.brand-mark{font-size:0!important;border:1px solid rgba(214,182,109,.62)!important;border-radius:11px!important;background:linear-gradient(145deg,rgba(214,182,109,.15),rgba(4,8,6,.9));box-shadow:inset 0 0 18px rgba(214,182,109,.10),0 0 22px rgba(214,182,109,.10);position:relative;overflow:hidden}
+.brand-mark:before{content:"";position:absolute;inset:5px;background-repeat:no-repeat;background-position:center;background-size:contain;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64' fill='none' stroke='%23e4c77f' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 22 6 9l17 7 9-5 9 5 17-7-6 13 3 15-9 13-14 6-14-6-9-13z'/%3E%3Cpath d='m19 25 8 4-3 8-8-4m29-8-8 4 3 8 8-4M25 43l7 5 7-5M25 19l7 4 7-4M32 23v20'/%3E%3Ccircle cx='23' cy='32' r='1.7' fill='%23e4c77f'/%3E%3Ccircle cx='41' cy='32' r='1.7' fill='%23e4c77f'/%3E%3C/svg%3E")}
+.workspace-shell,.team-shell{background:transparent!important}
+.workspace-top,.team-header{background:rgba(4,9,7,.48);backdrop-filter:blur(16px)}
+.auth-card,.workspace-card,.org-row,.panel,.team-stats article,.team-sidebar{background:linear-gradient(145deg,rgba(14,22,17,.88),rgba(5,10,8,.88))!important;backdrop-filter:blur(14px);border-color:rgba(192,177,132,.18)!important}
+.workspace-card strong,.workspace-content h1 em,.team-heading h1 em{color:#dfc17b!important}
+.primary-action,.submit{background:linear-gradient(110deg,#c2a15a,#ead59b)!important;color:#151209!important}
+.primary-action:hover,.submit:hover{background:linear-gradient(110deg,#e4ca8a,#fff0c4)!important}
+.status-dot,.eyebrow span,.online-dot{background:#d6b66d!important;box-shadow:0 0 12px rgba(214,182,109,.75)!important}
+@media(prefers-reduced-motion:reduce){body:before,body:after{animation:none!important}}
