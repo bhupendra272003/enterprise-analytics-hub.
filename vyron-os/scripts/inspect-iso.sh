@@ -9,8 +9,11 @@ echo "File: $ISO"
 echo "Size bytes: $size"
 sha256sum "$ISO"
 if command -v xorriso >/dev/null 2>&1; then
- echo "Inspecting ISO filesystem:"
+ echo "Inspecting boot metadata:"
  xorriso -indev "$ISO" -report_el_torito as_mkisofs 2>&1 | sed -n '1,100p'
+ echo "Checking key Ubuntu installer/live files (listing only):"
+ xorriso -indev "$ISO" -ls /casper 2>&1 | sed -n '1,80p' || true
+ xorriso -indev "$ISO" -ls /EFI 2>&1 | sed -n '1,40p' || true
 else echo "WARN: xorriso unavailable; skipping El Torito inspection"; fi
 if command -v qemu-system-x86_64 >/dev/null 2>&1; then
  echo "QEMU found. Manual boot test command:"
