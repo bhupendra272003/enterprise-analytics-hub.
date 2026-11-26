@@ -10,6 +10,7 @@ cp "$ROOT/config/packages.list" "$BUILD_DIR/config/package-lists/vyron.list"
 cp "$ROOT/config/hooks/live/"*.hook.chroot "$BUILD_DIR/config/hooks/live/"
 chmod +x "$BUILD_DIR/config/hooks/live/"*.hook.chroot
 cp "$ROOT/desktop/branding/lion-mark.svg" "$BUILD_DIR/config/includes.chroot/usr/share/vyron-os/branding/lion-mark.svg"
+cp "$ROOT/desktop/branding/wallpaper.svg" "$BUILD_DIR/config/includes.chroot/usr/share/vyron-os/branding/wallpaper.svg"
 cd "$BUILD_DIR"
 lb config \
   --distribution noble \
