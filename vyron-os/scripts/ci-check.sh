@@ -17,4 +17,13 @@ for f in (root/'desktop/branding/lion-mark.svg',root/'desktop/branding/wallpaper
  print('SVG parsed:',f.name)
 PY
 fi
-echo "CI structural checks passed (not an ISO build/boot test)."
+
+# Advisory package availability audit using runner repository metadata.
+echo "Package availability audit (advisory):"
+missing=0
+while IFS= read -r pkg; do
+ [[ -z "$pkg" || "$pkg" =~ ^# ]] && continue
+ if apt-cache show "$pkg" >/dev/null 2>&1; then echo "FOUND: $pkg"; else echo "MISSING/UNKNOWN: $pkg"; missing=$((missing+1)); fi
+done < "$ROOT/config/packages.list"
+echo "Packages missing/unknown in runner cache: $missing"
+echo "CI structural checks passed (not an ISO build or boot test)."
