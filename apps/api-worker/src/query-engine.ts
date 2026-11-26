@@ -1,6 +1,6 @@
 export type QueryRow = Record<string, string | number | null>;
 export function extractJoinDatasetToken(sql:string):string|null { return sql.match(/\bJOIN\s+dataset_([a-f0-9]{32})\b/i)?.[1]?.toLowerCase()||null; }
-type Condition = { column: string; operator: string; value?: string | number };
+type Condition = { column: string; operator: string; value?: string | number; valueType?: "STRING" | "NUMBER" };
 const cleanIdentifier = (value: string) => value.replace(/^[`"\[]|[`"\]]$/g, "");
 function maskQuotedLiterals(sql:string){let out="",quote="",i=0;while(i<sql.length){const ch=sql[i];if(quote){out+=" ";if(ch===quote){if(sql[i+1]===quote){out+=" ";i+=2;continue;}quote="";}i++;continue;}if(ch==="'"||ch==='"'){quote=ch;out+=" ";i++;continue;}out+=ch;i++;}return out;}
 function stripSqlComments(sql:string){let out="",quote="",i=0;while(i<sql.length){const ch=sql[i];if(quote){out+=ch;if(ch===quote){if(sql[i+1]===quote){out+=sql[i+1];i+=2;continue;}quote="";}i++;continue;}if(ch==="'"||ch==='"'){quote=ch;out+=ch;i++;continue;}if(ch==="-"&&sql[i+1]==="-"){while(i<sql.length&&sql[i]!=="\n"&&sql[i]!=="\r")i++;continue;}if(ch==="/"&&sql[i+1]==="*"){const end=sql.indexOf("*/",i+2);if(end===-1)throw new Error("Unterminated SQL block comment.");i=end+2;out+=" ";continue;}out+=ch;i++;}return out;}
@@ -33,7 +33,7 @@ function parseCondition(source: string, columns: string[]): Condition {
   const column = cleanIdentifier(match[1].trim());
   if (!columns.includes(column)) throw new Error("Unknown column: " + column);
   const value = match[3] !== undefined ? match[3].replace(/''/g, "'") : match[4] !== undefined ? match[4].slice(1,-1).replace(/""/g,'"') : Number(match[5]);
-  return { column, operator: match[2].toUpperCase(), value };
+  return { column, operator: match[2].toUpperCase(), value, valueType: match[3] !== undefined || match[4] !== undefined ? "STRING" : "NUMBER" };
 }
 function compareCondition(row: QueryRow, condition: Condition): boolean {
   const raw = row[condition.column];
@@ -42,7 +42,7 @@ function compareCondition(row: QueryRow, condition: Condition): boolean {
   const left = raw === null || raw === undefined ? "" : raw;
   const right = condition.value ?? "";
   const ln = Number(left), rn = Number(right);
-  const numeric = String(left).trim() !== "" && String(right).trim() !== "" && Number.isFinite(ln) && Number.isFinite(rn);
+  const numeric = condition.valueType === "NUMBER" && String(left).trim() !== "" && String(right).trim() !== "" && Number.isFinite(ln) && Number.isFinite(rn);
   const a: string | number = numeric ? ln : String(left).toLowerCase();
   const b: string | number = numeric ? rn : String(right).toLowerCase();
   switch (condition.operator) {
