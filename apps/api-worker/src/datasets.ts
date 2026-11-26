@@ -161,13 +161,16 @@ if(sub==="edits"&&req.method==="POST"){
   let edited;try{edited=applyDatasetCellEdits(parsed.records,parsed.columns,body.changes);}catch(e){return json({error:e instanceof Error?e.message:"Cell edits are invalid."},400);}
   const output=csvEncode(edited.rows,parsed.columns),bytes=new TextEncoder().encode(output);
   if(bytes.byteLength>MAX_SYNC_CSV_BYTES)return syncLimitError();
-  const latest=await env.DB.prepare("SELECT COALESCE(MAX(version_number),0) AS v FROM dataset_versions WHERE dataset_id=?").bind(datasetId).first<{v:number}>(),version=Number(latest?.v||0)+1,key=dataset.organization_id+"/"+datasetId+"/v"+version+"-edited-"+crypto.randomUUID()+".csv";
+  const key=dataset.organization_id+"/"+datasetId+"/edited-"+crypto.randomUUID()+".csv";
   const preview=edited.rows.slice(0,10).map(row=>Object.fromEntries(parsed.columns.map(column=>[column,String(row[column]??"").slice(0,500)])));
   await env.DATASETS.put(key,bytes);
   try{await env.DB.batch([
-   env.DB.prepare("INSERT INTO dataset_versions (id,dataset_id,version_number,storage_path,file_size,row_count,column_count,columns_json,preview_json,uploaded_by,change_note) VALUES (?,?,?,?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(),datasetId,version,key,bytes.length,edited.rows.length,parsed.columns.length,JSON.stringify(parsed.columns),JSON.stringify(preview),user.id,(typeof body.changeNote==="string"?body.changeNote:"Spreadsheet cell edits").slice(0,500)),
+   env.DB.prepare("INSERT INTO dataset_versions (id,dataset_id,version_number,storage_path,file_size,row_count,column_count,columns_json,preview_json,uploaded_by,change_note) SELECT ?,?,COALESCE(MAX(version_number),0)+1,?,?,?,?,?,?,?,?,? FROM dataset_versions WHERE dataset_id=?").bind(crypto.randomUUID(),datasetId,key,bytes.length,edited.rows.length,parsed.columns.length,JSON.stringify(parsed.columns),JSON.stringify(preview),user.id,(typeof body.changeNote==="string"?body.changeNote:"Spreadsheet cell edits").slice(0,500),datasetId),
    env.DB.prepare("UPDATE datasets SET storage_path=?,file_size=?,row_count=?,column_count=?,columns_json=?,preview_json=?,uploaded_by=? WHERE id=?").bind(key,bytes.length,edited.rows.length,parsed.columns.length,JSON.stringify(parsed.columns),JSON.stringify(preview),user.id,datasetId)
   ]);}catch{await env.DATASETS.delete(key);return json({error:"Edited dataset version could not be saved."},500);}
+  const savedVersion=await env.DB.prepare("SELECT version_number AS versionNumber FROM dataset_versions WHERE dataset_id=? AND storage_path=?").bind(datasetId,key).first<{versionNumber:number}>();
+  if(!savedVersion)return json({error:"Edited dataset version was saved but its version number could not be read."},500);
+  const version=Number(savedVersion.versionNumber);
   await audit(env,dataset.organization_id,user.id,"DATASET_CELLS_EDITED",datasetId,{versionNumber:version,editedCells:edited.applied});
   return json({version:{versionNumber:version,rowCount:edited.rows.length,columnCount:parsed.columns.length,columns:parsed.columns,preview},editedCells:edited.applied},201);
 }
