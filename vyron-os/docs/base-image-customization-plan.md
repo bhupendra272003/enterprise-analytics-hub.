@@ -5,16 +5,23 @@ VyronOS will customize a supported Ubuntu 24.04 Desktop live ISO as its base ins
 
 Ubuntu's documentation identifies `livecd-rootfs` as its image creation machinery and recommends customization of existing installer images using LiveFS Editor for many use cases. The canonical Ubuntu CD image pipeline is more complex than invoking generic `lb config`.
 
-## Practical workflow (planned)
+## Practical workflow
+
+A guarded wrapper now exists at `scripts/customize-base-iso.sh`. It requires a source ISO, destination path and reviewed LiveFS Editor YAML action file; checks source/destination separation, tools and free disk space; prints the source hash; and requires an explicit typed confirmation before running. It is a wrapper, not yet a verified end-to-end pipeline.
 1. Download a verified Ubuntu 24.04 Desktop ISO from an official source; verify its checksum/signature.
 2. Run customization on a dedicated Ubuntu 24.04 VM/host with ample disk space (recommend 100 GB+ for ISO customization workflows).
-3. Use LiveFS Editor or a documented compatible workflow to add packages, hooks, branding and defaults.
+3. Prepare and review a LiveFS Editor action YAML; use the guarded wrapper. The precise desktop squashfs targets and branding action sequence still require test validation.
 4. Keep installer, casper, kernel and initramfs components intact unless an explicit validated change requires rebuilding them.
 5. Generate image, checksum, inspect files, and VM-test both BIOS/UEFI where supported, plus installer and live session.
 6. Never use this pipeline on the host's system image or production disk; build in an isolated workspace.
 
 ## Package sourcing
 The current packages manifest remains a desired package set, not yet a dependency-resolved install list. Vendor-specific software must be packaged separately. We should not assume MySQL Workbench, Python Jupyter packages, or all XFCE extras resolve identically on Noble without testing.
+
+## Current implementation status
+- `scripts/customize-base-iso.sh`: added as a guarded wrapper; not yet executed on an Ubuntu builder.
+- No validated action YAML for the Desktop image has been committed yet, because target squashfs/layer naming must be confirmed against a real base ISO.
+- ISO creation and boot/install validation remain outstanding.
 
 ## Prototype status
 This is a design decision and safety checklist. No base ISO has been downloaded, modified, or generated in this repository workflow, and no VM test has occurred.
