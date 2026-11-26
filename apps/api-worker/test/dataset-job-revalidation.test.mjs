@@ -31,3 +31,13 @@ test("profiling job failure transition cannot overwrite a cancellation", () => {
   const profileBody = source.slice(profileStart);
   assert.match(profileBody, /WHERE id=\? AND status='RUNNING'/);
 });
+
+
+test("SQL job failure transition is guarded against cancellation", () => {
+  const sqlStart = source.indexOf("async function runSqlJob");
+  const profileStart = source.indexOf("async function runProfile");
+  const sqlBody = source.slice(sqlStart, profileStart);
+  const catchBody = sqlBody.slice(sqlBody.lastIndexOf("}catch(e){"));
+  assert.match(catchBody, /WHERE id=\? AND status='RUNNING'/);
+  assert.doesNotMatch(catchBody, /status='RUNNING' AND status='RUNNING'/);
+});
