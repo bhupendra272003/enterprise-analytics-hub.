@@ -22,3 +22,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libxml2-utils
       - name: Run VyronOS checks
         run: bash vyron-os/scripts/ci-check.sh
+      - name: Resolve manifest against Ubuntu 24.04 repositories (simulation only)
+        run: |
+          sudo apt-get update
+          bash vyron-os/scripts/resolve-packages.sh
