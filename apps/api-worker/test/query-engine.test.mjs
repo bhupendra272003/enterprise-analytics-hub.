@@ -241,3 +241,6 @@ test("allows reserved SQL keywords and semicolons inside quoted literals", () =>
   assert.deepEqual(runDatasetQuery("SELECT id FROM data WHERE region = 'UNION; DROP'", sample, columns).rows, [{ id: "1" }]);
   assert.deepEqual(runDatasetQuery("SELECT id FROM data WHERE region = 'UNION'", [{id:"1",region:"UNION",sales:"1"}], columns).rows, [{ id: "1" }]);
 });
+
+
+test("allows SQL keywords and semicolons inside quoted literal values", () => {\n  const sample=[{id:"1",region:"UNION; DELETE",sales:"10"},{id:"2",region:"SELECT",sales:"20"}];\n  assert.deepEqual(runDatasetQuery("SELECT id FROM data WHERE region = 'UNION; DELETE'",sample,columns).rows,[{id:"1"}]);\n  assert.deepEqual(runDatasetQuery("SELECT id FROM data WHERE region = 'SELECT'",sample,columns).rows,[{id:"2"}]);\n});\n
