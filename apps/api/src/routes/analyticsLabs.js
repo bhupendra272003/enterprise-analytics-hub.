@@ -30,7 +30,7 @@ router.post('/organizations/:orgId/labs',async(req,res,next)=>{
   if(!m.length||m[0].role!=='OWNER')return res.status(403).json({error:'Only the organization Owner may request lab provisioning.'});
   const input=z.object({name:z.string().trim().min(2).max(160),template:z.enum(templates),projectId:z.string().uuid().optional(),taskId:z.string().uuid().optional()}).parse(req.body);
   if(input.projectId){const [p]=await pool.execute('SELECT id FROM projects WHERE id=? AND organization_id=? LIMIT 1',[input.projectId,req.params.orgId]);if(!p.length)return res.status(400).json({error:'Project must belong to this organization.'});}
-  if(input.taskId){const [t]=await pool.execute('SELECT t.id FROM tasks t JOIN projects p ON p.id=t.project_id WHERE t.id=? AND p.organization_id=? LIMIT 1',[input.taskId,req.params.orgId]);if(!t.length)return res.status(400).json({error:'Task must belong to this organization.'});}
+  if(input.taskId){const [t]=await pool.execute('SELECT t.id,t.project_id FROM tasks t JOIN projects p ON p.id=t.project_id WHERE t.id=? AND p.organization_id=? LIMIT 1',[input.taskId,req.params.orgId]);if(!t.length)return res.status(400).json({error:'Task must belong to this organization.'});if(input.projectId&&t[0].project_id!==input.projectId)return res.status(400).json({error:'Task must belong to the selected project.'});}
   const [quota]=await pool.execute("SELECT COUNT(*) AS n FROM analytics_labs WHERE organization_id=? AND status IN ('REQUESTED','PROVISIONING','RUNNING')",[req.params.orgId]);
   if(Number(quota[0].n)>=3)return res.status(409).json({error:'Organization lab request limit reached (3 active or pending labs).'});
   const id=randomUUID();
