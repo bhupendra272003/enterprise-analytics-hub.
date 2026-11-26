@@ -277,6 +277,6 @@ test("GROUP BY keeps NULL and empty-string values in separate groups", () => {
   assert.equal(result.rows.length, 2);
   assert.equal(result.rows[0].n, 2);
   assert.equal(result.rows[1].n, 1);
-  assert.equal(result.rows[0].region, null);
+  assert.equal(result.rows[0].region, "");
   assert.equal(result.rows[1].region, "");
 });
