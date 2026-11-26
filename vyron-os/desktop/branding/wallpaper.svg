@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+<defs>
+ <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#12151b"/><stop offset="1" stop-color="#030406"/></linearGradient>
+ <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f1d58a"/><stop offset="1" stop-color="#9a7130"/></linearGradient>
+ <radialGradient id="glow"><stop stop-color="#b98b3b" stop-opacity=".16"/><stop offset="1" stop-color="#b98b3b" stop-opacity="0"/></radialGradient>
+</defs>
+<rect width="1920" height="1080" fill="url(#bg)"/><circle cx="1460" cy="390" r="600" fill="url(#glow)"/>
+<path d="M0 790 L180 760 300 700 460 740 620 690 780 735 940 680 1110 730 1300 670 1470 720 1630 660 1790 715 1920 680 V1080 H0Z" fill="#090b0f"/>
+<g fill="#11151b" stroke="#9a7130" stroke-opacity=".22" stroke-width="3">
+<path d="M1160 780V490h90V410h110V330h180v80h100v370Z"/><path d="M1180 490h60v-65h100v-65h140v65h80v120h-380Z"/>
+<path d="M1290 780V540h80V470h100v70h80v240Z"/>
+</g>
+<g fill="none" stroke="url(#gold)" stroke-opacity=".42" stroke-width="4"><path d="M1260 780V500h70V420h120V350h160v70h90v290"/><path d="M1370 780V570q0-120 110-120t110 120v210"/></g>
+<g transform="translate(800 390)" fill="none" stroke="url(#gold)" stroke-width="5" stroke-opacity=".82">
+<path d="M0 220 C-85 150 -115 45 -55 -35 C-20 -80 40 -80 85 -45 C130 -15 155 35 150 95 C145 155 105 205 60 230 L80 275 L30 265 L0 300 L-35 265 L-85 275 L-65 230Z"/>
+<path d="M-70 45 L-105 5 -75 -25 -45 15 M85 45 L120 5 95 -25 65 15"/>
+<path d="M-45 85 L-10 105 25 85 M-25 155 L0 175 25 155"/>
+<circle cx="-15" cy="70" r="8" fill="#d8b46b"/><circle cx="45" cy="70" r="8" fill="#d8b46b"/>
+<path d="M-10 195 Q15 215 40 195"/>
+</g>
+<text x="960" y="820" fill="#e2c27c" font-family="serif" font-size="58" text-anchor="middle" letter-spacing="8">BHUPENDRA VYRONOS</text>
+<text x="960" y="880" fill="#aaa6a0" font-family="sans-serif" font-size="22" text-anchor="middle" letter-spacing="7">ANALYTICS WORKSTATION</text>
+<path d="M720 920H1200" stroke="#a98242" stroke-opacity=".4"/>
+<text x="960" y="965" fill="#80776b" font-family="sans-serif" font-size="20" text-anchor="middle">BHUPENDRA'S WORKSTATION</text>
+</svg>
