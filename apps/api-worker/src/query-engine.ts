@@ -110,8 +110,9 @@ function aggregateValue(fn: string, column: string, rows: QueryRow[], distinct=f
 export function runDatasetQuery(sql: string, sourceRows: QueryRow[], sourceColumns: string[]) {
   if (typeof sql !== "string" || !sql.trim() || sql.length > 12000) throw new Error("Enter a SQL query up to 12,000 characters.");
   const statement = stripSqlComments(sql).trim().replace(/;\s*$/, "").trim();
-  if (statement.includes(";") || !/^SELECT\b/i.test(statement)) throw new Error("Only one read-only SELECT statement is allowed.");
-  if (/\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|REPLACE|ATTACH|DETACH|PRAGMA|VACUUM|INTO|UNION|WITH|RECURSIVE)\b/i.test(statement)) throw new Error("This SQL Studio supports read-only SELECT queries only.");
+  const masked=maskQuotedLiterals(statement);
+  if (masked.includes(";") || !/^SELECT\b/i.test(masked)) throw new Error("Only one read-only SELECT statement is allowed.");
+  if (/\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|REPLACE|ATTACH|DETACH|PRAGMA|VACUUM|INTO|UNION|WITH|RECURSIVE)\b/i.test(masked)) throw new Error("This SQL Studio supports read-only SELECT queries only.");
   const match = statement.match(/^SELECT\s+([\s\S]+?)\s+FROM\s+([\w-]+)(?:\s+WHERE\s+([\s\S]+?))?(?:\s+GROUP\s+BY\s+([\w."`\[\]-]+(?:\s*,\s*[\w."`\[\]-]+)*))?(?:\s+HAVING\s+([\s\S]+?))?(?:\s+ORDER\s+BY\s+([\w."`\[\]-]+)(?:\s+(ASC|DESC))?)?(?:\s+LIMIT\s+(\d+))?$/i);
   if (!match) throw new Error("Use SELECT columns FROM data with optional WHERE, GROUP BY, HAVING, ORDER BY and LIMIT clauses.");
   if (!["data","dataset","records"].includes(match[2].toLowerCase())) throw new Error("FROM must reference the selected dataset as data.");
@@ -188,7 +189,7 @@ export function runDatasetQuery(sql: string, sourceRows: QueryRow[], sourceColum
 export function runDatasetJoinQuery(sql:string,leftRows:QueryRow[],leftColumns:string[],rightRows:QueryRow[],rightColumns:string[]){
  if(typeof sql!=="string"||!sql.trim()||sql.length>12000)throw new Error("Enter a SQL query up to 12,000 characters.");
  const statement=stripSqlComments(sql).trim().replace(/;\s*$/,"").trim();
- if(statement.includes(";")||!/^SELECT\b/i.test(statement)||/\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|REPLACE|ATTACH|DETACH|PRAGMA|VACUUM|INTO|UNION|WITH|RECURSIVE)\b/i.test(statement))throw new Error("Only one read-only SELECT statement is allowed.");
+ const masked=maskQuotedLiterals(statement);if(masked.includes(";")||!/^SELECT\b/i.test(masked)||/\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|REPLACE|ATTACH|DETACH|PRAGMA|VACUUM|INTO|UNION|WITH|RECURSIVE)\b/i.test(masked))throw new Error("Only one read-only SELECT statement is allowed.");
  const match=statement.match(/^SELECT\s+([\s\S]+?)\s+FROM\s+data\s+(?:AS\s+)?([a-zA-Z_]\w*)\s+(INNER|LEFT)\s+JOIN\s+dataset_([a-f0-9]{32})\s+(?:AS\s+)?([a-zA-Z_]\w*)\s+ON\s+([a-zA-Z_]\w*)\.([\w-]+)\s*=\s*([a-zA-Z_]\w*)\.([\w-]+)(?:\s+ORDER\s+BY\s+([a-zA-Z_]\w*\.[\w-]+)(?:\s+(ASC|DESC))?)?(?:\s+LIMIT\s+(\d+))?$/i);
  if(!match)throw new Error("JOIN syntax: SELECT c.name, o.amount FROM data c INNER JOIN dataset_<32-character-id> o ON c.id = o.customer_id LIMIT 100.");
  const [,projection,leftAlias,joinType,token,rightAlias,onAliasA,onColumnA,onAliasB,onColumnB,orderRef,orderDirection,limitRaw]=match;
