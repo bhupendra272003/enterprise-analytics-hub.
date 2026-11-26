@@ -6,7 +6,11 @@ export async function GET(request: Request, context: { params: Promise<{ path: s
 export async function POST(request: Request, context: { params: Promise<{ path: string[] }> }) {
   return proxy(request, context);
 }
-export async function DELETE(request: Request, context: { params: Promise<{ path: string[] }> }) {\n  return proxy(request, context);\n}\n\nexport async function PATCH(request: Request, context: { params: Promise<{ path: string[] }> }) {
+export async function DELETE(request: Request, context: { params: Promise<{ path: string[] }> }) {
+  return proxy(request, context);
+}
+
+export async function PATCH(request: Request, context: { params: Promise<{ path: string[] }> }) {
   return proxy(request, context);
 }
 export async function OPTIONS(request: Request, context: { params: Promise<{ path: string[] }> }) {
