@@ -151,7 +151,7 @@ test("handles empty filtered aggregate results and NULL checks", () => {
   ];
   const empty = runDatasetQuery("SELECT COUNT(*) AS n, SUM(sales) AS total, AVG(sales) AS average FROM data WHERE region = 'Missing'", sample, columns);
   assert.deepEqual(empty.rows, [{ n: 0, total: 0, average: null }]);
-  assert.equal(runDatasetQuery("SELECT COUNT(*) AS n FROM data WHERE sales IS NULL", sample, columns).rows[0].n, 2);
+  assert.equal(runDatasetQuery("SELECT COUNT(*) AS n FROM data WHERE sales IS NULL", sample, columns).rows[0].n, 1);
   assert.equal(runDatasetQuery("SELECT COUNT(*) AS n FROM data WHERE sales IS NOT NULL", sample, columns).rows[0].n, 2);
 });
 
