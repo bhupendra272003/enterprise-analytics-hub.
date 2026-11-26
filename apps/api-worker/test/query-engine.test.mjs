@@ -257,6 +257,13 @@ test("JOIN treats whitespace-only keys as blank and never matches them", () => {
 });
 
 
+test("HAVING compares numeric aggregate values numerically", () => {
+  const sample = Array.from({length: 12}, (_, i) => ({id:String(i+1),region:"North",sales:String(i+1)}));
+  sample.push({id:"13",region:"South",sales:"1"});
+  const result = runDatasetQuery("SELECT region, COUNT(*) AS n FROM data GROUP BY region HAVING n >= 2 ORDER BY n DESC", sample, columns);
+  assert.deepEqual(result.rows, [{region:"North",n:12}]);
+});
+
 test("quoted numeric SQL literals compare as strings and preserve leading zero identifiers", () => {
   const sample = [{ id: "001", region: "A", sales: "10" }, { id: "1", region: "B", sales: "20" }];
   assert.deepEqual(runDatasetQuery("SELECT id FROM data WHERE id = '001'", sample, columns).rows, [{id:"001"}]);
