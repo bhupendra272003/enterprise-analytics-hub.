@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Idempotently establish VyronOS coarse-grained local groups and shared directory.
+set -euo pipefail
+
+for group in vyron-users vyron-owner vyron-manager vyron-leader vyron-analyst vyron-data vyron-audit; do
+  if ! getent group "$group" >/dev/null; then
+    groupadd --system "$group"
+  fi
+done
+
+install -d -o root -g vyron-data -m 2770 /srv/vyron/shared
+install -d -o root -g vyron-audit -m 0750 /var/log/vyron
+install -d -o root -g vyron-users -m 0750 /etc/vyron
+
+# No user accounts or passwords are created in the image.
+# Role membership is assigned per person during installation/admin provisioning.
+# These groups alone do not enforce application authorization.
+echo "VyronOS local groups and protected directories prepared."
