@@ -288,3 +288,10 @@ test("COUNT(column) counts blank strings but excludes SQL NULL", () => {
   const sample = [{id:"1",region:"",sales:"10"},{id:"2",region:null,sales:"20"},{id:"3",region:"North",sales:"30"}];
   assert.equal(runDatasetQuery("SELECT COUNT(region) AS n FROM data", sample, columns).rows[0].n, 2);
 });
+
+
+test("COUNT DISTINCT excludes NULL while preserving blank-string values", () => {
+  const sample = [{region:"North"},{region:"North"},{region:""},{region:null},{region:"South"}];
+  const result = runDatasetQuery("SELECT COUNT(DISTINCT region) AS unique_regions FROM data", sample, columns);
+  assert.equal(result.rows[0].unique_regions, 3);
+});
