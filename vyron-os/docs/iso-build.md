@@ -15,3 +15,6 @@ Use a dedicated Ubuntu 24.04 machine or VM with sufficient disk space and RAM. T
 - The current configuration does not yet fully install desktop branding, custom login manager artwork, portal services, role-enforcement controls, or app-specific security rules in the image.
 - ISO build dependencies and package availability must be checked on the target host; build may fail and require revisions.
 - Test in VirtualBox/QEMU before installing to hardware. Do not install an untested image on your main computer.
+
+## Automated checks
+The branch includes a GitHub Actions structural-validation workflow. It checks shell syntax, hooks, SVG parsing, preflight structure, and emits an advisory package availability audit against the runner's apt metadata. This audit is informational; it is not a full Noble live-build test or a boot test.
