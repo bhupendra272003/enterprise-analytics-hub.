@@ -5,8 +5,11 @@ BUILD_DIR="${VYRON_BUILD_DIR:-$ROOT/build}"
 if [[ "${EUID}" -eq 0 ]]; then echo "Run build as a normal user, not root; lb handles privileged steps." >&2; exit 1; fi
 if ! command -v lb >/dev/null 2>&1; then echo "live-build missing. Run scripts/prepare-host.sh first." >&2; exit 1; fi
 if [[ -e "$BUILD_DIR" ]]; then echo "Build directory already exists: $BUILD_DIR" >&2; echo "Remove it manually or set VYRON_BUILD_DIR to another path." >&2; exit 1; fi
-mkdir -p "$BUILD_DIR/config/package-lists"
+mkdir -p "$BUILD_DIR/config/package-lists" "$BUILD_DIR/config/hooks/live" "$BUILD_DIR/config/includes.chroot/usr/share/vyron-os/branding"
 cp "$ROOT/config/packages.list" "$BUILD_DIR/config/package-lists/vyron.list"
+cp "$ROOT/config/hooks/live/"*.hook.chroot "$BUILD_DIR/config/hooks/live/"
+chmod +x "$BUILD_DIR/config/hooks/live/"*.hook.chroot
+cp "$ROOT/desktop/branding/lion-mark.svg" "$BUILD_DIR/config/includes.chroot/usr/share/vyron-os/branding/lion-mark.svg"
 cd "$BUILD_DIR"
 lb config \
   --distribution noble \
