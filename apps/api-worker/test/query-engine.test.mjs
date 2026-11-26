@@ -269,3 +269,14 @@ test("quoted numeric SQL literals compare as strings and preserve leading zero i
   assert.deepEqual(runDatasetQuery("SELECT id FROM data WHERE id = '001'", sample, columns).rows, [{id:"001"}]);
   assert.deepEqual(runDatasetQuery("SELECT id FROM data WHERE id = 1", sample, columns).rows, [{id:"001"},{id:"1"}]);
 });
+
+
+test("GROUP BY keeps NULL and empty-string values in separate groups", () => {
+  const sample = [{id:"1",region:null,sales:"10"},{id:"2",region:"",sales:"20"},{id:"3",region:null,sales:"30"}];
+  const result = runDatasetQuery("SELECT region, COUNT(*) AS n FROM data GROUP BY region ORDER BY n DESC", sample, columns);
+  assert.equal(result.rows.length, 2);
+  assert.equal(result.rows[0].n, 2);
+  assert.equal(result.rows[1].n, 1);
+  assert.equal(result.rows[0].region, null);
+  assert.equal(result.rows[1].region, "");
+});
