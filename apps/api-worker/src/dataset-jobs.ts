@@ -85,10 +85,17 @@ export async function handleDatasetJobs(req:Request,env:Env,path:string):Promise
  }
  return json({error:"Method not allowed."},405);
 }
+async function revalidateJobAccess(env:Env,job:any,joinDatasetId?:string){
+ const membership=await env.DB.prepare("SELECT role FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE'").bind(job.organization_id,job.requested_by).first<{role:Role}>();
+ if(!membership||!canAnalyzeDataset(membership.role)||!await hasDatasetAccess(env,job.dataset_id,job.organization_id,job.requested_by,membership.role))throw new Error("JOB_ACCESS_REVOKED");
+ if(joinDatasetId&&!await hasDatasetAccess(env,joinDatasetId,job.organization_id,job.requested_by,membership.role))throw new Error("JOIN_ACCESS_REVOKED");
+ return membership.role;
+}
 async function runSqlJob(msg:Msg,env:Env){
  const job=await env.DB.prepare("SELECT * FROM dataset_jobs WHERE id=?").bind(msg.jobId).first<any>();if(!job||["COMPLETED","FAILED","CANCELLED"].includes(job.status))return;
  const claim=await env.DB.prepare("UPDATE dataset_jobs SET status='RUNNING',stage='LOADING_SOURCE',progress=10,attempt_count=attempt_count+1,started_at=COALESCE(started_at,CURRENT_TIMESTAMP),updated_at=CURRENT_TIMESTAMP WHERE id=? AND status IN ('QUEUED','RETRYING')").bind(job.id).run();if(!claim.meta.changes)return;
  try{
+  await revalidateJobAccess(env,job,JSON.parse(job.payload_json||"{}").joinDatasetId);
   const ds=await env.DB.prepare("SELECT name,storage_path,file_size FROM datasets WHERE id=? AND organization_id=?").bind(job.dataset_id,job.organization_id).first<any>();if(!ds)throw new Error("DATASET_NOT_FOUND");if(ds.file_size>10*1024*1024)throw new Error("DATASET_TOO_LARGE");
   const payload=JSON.parse(job.payload_json||"{}");if(typeof payload.sql!=="string"||payload.sql.length>12000)throw new Error("INVALID_SQL_PAYLOAD");
   const source=await env.DATASETS.get(ds.storage_path,"text");if(source===null)throw new Error("SOURCE_FILE_MISSING");
@@ -121,6 +128,7 @@ async function runProfile(msg:Msg,env:Env){
  const job=await env.DB.prepare("SELECT * FROM dataset_jobs WHERE id=?").bind(msg.jobId).first<any>();if(!job||["COMPLETED","FAILED","CANCELLED"].includes(job.status))return;
  const claim=await env.DB.prepare("UPDATE dataset_jobs SET status='RUNNING',stage='LOADING_SOURCE',progress=10,attempt_count=attempt_count+1,started_at=COALESCE(started_at,CURRENT_TIMESTAMP),updated_at=CURRENT_TIMESTAMP WHERE id=? AND status IN ('QUEUED','RETRYING')").bind(job.id).run();if(!claim.meta.changes)return;
  try{
+  await revalidateJobAccess(env,job);
   const ds=await env.DB.prepare("SELECT name,storage_path,file_size FROM datasets WHERE id=? AND organization_id=?").bind(job.dataset_id,job.organization_id).first<any>();if(!ds)throw new Error("DATASET_NOT_FOUND");if(ds.file_size>10*1024*1024)throw new Error("DATASET_TOO_LARGE");
   const source=await env.DATASETS.get(ds.storage_path,"text");if(source===null)throw new Error("SOURCE_FILE_MISSING");
   const {parse}=await import("csv-parse/sync");const rows=parse(source,{columns:true,skip_empty_lines:true,bom:true,trim:true,relax_column_count:false}) as Record<string,unknown>[];if(!rows.length)throw new Error("EMPTY_DATASET");
