@@ -85,4 +85,49 @@ router.get('/labs/:labId/events',async(req,res,next)=>{
  }catch(e){next(e);}
 });
 
+
+// Owner-only lab access controls. Grants are limited to active organization members.
+router.get('/labs/:labId/access',async(req,res,next)=>{
+ try{
+  const [labs]=await pool.execute('SELECT id,organization_id FROM analytics_labs WHERE id=? LIMIT 1',[req.params.labId]);
+  if(!labs.length)return res.status(404).json({error:'Lab not found.'});
+  const [m]=await pool.execute("SELECT role FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE' LIMIT 1",[labs[0].organization_id,req.user.id]);
+  if(!m.length||m[0].role!=='OWNER')return res.status(403).json({error:'Only the organization Owner can manage lab access.'});
+  const [rows]=await pool.execute("SELECT a.user_id AS userId,u.full_name AS fullName,u.email,a.access_level AS accessLevel,a.created_at AS grantedAt,a.revoked_at AS revokedAt FROM analytics_lab_access a JOIN users u ON u.id=a.user_id WHERE a.lab_id=? ORDER BY a.created_at DESC",[req.params.labId]);
+  res.json({access:rows});
+ }catch(e){next(e);}
+});
+router.post('/labs/:labId/access',async(req,res,next)=>{
+ try{
+  const input=z.object({userId:z.string().uuid(),accessLevel:z.enum(['ANALYST','READ_ONLY'])}).parse(req.body);
+  const [labs]=await pool.execute('SELECT id,organization_id FROM analytics_labs WHERE id=? LIMIT 1',[req.params.labId]);
+  if(!labs.length)return res.status(404).json({error:'Lab not found.'});
+  const lab=labs[0];
+  const [m]=await pool.execute("SELECT role FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE' LIMIT 1",[lab.organization_id,req.user.id]);
+  if(!m.length||m[0].role!=='OWNER')return res.status(403).json({error:'Only the organization Owner can grant lab access.'});
+  const [target]=await pool.execute("SELECT role FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE' LIMIT 1",[lab.organization_id,input.userId]);
+  if(!target.length)return res.status(400).json({error:'Target must be an active member of this organization.'});
+  if(!['ANALYST','LEADER'].includes(target[0].role))return res.status(400).json({error:'Access grants are limited to Analysts and Leaders.'});
+  await pool.execute("INSERT INTO analytics_lab_access (lab_id,user_id,access_level,granted_by,revoked_at) VALUES (?,?,?,?,NULL) ON DUPLICATE KEY UPDATE access_level=VALUES(access_level),granted_by=VALUES(granted_by),revoked_at=NULL",[lab.id,input.userId,input.accessLevel,req.user.id]);
+  await pool.execute("INSERT INTO analytics_lab_events (lab_id,organization_id,actor_user_id,event_type,details_json) VALUES (?,?,?,?,?)",[lab.id,lab.organization_id,req.user.id,'ACCESS_GRANTED',JSON.stringify({userId:input.userId,accessLevel:input.accessLevel})]);
+  await audit({orgId:lab.organization_id,actorId:req.user.id,action:'ANALYTICS_LAB_ACCESS_GRANTED',targetType:'ANALYTICS_LAB',targetId:lab.id,metadata:{userId:input.userId,accessLevel:input.accessLevel},ip:req.ip});
+  res.status(201).json({message:'Lab access granted.'});
+ }catch(e){next(e);}
+});
+router.delete('/labs/:labId/access/:userId',async(req,res,next)=>{
+ try{
+  const [labs]=await pool.execute('SELECT id,organization_id FROM analytics_labs WHERE id=? LIMIT 1',[req.params.labId]);
+  if(!labs.length)return res.status(404).json({error:'Lab not found.'});
+  const lab=labs[0];
+  const [m]=await pool.execute("SELECT role FROM memberships WHERE organization_id=? AND user_id=? AND membership_status='ACTIVE' LIMIT 1",[lab.organization_id,req.user.id]);
+  if(!m.length||m[0].role!=='OWNER')return res.status(403).json({error:'Only the organization Owner can revoke lab access.'});
+  const [grant]=await pool.execute('SELECT access_level FROM analytics_lab_access WHERE lab_id=? AND user_id=? AND revoked_at IS NULL LIMIT 1',[lab.id,req.params.userId]);
+  if(!grant.length)return res.status(404).json({error:'Active grant not found.'});
+  await pool.execute('UPDATE analytics_lab_access SET revoked_at=NOW() WHERE lab_id=? AND user_id=? AND revoked_at IS NULL',[lab.id,req.params.userId]);
+  await pool.execute("INSERT INTO analytics_lab_events (lab_id,organization_id,actor_user_id,event_type,details_json) VALUES (?,?,?,?,?)",[lab.id,lab.organization_id,req.user.id,'ACCESS_REVOKED',JSON.stringify({userId:req.params.userId})]);
+  await audit({orgId:lab.organization_id,actorId:req.user.id,action:'ANALYTICS_LAB_ACCESS_REVOKED',targetType:'ANALYTICS_LAB',targetId:lab.id,metadata:{userId:req.params.userId},ip:req.ip});
+  res.json({message:'Lab access revoked.'});
+ }catch(e){next(e);}
+});
+
 export default router;
