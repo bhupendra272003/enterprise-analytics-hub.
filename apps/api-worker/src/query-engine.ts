@@ -91,7 +91,7 @@ function parseHavingCondition(source: string, projections: ReturnType<typeof par
   return { column: projection.alias, operator: match[2], value, valueType: match[3] !== undefined || match[4] !== undefined ? "STRING" : "NUMBER" };
 }
 function aggregateValue(fn: string, column: string, rows: QueryRow[], distinct=false) {
-  let values = column === "*" ? rows.map(() => 1) : rows.map(row => row[column]).filter(v => v !== "" && v !== null && v !== undefined);
+  let values = column === "*" ? rows.map(() => 1) : rows.map(row => row[column]).filter(v => fn === "COUNT" ? v !== null && v !== undefined : v !== "" && v !== null && v !== undefined);
   if (distinct) values = [...new Map(values.map(value => [String(value), value])).values()];
   const nums = values.map(Number).filter(Number.isFinite);
   if (fn === "COUNT") return values.length;
