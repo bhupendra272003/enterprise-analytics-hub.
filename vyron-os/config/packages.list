@@ -7,6 +7,7 @@ lightdm-gtk-greeter
 network-manager
 network-manager-gnome
 firefox
+mpv
 libreoffice
 libreoffice-calc
 libreoffice-writer
