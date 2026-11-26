@@ -116,6 +116,8 @@ export function runDatasetQuery(sql: string, sourceRows: QueryRow[], sourceColum
   if (!["data","dataset","records"].includes(match[2].toLowerCase())) throw new Error("FROM must reference the selected dataset as data.");
   const selectClause=match[1].trim(),distinct=/^DISTINCT\b/i.test(selectClause);
   const projections = parseProjection(distinct?selectClause.replace(/^DISTINCT\s+/i,""):selectClause, sourceColumns);
+  const outputAliases=projections.filter(p=>p.kind!=="all").map(p=>p.alias.toLowerCase());
+  if(new Set(outputAliases).size!==outputAliases.length)throw new Error("SELECT output aliases must be unique (case-insensitive).");
   if(distinct&&projections.some(p=>p.kind==="aggregate"))throw new Error("DISTINCT aggregate expressions are not supported; use a grouped query.");
   const where = match[3] ? splitLogical(match[3],"OR").map(group=>splitLogical(group,"AND").map(v=>parseCondition(v, sourceColumns))) : [];
   const groupColumns = match[4] ? match[4].split(",").map(v=>cleanIdentifier(v.trim())) : [];
