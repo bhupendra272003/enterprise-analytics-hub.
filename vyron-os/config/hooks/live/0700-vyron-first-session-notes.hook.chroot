@@ -1,0 +1,16 @@
+#!/bin/sh
+set -eu
+# Friendly first-session notes in the default home skeleton.
+mkdir -p /etc/skel
+cat > /etc/skel/VYRONOS-START-HERE.txt <<'EOF'
+WELCOME TO BHUPENDRA VYRONOS
+Bhupendra's Workstation
+
+This is an analytics-focused Ubuntu-based desktop prototype.
+
+Available tools may include LibreOffice Calc, Python, Jupyter, MySQL and Git.
+Before storing confidential data, review your system security and backup policies.
+Live wallpaper is experimental and is not enabled by default.
+
+Project status: prototype. Confirm installed applications and security settings on this machine.
+EOF
