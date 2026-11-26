@@ -1,0 +1,15 @@
+#!/bin/bash
+set -e
+# Set a branded greeter configuration, preserving system defaults as backup.
+mkdir -p /etc/lightdm/lightdm-gtk-greeter.conf.d
+cat >/etc/lightdm/lightdm-gtk-greeter.conf.d/50-vyron.conf <<'CONF'
+[greeter]
+background=/usr/share/vyron-os/branding/login-background.jpg
+theme-name=Adwaita-dark
+icon-theme-name=Papirus-Dark
+font-name=DejaVu Sans 12
+CONF
+# Background may be supplied in a later asset step; if absent remove the invalid path.
+if [[ ! -f /usr/share/vyron-os/branding/login-background.jpg ]]; then
+ sed -i '/^background=/d' /etc/lightdm/lightdm-gtk-greeter.conf.d/50-vyron.conf
+fi
