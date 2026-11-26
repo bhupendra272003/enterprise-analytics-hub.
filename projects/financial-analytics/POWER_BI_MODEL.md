@@ -109,6 +109,7 @@ After running `python python/build_analytics.py`, the current CSV workflow provi
 - `loan_outcome_summary.csv` — pre-aggregated status summary for reconciliation only; do not relate it as another loan fact table.
 - `loan_duration_outcome_summary.csv` — descriptive outcome counts by loan duration and observed status; use for duration comparisons, not as a predictor table.
 - `loan_vintage_outcome_summary.csv` — descriptive outcome counts by loan month and observed status; use for historical cohort trends, not as a predictor table.
+- `loan_amount_outcome_summary.csv` — descriptive outcome counts and average principal by fixed amount band and observed status; use for amount-band comparisons, not as a predictor table.
 - `data_quality_summary.csv`, `missing_value_profile.csv`, and `relationship_integrity.csv` — quality/audit tables for the quality page.
 
 The profiler creates the quality and loan-focused extracts. `build_analytics.py` adds the duration and monthly-vintage summaries from the saved loan extract without reconnecting to MariaDB. Run `python python/export_source_tables.py` to create full raw CSV extracts for all eight source tables under `output/source_tables/`. Import these raw extracts only when needed for the wider relational report; preserve the exact source column names and validate row counts against `source_profile.json` before modelling.
