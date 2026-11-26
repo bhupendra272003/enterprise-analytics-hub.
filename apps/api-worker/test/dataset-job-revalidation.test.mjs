@@ -4,6 +4,13 @@ import { readFile } from "node:fs/promises";
 
 const source = await readFile(new URL("../src/dataset-jobs.ts", import.meta.url), "utf8");
 
+test("job revalidation rejects revoked handoffs and inactive memberships", () => {
+  assert.match(source, /membership_status='ACTIVE'/);
+  assert.match(source, /status<>'REVOKED'/);
+  assert.match(source, /JOB_ACCESS_REVOKED/);
+  assert.match(source, /JOIN_ACCESS_REVOKED/);
+});
+
 test("background dataset jobs revalidate active membership and source handoff at execution", () => {
   assert.match(source, /membership_status='ACTIVE'/);
   assert.match(source, /revalidateJobAccess\(env,job\)/);
