@@ -14,8 +14,9 @@ This repository currently contains the build scaffolding and host preparation sc
 
 ## Build overview
 1. Use a dedicated Ubuntu 24.04 build host or VM.
-2. Run `scripts/prepare-host.sh` to install ISO-building prerequisites.
-3. Build configuration and live image scaffolding will be added next.
+2. Run `sudo bash scripts/prepare-host.sh` to install ISO-building prerequisites.
+3. Run `bash scripts/builder-host-check.sh` from the OS folder (read-only readiness check; set `VYRON_BUILD_DIR` if needed).
+4. The ISO builder remains experimental; validate build artifacts and test in a disposable VM before installation.
 
 ## Security notes
 Linux groups alone do not implement application RBAC. USB blocking is not a complete data-loss-prevention system. Role policy, file permissions, application controls, audit logs and encryption must be tested together. Never test the installer on a machine with valuable data without backups.
