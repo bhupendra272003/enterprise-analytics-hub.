@@ -18,12 +18,22 @@ for f in (root/'desktop/branding/lion-mark.svg',root/'desktop/branding/wallpaper
 PY
 fi
 
-# Advisory package availability audit using runner repository metadata.
-echo "Package availability audit (advisory):"
+# Package manifest syntax audit; apt-cache results are advisory only.
+echo "Package manifest audit:"
 missing=0
-while IFS= read -r pkg; do
+invalid=0
+while IFS= read -r raw || [[ -n "$raw" ]]; do
+ pkg="$(printf '%s' "$raw" | sed 's/[[:space:]]//g')"
  [[ -z "$pkg" || "$pkg" =~ ^# ]] && continue
- if apt-cache show "$pkg" >/dev/null 2>&1; then echo "FOUND: $pkg"; else echo "MISSING/UNKNOWN: $pkg"; missing=$((missing+1)); fi
+ if [[ ! "$pkg" =~ ^[a-z0-9][a-z0-9+.-]*$ ]]; then
+  echo "INVALID NAME: $raw"; invalid=$((invalid+1)); continue
+ fi
+ if command -v apt-cache >/dev/null 2>&1 && apt-cache policy "$pkg" 2>/dev/null | grep -qE 'Candidate: [^\-]'; then
+  echo "CANDIDATE: $pkg"
+ else
+  echo "NO CANDIDATE/UNKNOWN: $pkg"; missing=$((missing+1))
+ fi
 done < "$ROOT/config/packages.list"
-echo "Packages missing/unknown in runner cache: $missing"
+echo "No candidate/unknown: $missing; invalid names: $invalid (advisory)"
+(( invalid == 0 )) || exit 1
 echo "CI structural checks passed (not an ISO build or boot test)."
