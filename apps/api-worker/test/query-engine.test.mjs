@@ -282,3 +282,9 @@ test("GROUP BY keeps NULL and empty-string values in separate groups", () => {
   assert.equal(result.rows[0].region, "");
   assert.equal(result.rows[1].region, "");
 });
+
+
+test("COUNT(column) counts blank strings but excludes SQL NULL", () => {
+  const sample = [{id:"1",region:"",sales:"10"},{id:"2",region:null,sales:"20"},{id:"3",region:"North",sales:"30"}];
+  assert.equal(runDatasetQuery("SELECT COUNT(region) AS n FROM data", sample, columns).rows[0].n, 2);
+});
