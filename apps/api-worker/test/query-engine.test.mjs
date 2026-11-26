@@ -255,3 +255,10 @@ test("JOIN treats whitespace-only keys as blank and never matches them", () => {
   assert.deepEqual(result.rows, [{c_name:"Whitespace",o_amount:null},{c_name:"Valid",o_amount:"20"}]);
   assert.equal(result.matchedJoinRows,1);
 });
+
+
+test("quoted numeric SQL literals compare as strings and preserve leading zero identifiers", () => {
+  const sample = [{ id: "001", region: "A", sales: "10" }, { id: "1", region: "B", sales: "20" }];
+  assert.deepEqual(runDatasetQuery("SELECT id FROM data WHERE id = '001'", sample, columns).rows, [{id:"001"}]);
+  assert.deepEqual(runDatasetQuery("SELECT id FROM data WHERE id = 1", sample, columns).rows, [{id:"1"},{id:"001"}]);
+});
