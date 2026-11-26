@@ -11,7 +11,7 @@ for asset in lion-mark.svg wallpaper.svg; do
 done
 # Normalize manifest whitespace and validate package-name syntax.
 normalized="$(sed 's/[[:space:]]//g' "$LIST" | grep -vE '^(#|$)' || true)"
-dupes="$(printf '%s\\n' "$normalized" | sort | uniq -d || true)"
+dupes="$(printf '%s\n' "$normalized" | sort | uniq -d || true)"
 if [[ -n "$dupes" ]]; then echo "ERROR: duplicate packages: $dupes"; errors=$((errors+1)); fi
 while IFS= read -r pkg; do
  [[ -z "$pkg" ]] && continue
