@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import hashlib
 from collections import defaultdict
 from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
@@ -158,6 +159,42 @@ def _write_csv(path: Path, columns: tuple[str, ...], rows: list[dict[str, str]])
         writer.writerows(rows)
     temporary.replace(path)
 
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _write_analytics_manifest(
+    directory: Path, source: Path, output_names: list[str], summary: dict
+) -> dict:
+    manifest = {
+        "schema_version": 1,
+        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+        "source": {
+            "file": source.name,
+            "bytes": source.stat().st_size,
+            "sha256": _sha256_file(source),
+        },
+        "summary": summary,
+        "outputs": [
+            {
+                "file": name,
+                "bytes": (directory / name).stat().st_size,
+                "sha256": _sha256_file(directory / name),
+            }
+            for name in output_names
+        ],
+        "descriptive_only": True,
+        "manifest_hash_excluded": True,
+    }
+    target = directory / "analytics_manifest.json"
+    temporary = target.with_suffix(".json.tmp")
+    temporary.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    temporary.replace(target)
+    return manifest
 
 
 REPAYMENT_COLUMNS = (
@@ -221,8 +258,17 @@ def build_analytics(directory: Path) -> dict:
     _write_csv(directory / "loan_vintage_outcome_summary.csv", VINTAGE_COLUMNS, vintage_rows)
     _write_csv(directory / "loan_amount_outcome_summary.csv", AMOUNT_BAND_COLUMNS, amount_band_rows)
     _write_csv(directory / "loan_scheduled_repayment_summary.csv", REPAYMENT_COLUMNS, repayment_rows)
+    output_names = ["loan_duration_outcome_summary.csv","loan_vintage_outcome_summary.csv","loan_amount_outcome_summary.csv","loan_scheduled_repayment_summary.csv"]
+    _write_analytics_manifest(directory, source, output_names, {
+        "loan_rows": len(loans),
+        "duration_groups": len(duration_rows),
+        "vintage_groups": len(vintage_rows),
+        "amount_band_groups": len(amount_band_rows),
+        "scheduled_repayment_groups": len(repayment_rows),
+    })
     return {
         "source_file": source.name,
+        "manifest_file": "analytics_manifest.json",
         "loan_rows": len(loans),
         "duration_groups": len(duration_rows),
         "vintage_groups": len(vintage_rows),
