@@ -57,5 +57,5 @@ test("rejects missing chart fields and safely handles extreme numeric values", (
   assert.throws(() => aggregateCategoryRows(rows, "", "sales", "", "SUM"), /category and measure/);
   const extreme = [{region:"X",sales:"1e308"},{region:"X",sales:"1e308"}];
   const result = aggregateCategoryRows(extreme,"region","sales","","SUM");
-  assert.deepEqual(result.chartRows,[{label:"X",value:0}]);
+  assert.throws(() => aggregateCategoryRows(extreme,"region","sales","","SUM"), /overflowed numeric range/);
 });
