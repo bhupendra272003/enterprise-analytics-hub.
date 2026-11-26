@@ -54,10 +54,20 @@ class FinancialProjectAssetTests(unittest.TestCase):
         script = (ROOT / "python" / "build_analytics.py").read_text(encoding="utf-8")
         self.assertIn("loan_duration_outcome_summary.csv", script)
         self.assertIn("loan_vintage_outcome_summary.csv", script)
+        self.assertIn("loan_amount_outcome_summary.csv", script)
         self.assertIn("def summarize_loans", script)
         self.assertNotIn("mysql.connector", script)
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         self.assertIn("python python/build_analytics.py", readme)
+
+    def test_amount_band_sql_and_power_bi_output_are_documented(self):
+        sql = (SQL_DIR / "04_loan_amount_band_analysis.sql").read_text(encoding="utf-8")
+        self.assertIn("0 < amount <= 50,000", sql)
+        self.assertIn("amount > 250,000", sql)
+        guide = (ROOT / "POWER_BI_MODEL.md").read_text(encoding="utf-8")
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        self.assertIn("loan_amount_outcome_summary.csv", guide)
+        self.assertIn("loan_amount_outcome_summary.csv", readme)
 
     def test_python_profiler_covers_all_table_nulls_and_relationships(self):
         script = (ROOT / "python" / "profile_financial.py").read_text(encoding="utf-8")

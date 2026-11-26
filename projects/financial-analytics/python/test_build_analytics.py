@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from build_analytics import build_analytics, summarize_loans
+from build_analytics import build_analytics, normalize_loan_amount_band, summarize_loans
 
 
 class BuildAnalyticsTests(unittest.TestCase):
@@ -30,6 +30,11 @@ class BuildAnalyticsTests(unittest.TestCase):
         self.assertEqual(result["duration_groups"], 3)
         self.assertEqual(result["vintage_groups"], 3)
         self.assertEqual(result["scheduled_repayment_groups"], 3)
+        self.assertEqual(result["amount_band_groups"], 2)
+        with (self.directory / "loan_amount_outcome_summary.csv").open(encoding="utf-8-sig", newline="") as handle:
+            amount_bands = list(csv.DictReader(handle))
+        self.assertEqual(sum(int(row["loan_count"]) for row in amount_bands), 3)
+        self.assertEqual({row["loan_amount_band"] for row in amount_bands}, {"0 < amount <= 50,000"})
         with (self.directory / "loan_scheduled_repayment_summary.csv").open(encoding="utf-8-sig", newline="") as handle:
             repayment = list(csv.DictReader(handle))
         self.assertEqual(sum(int(row["loan_count"]) for row in repayment), 3)
@@ -39,6 +44,20 @@ class BuildAnalyticsTests(unittest.TestCase):
         self.assertEqual(duration[0]["duration_months"], "12")
         self.assertEqual(duration[0]["average_loan_amount"], "1000.00")
         self.assertAlmostEqual(sum(float(row["share_pct"]) for row in duration), 100.0, places=1)
+
+    def test_amount_band_boundaries_and_exceptions(self):
+        self.assertEqual(normalize_loan_amount_band("50000"), "0 < amount <= 50,000")
+        self.assertEqual(normalize_loan_amount_band("50000.01"), "50,000 < amount <= 100,000")
+        self.assertEqual(normalize_loan_amount_band("100000"), "50,000 < amount <= 100,000")
+        self.assertEqual(normalize_loan_amount_band("100001"), "100,000 < amount <= 150,000")
+        self.assertEqual(normalize_loan_amount_band("150000"), "100,000 < amount <= 150,000")
+        self.assertEqual(normalize_loan_amount_band("150001"), "150,000 < amount <= 250,000")
+        self.assertEqual(normalize_loan_amount_band("250000"), "150,000 < amount <= 250,000")
+        self.assertEqual(normalize_loan_amount_band("250001"), "amount > 250,000")
+        self.assertEqual(normalize_loan_amount_band("0"), "<NONPOSITIVE>")
+        self.assertEqual(normalize_loan_amount_band("-1"), "<NONPOSITIVE>")
+        self.assertEqual(normalize_loan_amount_band(""), "<MISSING>")
+        self.assertEqual(normalize_loan_amount_band("bad"), "<INVALID>")
 
     def test_missing_values_are_visible_not_dropped(self):
         rows = [

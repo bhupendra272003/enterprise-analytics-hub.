@@ -19,7 +19,7 @@ REQUIRED_FILES = (
     "relationship_integrity.csv", "loan_analysis_extract.csv",
     "loan_outcome_summary.csv", "loan_prior_features.csv",
     "loan_duration_outcome_summary.csv", "loan_vintage_outcome_summary.csv",
-    "loan_scheduled_repayment_summary.csv",
+    "loan_amount_outcome_summary.csv", "loan_scheduled_repayment_summary.csv",
 )
 ALLOWED_STATUSES = {"A", "B", "C", "D"}
 
@@ -284,6 +284,7 @@ def validate_exports(directory: Path) -> dict:
         features = read_csv(directory / "loan_prior_features.csv")
         duration_summary = read_csv(directory / "loan_duration_outcome_summary.csv")
         vintage_summary = read_csv(directory / "loan_vintage_outcome_summary.csv")
+        amount_band_summary = read_csv(directory / "loan_amount_outcome_summary.csv")
         repayment_summary = read_csv(directory / "loan_scheduled_repayment_summary.csv")
     except (OSError, json.JSONDecodeError, csv.Error) as exc:
         record("artifact_readability", False, str(exc))
@@ -415,6 +416,9 @@ def validate_exports(directory: Path) -> dict:
     reconcile_analytics_summary(
         "vintage_outcome_summary_reconciliation", "loan_month", vintage_summary
     )
+    reconcile_analytics_summary(
+        "amount_band_outcome_summary_reconciliation", "loan_amount_band", amount_band_summary
+    )
 
     expected_repayments = summarize_scheduled_repayments(loans)
     repayment_columns = {
@@ -494,7 +498,8 @@ def validate_exports(directory: Path) -> dict:
     report["summary"] = {
         "loan_rows": len(loans), "feature_rows": len(features),
         "status_groups": len(outcomes), "duration_groups": len(duration_summary),
-        "vintage_groups": len(vintage_summary), "scheduled_repayment_groups": len(repayment_summary),
+        "vintage_groups": len(vintage_summary), "amount_band_groups": len(amount_band_summary),
+        "scheduled_repayment_groups": len(repayment_summary),
         "source_columns_profiled": len(missing_rows),
         "relationship_checks": len(relationship_rows),
         "foreign_key_orphan_rows": orphan_total,
