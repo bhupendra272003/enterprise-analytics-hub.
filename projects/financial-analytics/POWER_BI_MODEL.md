@@ -49,8 +49,9 @@ Then run python python/build_analytics.py. This offline step reads loan_analysis
 - output/loan_duration_outcome_summary.csv — descriptive counts, distinct accounts, average amount and overall loan share by duration and observed status.
 - output/loan_vintage_outcome_summary.csv — the same descriptive metrics by loan start month and observed status.
 - output/loan_amount_outcome_summary.csv — loan counts, distinct accounts, average principal and share by fixed principal band and observed status, including visible non-positive/missing/invalid groups.
+- output/analytics_manifest.json — SHA-256 hashes and byte sizes for the input loan extract and four grouped outputs, alongside group counts and build timestamp.
 
-Finally, run python python/validate_exports.py. The standard-library validator checks the complete artifact set offline, including exact reconciliation of both grouped summaries to the loan extract. None of these steps requires a live MariaDB connection after the source profiling/export step.
+Finally, run python python/validate_exports.py. The standard-library validator checks the complete artifact set offline, including exact reconciliation of both grouped summaries to the loan extract. Preserve `analytics_manifest.json` beside the PBIX and validation report to fingerprint the input/output files used for the grouped analysis. None of these steps requires a live MariaDB connection after the source profiling/export step.
 
 ## Suggested report pages
 
