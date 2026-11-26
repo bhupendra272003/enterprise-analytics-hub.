@@ -14,3 +14,13 @@ test("SQL background jobs revalidate joined dataset handoff at execution", () =>
   assert.match(source, /revalidateJobAccess\(env,job,JSON\.parse\(job\.payload_json\|\|\"\{\}\"\)\.joinDatasetId\)/);
   assert.match(source, /JOIN_ACCESS_REVOKED/);
 });
+
+
+test("rechecks access immediately before SQL and profile analysis", () => {
+  const sqlStart = source.indexOf("async function runSqlJob");
+  const profileStart = source.indexOf("async function runProfile");
+  const sqlBody = source.slice(sqlStart, profileStart);
+  const profileBody = source.slice(profileStart);
+  assert.match(sqlBody, /await revalidateJobAccess\(env,job,payload\.joinDatasetId\);\s*await env\.DB\.prepare\("UPDATE dataset_jobs SET progress=45/);
+  assert.match(profileBody, /await revalidateJobAccess\(env,job\);\s*const profile=columns\.map/);
+});
