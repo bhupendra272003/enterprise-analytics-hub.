@@ -24,3 +24,11 @@ sudo systemctl status auditd --no-pager
 - Automatic updates are installed/enabled but their effective settings should be checked on the target system.
 - Prefer full-disk encryption during OS installation. Do not put secrets or real client data into the ISO.
 - These scripts have not yet been run on a physical or virtual Ubuntu target. Commit status is not test status.
+
+## Read-only posture check
+
+Run the newer diagnostic script without applying changes:
+```bash
+bash scripts/check-security-posture.sh
+```
+It checks firewall defaults and active services, and evaluates effective SSH root-login policy when sshd is present. It is a diagnostic aid only.
