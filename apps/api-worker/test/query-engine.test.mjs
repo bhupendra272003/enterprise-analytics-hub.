@@ -223,3 +223,8 @@ test("supports MIN and MAX over text columns", () => {
   const empty = runDatasetQuery("SELECT MIN(region) AS first_region, MAX(region) AS last_region FROM data WHERE id = 'missing'", sample, columns);
   assert.deepEqual(empty.rows, [{first_region:null,last_region:null}]);
 });
+
+test("rejects duplicate SELECT output aliases case-insensitively", () => {
+  assert.throws(() => runDatasetQuery("SELECT id AS value, region AS VALUE FROM data", rows, columns), /output aliases must be unique/);
+  assert.throws(() => runDatasetQuery("SELECT COUNT(*) AS total, SUM(sales) AS TOTAL FROM data", rows, columns), /output aliases must be unique/);
+});
