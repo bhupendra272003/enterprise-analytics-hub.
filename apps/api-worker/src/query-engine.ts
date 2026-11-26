@@ -138,7 +138,7 @@ export function runDatasetQuery(sql: string, sourceRows: QueryRow[], sourceColum
     for (const p of projections) if (p.kind === "column" && !groupColumns.includes(p.column)) throw new Error("Selected column " + p.column + " must appear in GROUP BY.");
     const groups = new Map<string, QueryRow[]>();
     for (const row of filteredRows) {
-      const key = JSON.stringify(groupColumns.map(c=>row[c]??""));
+      const key = JSON.stringify(groupColumns.map(c=>row[c]===undefined?null:row[c]));
       const bucket = groups.get(key) || [];
       bucket.push(row); groups.set(key,bucket);
     }
