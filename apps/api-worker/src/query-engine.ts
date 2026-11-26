@@ -88,7 +88,7 @@ function parseHavingCondition(source: string, projections: ReturnType<typeof par
   ));
   if (!projection || projection.kind !== "aggregate") throw new Error("HAVING must reference an aggregate expression or its SELECT alias.");
   const value = match[3] !== undefined ? match[3].replace(/''/g, "'") : match[4] !== undefined ? match[4].slice(1,-1).replace(/""/g,'"') : Number(match[5]);
-  return { column: projection.alias, operator: match[2], value };
+  return { column: projection.alias, operator: match[2], value, valueType: match[3] !== undefined || match[4] !== undefined ? "STRING" : "NUMBER" };
 }
 function aggregateValue(fn: string, column: string, rows: QueryRow[], distinct=false) {
   let values = column === "*" ? rows.map(() => 1) : rows.map(row => row[column]).filter(v => v !== "" && v !== null && v !== undefined);
