@@ -17,7 +17,7 @@ router.get('/organizations/:orgId/labs',async(req,res,next)=>{
   let sql='SELECT l.id,l.lab_name AS name,l.template,l.status,l.provider,l.project_id AS projectId,l.task_id AS taskId,l.created_at AS createdAt,l.updated_at AS updatedAt FROM analytics_labs l WHERE l.organization_id=?';
   const args=[req.params.orgId];
   if(role==='ANALYST'){sql+=' AND (l.owner_user_id=? OR EXISTS(SELECT 1 FROM analytics_lab_access a WHERE a.lab_id=l.id AND a.user_id=? AND a.revoked_at IS NULL))';args.push(req.user.id,req.user.id);}
-  else if(role==='LEADER'){sql+=' AND (l.owner_user_id=? OR l.task_id IN (SELECT t.id FROM tasks t JOIN teams tm ON tm.id=t.team_id WHERE tm.organization_id=? AND tm.leader_user_id=?))';args.push(req.user.id,req.params.orgId,req.user.id);}
+  else if(role==='LEADER'){sql+=' AND l.task_id IN (SELECT t.id FROM tasks t JOIN teams tm ON tm.id=t.team_id WHERE tm.organization_id=? AND tm.leader_user_id=?)';args.push(req.params.orgId,req.user.id);}
   else if(!['OWNER','MANAGER','ADMIN'].includes(role))return res.status(403).json({error:'Insufficient permissions.'});
   sql+=' ORDER BY l.updated_at DESC LIMIT 100';
   const [labs]=await pool.execute(sql,args);res.json({labs});
