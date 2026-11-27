@@ -6,6 +6,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 install -d -m 0755 /etc/skel/.config/xfce4
 install -d -m 0755 /etc/skel/.config/autostart
 install -d -m 0755 /usr/share/vyron
+install -d -m 0755 /usr/share/backgrounds/vyron
+install -m 0644 "$ROOT/desktop/branding/wallpaper.svg" /usr/share/backgrounds/vyron/wallpaper.svg
 cat > /usr/share/vyron/welcome.sh <<'WELCOME'
 #!/usr/bin/env bash
 set -euo pipefail
