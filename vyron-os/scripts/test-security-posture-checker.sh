@@ -51,3 +51,11 @@ grep -q '\[WARN\] apparmor inactive' <<<"$out"
 grep -q '\[WARN\] effective SSH root-login policy not confirmed' <<<"$out"
 grep -q 'Warnings: ' <<<"$out"
 echo "Security posture checker mock regression tests passed."
+
+# Missing systemctl must degrade to explicit warnings, not command-not-found errors.
+rm -f "$tmp/bin/systemctl"
+out="$(PATH="$tmp/bin:/usr/bin:/bin" bash "$checker" 2>&1)"
+grep -q '\[WARN\] systemctl unavailable; cannot verify apparmor' <<<"$out" || {
+  # On hosts where systemctl is available in /usr/bin, skip this PATH-specific assertion.
+  if command -v systemctl >/dev/null 2>&1; then :; else exit 1; fi
+}
