@@ -10,7 +10,7 @@ for f in "$ISO" "$SUMS" "$SIG" "$KEYRING"; do
   [[ -f "$f" && -r "$f" && -s "$f" ]] || { echo "ERROR: required input missing, empty or unreadable: $f" >&2; exit 1; }
 done
 [[ -s "$ISO" ]] || { echo "ERROR: source ISO is empty" >&2; exit 1; }
-[[ ! -e "$WORKSPACE" ]] || { echo "ERROR: candidate directory already exists; refusing overwrite" >&2; exit 1; }
+[[ ! -e "$WORKSPACE" && ! -L "$WORKSPACE" ]] || { echo "ERROR: candidate directory already exists; refusing overwrite" >&2; exit 1; }
 PARENT="$(dirname "$WORKSPACE")"
 [[ -d "$PARENT" ]] || { echo "ERROR: candidate parent directory must already exist" >&2; exit 1; }
 [[ "$WORKSPACE" != "$ISO" ]] || { echo "ERROR: candidate directory cannot be the source ISO path" >&2; exit 1; }
@@ -44,7 +44,8 @@ cp "$SIG" "$TMP_WORKSPACE/SHA256SUMS.gpg"
   echo "Free space at intake: ${free_gb} GiB (minimum ${MIN_FREE_GB} GiB)"
   echo "Inspection is read-only; LiveFS Editor compatibility and bootability are not certified."
 } > "$TMP_WORKSPACE/intake-evidence.txt"
-mv "$TMP_WORKSPACE" "$WORKSPACE"
+mv -T -n -- "$TMP_WORKSPACE" "$WORKSPACE"
+[[ ! -e "$TMP_WORKSPACE" ]] || { echo "ERROR: candidate path appeared during intake; refusing to publish" >&2; exit 1; }
 trap - EXIT
 echo "Authenticated intake evidence created: $WORKSPACE"
 echo "The source ISO remains unchanged at: $ISO"
