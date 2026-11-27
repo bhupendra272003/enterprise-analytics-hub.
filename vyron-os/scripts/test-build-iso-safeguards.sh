@@ -9,10 +9,10 @@ cat > "$tmp/bin/lb" <<'MOCK'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "${LB_LOG:?}"
 if [[ "$1" == config ]]; then exit 0; fi
-if [[ "$1" == build ]]; then touch binary.iso; exit 0; fi
+if [[ "$1" == build ]]; then touch "${LB_OUTPUT:?}"; exit 0; fi
 MOCK
 chmod +x "$tmp/bin/lb"
-export PATH="$tmp/bin:$PATH" LB_LOG="$tmp/lb.log"
+export PATH="$tmp/bin:$PATH" LB_LOG="$tmp/lb.log" LB_OUTPUT="$tmp/build/binary.iso"
 # Default path must block prototype and not invoke lb.
 if VYRON_BUILD_DIR="$tmp/blocked" bash "$build_script" >"$tmp/blocked.out" 2>&1; then
  echo "ERROR: prototype unexpectedly allowed by default"; exit 1
@@ -23,7 +23,7 @@ grep -q 'BLOCKED: generic live-build prototype' "$tmp/blocked.out"
 VYRON_ALLOW_EXPERIMENTAL_LB=1 VYRON_BUILD_DIR="$tmp/build" bash "$build_script"
 grep -q -- '--distribution noble' "$LB_LOG"
 grep -q -- '--debian-installer false' "$LB_LOG"
-[[ -s "$tmp/build/binary.iso" ]] || { echo "ERROR: mocked build output missing"; exit 1; }
+[[ -s "$LB_OUTPUT" ]] || { echo "ERROR: mocked build output missing"; exit 1; }
 # Existing build directory must be refused, no overwrite.
 if VYRON_ALLOW_EXPERIMENTAL_LB=1 VYRON_BUILD_DIR="$tmp/build" bash "$build_script" >"$tmp/reuse.out" 2>&1; then
  echo "ERROR: existing build directory accepted"; exit 1
