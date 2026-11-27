@@ -28,7 +28,8 @@ bash "$ROOT/scripts/verify-source-integrity.sh" "$ISO" "$SUMS" "$SIG" "$KEYRING"
 TMP_WORKSPACE=""
 cleanup(){ [[ -n "$TMP_WORKSPACE" && -d "$TMP_WORKSPACE" ]] && rm -rf -- "$TMP_WORKSPACE"; }
 trap cleanup EXIT
-TMP_WORKSPACE="$(mktemp -d -m 0755 "$PARENT/.$(basename "$WORKSPACE").tmp.XXXXXXXX")"
+TMP_WORKSPACE="$(mktemp -d "$PARENT/.$(basename "$WORKSPACE").tmp.XXXXXXXX")"
+chmod 0755 "$TMP_WORKSPACE"
 bash "$ROOT/scripts/inspect-base-iso.sh" "$ISO" "$TMP_WORKSPACE/base-iso-inspection.txt"
 cp "$SUMS" "$TMP_WORKSPACE/SHA256SUMS"
 cp "$SIG" "$TMP_WORKSPACE/SHA256SUMS.gpg"
