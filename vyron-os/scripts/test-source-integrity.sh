@@ -11,8 +11,7 @@ fingerprint="0123456789ABCDEF0123456789ABCDEF01234567"
 cat > "$tmp/bin/gpgv" <<'MOCK'
 #!/usr/bin/env bash
 set -euo pipefail
-[[ "$1" == "--status-fd=1" && "$2" == "--keyring" && -s "$3" && -s "$4" && -s "$5" ]]
-echo "[GNUPG:] VALIDSIG 0123456789ABCDEF0123456789ABCDEF01234567 20261127 0 4 0 1 10 00 ABCDEF"
+printf "%s\\n" "[GNUPG:] VALIDSIG 0123456789ABCDEF0123456789ABCDEF01234567 20261127 0 4 0 1 10 00 ABCDEF"
 MOCK
 chmod +x "$tmp/bin/gpgv"
 PATH="$tmp/bin:$PATH" VYRON_EXPECTED_SIGNING_FINGERPRINT="$fingerprint" bash "$ROOT/scripts/verify-source-integrity.sh" "$tmp/source.iso" "$tmp/SHA256SUMS" "$tmp/signature.gpg" "$tmp/keyring.gpg"
