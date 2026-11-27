@@ -41,6 +41,10 @@ grep -q 'filesystem.squashfs' "$tmp/candidate/base-iso-inspection.txt"
 grep -q 'Source ISO: .*source.iso' "$tmp/candidate/intake-evidence.txt"
 if bash "$SCRIPT" "$tmp/source.iso" "$tmp/SHA256SUMS" "$tmp/SHA256SUMS.gpg" "$tmp/keyring.gpg" "$tmp/candidate" >"$tmp/overwrite.log" 2>&1; then echo "ERROR: existing candidate overwritten"; exit 1; fi
 grep -q 'already exists; refusing overwrite' "$tmp/overwrite.log"
+ln -s "$tmp/nonexistent-target" "$tmp/dangling-candidate"
+if bash "$SCRIPT" "$tmp/source.iso" "$tmp/SHA256SUMS" "$tmp/SHA256SUMS.gpg" "$tmp/keyring.gpg" "$tmp/dangling-candidate" >"$tmp/symlink.log" 2>&1; then echo "ERROR: dangling-symlink candidate path accepted"; exit 1; fi
+grep -q 'already exists; refusing overwrite' "$tmp/symlink.log"
+test -L "$tmp/dangling-candidate"
 printf 'bad checksum\n' > "$tmp/bad.iso"
 printf '0000000000000000000000000000000000000000000000000000000000000000  bad.iso\n' > "$tmp/bad-SHA256SUMS"
 if bash "$SCRIPT" "$tmp/bad.iso" "$tmp/bad-SHA256SUMS" "$tmp/SHA256SUMS.gpg" "$tmp/keyring.gpg" "$tmp/bad-candidate" >"$tmp/checksum.log" 2>&1; then echo "ERROR: invalid ISO checksum accepted"; exit 1; fi
