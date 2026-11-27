@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Configure a branded XFCE session and a first-login welcome launcher.
 set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 # Avoid mutating the build host: this hook runs inside the target chroot.
 install -d -m 0755 /etc/skel/.config/xfce4
 install -d -m 0755 /etc/skel/.config/autostart
