@@ -9,6 +9,7 @@ export MOCK_LOG="$tmp/log"
 cat > "$mock/getent" <<'MOCK'
 #!/usr/bin/env bash
 [[ "$1" == group ]] && exit 0
+[[ "$1" == passwd && "${MOCK_EXISTING_USER:-0}" == 1 ]] && exit 0
 exit 1
 MOCK
 cat > "$mock/id" <<'MOCK'
@@ -62,4 +63,16 @@ if printf 'vyron_test\nTest User\n1\ny\n' | PATH="$mock:$PATH" VYRON_TEST_MODE=1
  echo "ERROR: adduser failure unexpectedly succeeded"; exit 1
 fi
 ! grep -q '^userdel:' "$MOCK_LOG"; ! grep -q '^usermod:' "$MOCK_LOG"
-echo "Provisioning execution tests (success, cancellation, role rejection, creation failure, rollback) passed."
+# Existing username must be refused before account creation.
+: > "$MOCK_LOG"
+if printf 'vyron_test\n' | PATH="$mock:$PATH" VYRON_TEST_MODE=1 MOCK_LOG="$MOCK_LOG" MOCK_EXISTING_USER=1 bash "$helper"; then
+ echo "ERROR: existing username unexpectedly accepted"; exit 1
+fi
+! grep -q '^adduser:' "$MOCK_LOG"; ! grep -q '^usermod:' "$MOCK_LOG"
+# Empty full name must be rejected.
+: > "$MOCK_LOG"
+if printf 'vyron_test\n\n' | PATH="$mock:$PATH" VYRON_TEST_MODE=1 MOCK_LOG="$MOCK_LOG" bash "$helper"; then
+ echo "ERROR: empty full name unexpectedly accepted"; exit 1
+fi
+! grep -q '^adduser:' "$MOCK_LOG"
+echo "Provisioning execution tests (success, cancellation, existing user, empty name, role rejection, creation failure, rollback) passed."
