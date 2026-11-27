@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Install a restrained, branded LightDM GTK greeter configuration.
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+install -d -m 0755 /usr/share/backgrounds/vyron /usr/share/pixmaps/vyron /etc/lightdm
+install -m 0644 "$ROOT/desktop/branding/wallpaper.svg" /usr/share/backgrounds/vyron/wallpaper.svg
+install -m 0644 "$ROOT/desktop/branding/lion-mark.svg" /usr/share/pixmaps/vyron/lion-mark.svg
+cat > /etc/lightdm/lightdm-gtk-greeter.conf <<'GREETER'
+[greeter]
+background=/usr/share/backgrounds/vyron/wallpaper.svg
+logo=/usr/share/pixmaps/vyron/lion-mark.svg
+theme-name=Arc-Dark
+icon-theme-name=Papirus
+font-name=Sans 11
+indicators=~host;~spacer;~clock;~spacer;~session;~language;~a11y;~power
+position=50% 50%
+xft-antialias=true
+xft-hinting=true
+xft-hintstyle=hintslight
+xft-rgba=rgb
+hide-users=true
+show-manual-login=false
+GREETER
+cat > /etc/lightdm/lightdm.conf.d/50-vyron-seat.conf <<'SEAT'
+[Seat:*]
+greeter-session=lightdm-gtk-greeter
+user-session=xfce
+SEAT
+echo "VyronOS LightDM greeter branding configured (runtime validation required)."
