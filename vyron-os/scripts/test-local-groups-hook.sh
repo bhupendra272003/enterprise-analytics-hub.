@@ -29,9 +29,17 @@ PATH="$tmp/bin:$PATH" bash "$hook" >/dev/null
 expected=(vyron-users vyron-owner vyron-manager vyron-leader vyron-analyst vyron-data vyron-audit)
 for group in "${expected[@]}"; do grep -q "^$group:" "$MOCK_GROUP_DB"; done
 [[ "$(wc -l < "$MOCK_GROUP_DB")" -eq 7 ]]
+expected_dirs=(
+  "install -d -o root -g vyron-data -m 2770 /srv/vyron/shared"
+  "install -d -o root -g vyron-audit -m 0750 /var/log/vyron"
+  "install -d -o root -g vyron-users -m 0750 /etc/vyron"
+ )
+for expected_cmd in "${expected_dirs[@]}"; do grep -Fqx "$expected_cmd" "$MOCK_LOG"; done
 [[ "$(grep -c '^install ' "$MOCK_LOG")" -eq 3 ]]
 # Second invocation must be idempotent for groups.
 PATH="$tmp/bin:$PATH" bash "$hook" >/dev/null
 [[ "$(wc -l < "$MOCK_GROUP_DB")" -eq 7 ]]
 [[ "$(grep -c '^groupadd ' "$MOCK_LOG")" -eq 7 ]]
+[[ "$(grep -c '^install ' "$MOCK_LOG")" -eq 6 ]]
+for expected_cmd in "${expected_dirs[@]}"; do [[ "$(grep -Fxc "$expected_cmd" "$MOCK_LOG")" -eq 2 ]]; done
 echo "Local group hook tests passed (mocked commands; no host changes)."
