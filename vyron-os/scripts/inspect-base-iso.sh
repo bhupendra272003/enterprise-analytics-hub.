@@ -12,6 +12,8 @@ if [[ -n "$REPORT" ]]; then
  [[ "$REPORT" != "$ISO" ]] || { echo "ERROR: report path must differ from source ISO" >&2; exit 1; }
  [[ ! -e "$REPORT" && ! -L "$REPORT" ]] || { echo "ERROR: report path already exists; refusing to overwrite" >&2; exit 1; }
  mkdir -p "$(dirname "$REPORT")"
+ REPORT_TMP="$(mktemp "${REPORT}.tmp.XXXXXX")"
+ trap 'rm -f "${REPORT_TMP:-}"' EXIT
 fi
 run_report(){
  local heading="$1"; shift
@@ -30,4 +32,10 @@ run_report(){
  echo
  echo "Review the Casper listing to identify actual filesystem layer names before authoring LiveFS Editor actions."
  echo "This report does not verify the publisher signature, installer behavior, or bootability."
-} | if [[ -n "$REPORT" ]]; then tee "$REPORT"; else cat; fi
+} | if [[ -n "$REPORT" ]]; then tee "$REPORT_TMP"; else cat; fi
+if [[ -n "$REPORT" ]]; then
+ # Publish only a complete report; -n prevents clobbering a path created concurrently.
+ mv -n -- "$REPORT_TMP" "$REPORT"
+ [[ ! -e "$REPORT_TMP" ]] || { echo "ERROR: report destination appeared during inspection; refusing to overwrite" >&2; exit 1; }
+ REPORT_TMP=""
+fi
