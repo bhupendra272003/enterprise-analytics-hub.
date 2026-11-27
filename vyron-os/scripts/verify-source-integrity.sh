@@ -7,12 +7,12 @@ if [[ $# -ne 4 ]]; then
 fi
 ISO="$1"; SUMS="$2"; SIG="$3"; KEYRING="$4"
 for f in "$ISO" "$SUMS" "$SIG" "$KEYRING"; do
- [[ -r "$f" && -f "$f" && -s "$f" ]] || { echo "ERROR: required readable, non-empty file missing: $f" >&2; exit 1; }
+ [[ ! -L "$f" && -r "$f" && -f "$f" && -s "$f" ]] || { echo "ERROR: required input must be a readable, non-empty regular file (not symlink): $f" >&2; exit 1; }
 done
 command -v gpgv >/dev/null || { echo "ERROR: gpgv is required" >&2; exit 1; }
 EXPECTED="${VYRON_EXPECTED_SIGNING_FINGERPRINT:-}"
 if [[ ! "$EXPECTED" =~ ^([[:xdigit:]]{40}|[[:xdigit:]]{64})$ ]]; then
- echo "ERROR: set VYRON_EXPECTED_SIGNING_FINGERPRINT to the independently verified 40- or 64-hex signing-key fingerprint" >&2
+ echo "ERROR: set VYRON_EXPECTED_SIGNING_FINGERPRINT to an independently verified 40- or 64-hex signing-key fingerprint" >&2
  exit 2
 fi
 EXPECTED="${EXPECTED^^}"
