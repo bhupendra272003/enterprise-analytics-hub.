@@ -3,9 +3,9 @@
 # Requires a user-supplied official ISO, isolated builder and reviewed package/action YAML.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-usage(){ echo "Usage: sudo $0 SOURCE.iso DEST.iso ACTIONS.yaml"; }
-[[ $# -eq 3 ]] || { usage >&2; exit 2; }
-SOURCE="$(realpath "$1")"; DEST="$(realpath -m "$2")"; ACTIONS="$(realpath "$3")"
+usage(){ echo "Usage: sudo $0 SOURCE.iso DEST.iso ACTIONS.yaml INTAKE_EVIDENCE.txt"; }
+[[ $# -eq 4 ]] || { usage >&2; exit 2; }
+SOURCE="$(realpath "$1")"; DEST="$(realpath -m "$2")"; ACTIONS="$(realpath "$3")"; EVIDENCE="$(realpath "$4")"
 MIN_FREE_GB="${VYRON_CUSTOMIZE_MIN_FREE_GB:-100}"
 if [[ ! "$MIN_FREE_GB" =~ ^[1-9][0-9]*$ ]]; then
  echo "ERROR: VYRON_CUSTOMIZE_MIN_FREE_GB must be a positive whole number of GiB" >&2
@@ -13,6 +13,18 @@ if [[ ! "$MIN_FREE_GB" =~ ^[1-9][0-9]*$ ]]; then
 fi
 [[ -f "$SOURCE" && -r "$SOURCE" ]] || { echo "ERROR: source ISO unreadable" >&2; exit 1; }
 [[ -f "$ACTIONS" && -r "$ACTIONS" ]] || { echo "ERROR: action YAML unreadable" >&2; exit 1; }
+[[ -f "$EVIDENCE" && -r "$EVIDENCE" && -s "$EVIDENCE" ]] || { echo "ERROR: authenticated intake evidence unreadable" >&2; exit 1; }
+SOURCE_SHA256="$(sha256sum "$SOURCE" | awk '{print toupper($1)}')"
+EVIDENCE_SOURCE="$(sed -n 's/^Source ISO: //p' "$EVIDENCE" | head -n 1)"
+EVIDENCE_SHA256="$(sed -n 's/^Source SHA256: //p' "$EVIDENCE" | head -n 1 | tr '[:lower:]' '[:upper:]')"
+EVIDENCE_FINGERPRINT="$(sed -n 's/^Pinned signing-key fingerprint: //p' "$EVIDENCE" | head -n 1 | tr '[:lower:]' '[:upper:]')"
+EXPECTED_FINGERPRINT="${VYRON_EXPECTED_SIGNING_FINGERPRINT:-}"
+if [[ "$EVIDENCE_SOURCE" != "$SOURCE" || "$EVIDENCE_SHA256" != "$SOURCE_SHA256" ]]; then
+ echo "ERROR: intake evidence does not match this source ISO path and SHA256" >&2; exit 1
+fi
+if [[ ! "$EXPECTED_FINGERPRINT" =~ ^([[:xdigit:]]{40}|[[:xdigit:]]{64})$ || "${EXPECTED_FINGERPRINT^^}" != "$EVIDENCE_FINGERPRINT" ]]; then
+ echo "ERROR: independently pinned signing-key fingerprint must match the intake evidence" >&2; exit 1
+fi
 [[ "$SOURCE" != "$DEST" ]] || { echo "ERROR: destination must differ from source" >&2; exit 1; }
 [[ ! -e "$DEST" ]] || { echo "ERROR: destination already exists; refusing overwrite" >&2; exit 1; }
 [[ "$EUID" -eq 0 ]] || { echo "ERROR: livefs-edit requires root; run in an isolated builder VM" >&2; exit 1; }
@@ -23,7 +35,8 @@ free_gb=$((free_kb/1024/1024))
 if (( free_gb < MIN_FREE_GB )); then echo "ERROR: at least ${MIN_FREE_GB} GiB free required for this guarded pipeline; found ${free_gb} GiB" >&2; exit 1; fi
 echo "Source ISO SHA256:"
 sha256sum "$SOURCE"
-echo "WARNING: verify source ISO checksum/signature against official Ubuntu publication before proceeding."
+echo "Authenticated intake evidence: $EVIDENCE"
+echo "Source SHA256 matches authenticated intake evidence: $SOURCE_SHA256"
 echo "WARNING: LiveFS Editor primarily targets Ubuntu live/server installer images; desktop ISO compatibility is not assured."
 echo "Review the action YAML carefully. A test output is not a release image until VM-validated."
 echo "Action YAML is user-reviewed and executes installer filesystem modifications."
