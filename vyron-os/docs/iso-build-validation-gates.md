@@ -19,7 +19,7 @@ Structural CI validates shell syntax, hooks, assets and package-manifest naming.
 Create a candidate directory outside the source checkout and keep the original Ubuntu ISO unchanged. Record the exact source ISO filename, official download page, checksum verification evidence, builder OS release, free disk space, commit SHA, package list, output ISO SHA256 and VM test results.
 
 - [ ] Source ISO checksum and signature independently authenticated against Ubuntu's official publication.
-- [ ] Builder host is Ubuntu 24.04 and passes `bash vyron-os/scripts/builder-host-check.sh`.
+- [ ] Builder host is Ubuntu 24.04 and passes `bash vyron-os/scripts/builder-host-check.sh` (100 GiB default free-space threshold; override only for a deliberately smaller, non-release experiment).
 - [ ] Builder storage capacity is sufficient for extraction, squashfs rebuild and ISO output (plan for at least 100 GiB free).
 - [ ] Customization actions are reviewed before execution; no unreviewed privileged scripts or YAML.
 - [ ] Output ISO exists and is inspected with `bash vyron-os/scripts/inspect-iso.sh PATH_TO_ISO`.
