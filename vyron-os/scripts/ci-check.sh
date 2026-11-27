@@ -9,6 +9,7 @@ bash "$ROOT/scripts/test-security-hook.sh"
 bash "$ROOT/scripts/test-source-integrity.sh"
 bash "$ROOT/scripts/test-iso-evidence.sh"
 bash "$ROOT/scripts/test-release-readiness-snapshot.sh"
+bash "$ROOT/scripts/test-inspect-base-iso.sh"
 for script in "$ROOT"/scripts/*.sh; do bash -n "$script"; done
 for hook in "$ROOT"/config/hooks/live/*.hook.chroot; do bash -n "$hook"; done
 if command -v xmllint >/dev/null 2>&1; then
