@@ -7,10 +7,10 @@ The `scripts/assign-role.sh` utility assigns an existing, individually provision
 Preview without system changes:
 
 ```bash
-bash scripts/assign-role.sh --dry-run analyst bhupendra
+bash scripts/assign-role.sh --dry-run bhupendra analyst
 ```
 
-(The actual argument order is `USER ROLE`; e.g. `bash scripts/assign-role.sh --dry-run bhupendra analyst`.)
+The argument order is `USER ROLE`.
 
 Apply as root only after the account exists and the image has the required groups:
 
@@ -18,7 +18,7 @@ Apply as root only after the account exists and the image has the required group
 sudo bash scripts/assign-role.sh bhupendra analyst
 ```
 
-Roles accepted: `owner`, `manager`, `leader`, `analyst`. The helper rejects unknown roles and does not create accounts, passwords, sudo policy, or application privileges.
+Roles accepted: `owner`, `manager`, `leader`, `analyst`. The helper rejects unknown roles and conflicting multi-role assignments. It does not create accounts, passwords, sudo policy, or application privileges.
 
 ## Boundaries and next steps
 
