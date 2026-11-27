@@ -5,7 +5,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 usage(){ echo "Usage: $0 SOURCE.iso SHA256SUMS SHA256SUMS.gpg TRUSTED_KEYRING CANDIDATE_DIR" >&2; }
 [[ $# -eq 5 ]] || { usage; exit 2; }
 ISO="$(realpath "$1")"; SUMS="$(realpath "$2")"; SIG="$(realpath "$3")"; KEYRING="$(realpath "$4")"
-WORKSPACE="$(realpath -m "$5")"
+WORKSPACE_PARENT="$(realpath "$(dirname "$5")")"
+WORKSPACE="$WORKSPACE_PARENT/$(basename "$5")"
 for f in "$ISO" "$SUMS" "$SIG" "$KEYRING"; do
   [[ -f "$f" && -r "$f" && -s "$f" ]] || { echo "ERROR: required input missing, empty or unreadable: $f" >&2; exit 1; }
 done
