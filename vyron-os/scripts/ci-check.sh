@@ -12,6 +12,7 @@ bash "$ROOT/scripts/test-release-readiness-snapshot.sh"
 bash "$ROOT/scripts/test-inspect-base-iso.sh"
 bash "$ROOT/scripts/test-builder-host-check.sh"
 bash "$ROOT/scripts/test-customize-base-iso.sh"
+bash "$ROOT/scripts/test-intake-base-iso.sh"
 for script in "$ROOT"/scripts/*.sh; do bash -n "$script"; done
 for hook in "$ROOT"/config/hooks/live/*.hook.chroot; do bash -n "$hook"; done
 if command -v xmllint >/dev/null 2>&1; then
