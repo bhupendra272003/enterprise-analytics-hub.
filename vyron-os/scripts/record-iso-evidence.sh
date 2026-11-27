@@ -23,7 +23,12 @@ HOST="$(uname -srm)"
 OS_NAME="unknown"
 if [[ -r /etc/os-release ]]; then OS_NAME="$(sed -n 's/^PRETTY_NAME=//p' /etc/os-release | head -n1 | tr -d '"')"; fi
 STAGING="$(mktemp -d "$OUT_PARENT/.$(basename "$FINAL_DIR").tmp.XXXXXXXX")"
-cleanup(){ [[ -n "${STAGING:-}" && -d "$STAGING" ]] && rm -rf -- "$STAGING"; }
+cleanup(){
+  if [[ -n "${STAGING:-}" && -d "$STAGING" ]]; then
+    rm -rf -- "$STAGING"
+  fi
+  return 0
+}
 trap cleanup EXIT
 {
   echo "VyronOS ISO Candidate Evidence"
