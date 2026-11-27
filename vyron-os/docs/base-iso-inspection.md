@@ -12,7 +12,7 @@ This is an inspection aid only. It does not authenticate the ISO, prove LiveFS E
 
 ## Authenticated intake workspace
 
-After downloading the official ISO, checksum manifest, detached signature, and preparing a trusted Ubuntu keyring, create an evidence workspace:
+After downloading the official ISO, checksum manifest, detached signature, and preparing a trusted Ubuntu keyring, independently verify the official signing-key fingerprint from Ubuntu documentation through a trusted channel. Set the pin explicitly; a keyring file alone is not sufficient trust configuration. Then create an evidence workspace:
 
 ```bash
 bash vyron-os/scripts/intake-base-iso.sh \\
@@ -23,4 +23,4 @@ bash vyron-os/scripts/intake-base-iso.sh \\
   /path/outside/repository/vyronos-base-candidate
 ```
 
-The intake helper authenticates the checksum manifest with the supplied keyring, verifies the ISO checksum, checks available disk space (100 GiB by default), and performs read-only ISO inspection. It creates the candidate directory only after integrity verification succeeds, stores the inspection and checksum evidence, and refuses to overwrite an existing candidate. It does not download the ISO, establish trust in the supplied keyring, validate LiveFS Editor compatibility, or certify bootability. The original ISO remains at its source path.
+The intake helper authenticates the checksum manifest with the supplied keyring and explicitly pinned signing-key fingerprint, verifies the ISO checksum, checks available disk space (100 GiB by default), and performs read-only ISO inspection. The fingerprint must be obtained independently; do not copy an unverified value from an example or from the keyring itself. It creates the candidate directory only after integrity verification succeeds, stores the inspection and checksum evidence, and refuses to overwrite an existing candidate. It does not download the ISO, establish trust in the supplied keyring, validate LiveFS Editor compatibility, or certify bootability. The original ISO remains at its source path.
