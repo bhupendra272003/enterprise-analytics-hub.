@@ -2,7 +2,7 @@
 # Install the interactive first-user provisioning tools into the target image.
 # This hook is executed inside the live-build chroot.
 set -euo pipefail
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 DEST=/usr/local/lib/vyron/scripts
 install -d -o root -g root -m 0755 "$DEST"
 install -o root -g root -m 0755 "$ROOT/scripts/provision-user.sh" "$DEST/provision-user.sh"
