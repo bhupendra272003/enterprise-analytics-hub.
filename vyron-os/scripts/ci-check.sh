@@ -22,6 +22,17 @@ fi
 
 # Package manifest syntax audit; apt-cache results are advisory only.
 echo "Package manifest audit:"
+# Run the strict package-candidate audit only on a genuine Ubuntu 24.04 Noble host.
+if [[ -r /etc/os-release ]]; then
+ . /etc/os-release
+ if [[ "${ID:-}" == ubuntu && "${VERSION_CODENAME:-}" == noble ]]; then
+  bash "$ROOT/scripts/audit-noble-packages.sh"
+ else
+  echo "SKIP: strict Noble candidate audit (runner is not Ubuntu 24.04 Noble)."
+ fi
+else
+ echo "SKIP: strict Noble candidate audit (/etc/os-release unavailable)."
+fi
 missing=0
 invalid=0
 while IFS= read -r raw || [[ -n "$raw" ]]; do
