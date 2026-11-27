@@ -9,7 +9,7 @@ cat > "$tmp/bin/lb" <<'MOCK'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "${LB_LOG:?}"
 if [[ "$1" == config ]]; then exit 0; fi
-if [[ "$1" == build ]]; then touch "${LB_OUTPUT:?}"; exit 0; fi
+if [[ "$1" == build ]]; then printf "mock ISO\n" > "${LB_OUTPUT:?}"; exit 0; fi
 MOCK
 chmod +x "$tmp/bin/lb"
 export PATH="$tmp/bin:$PATH" LB_LOG="$tmp/lb.log" LB_OUTPUT="$tmp/build/binary.iso"
