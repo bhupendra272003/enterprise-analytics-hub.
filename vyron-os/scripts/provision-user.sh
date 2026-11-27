@@ -12,7 +12,7 @@ for g in vyron-users vyron-owner vyron-manager vyron-leader vyron-analyst; do
  getent group "$g" >/dev/null || { echo "Missing group '$g'; run the image group hook first." >&2; exit 1; }
 done
 read -r -p "New workstation username: " username
-[[ "$username" =~ ^[a-z_][a-z0-9_-]*[$]?$ ]] || { echo "Invalid username." >&2; exit 1; }
+[[ "$username" =~ ^[a-z_][a-z0-9_-]*$ ]] || { echo "Invalid username." >&2; exit 1; }
 if getent passwd "$username" >/dev/null; then echo "Account already exists; refusing to overwrite." >&2; exit 1; fi
 read -r -p "Full name: " fullname
 [[ -n "$fullname" ]] || { echo "Full name cannot be empty." >&2; exit 1; }
