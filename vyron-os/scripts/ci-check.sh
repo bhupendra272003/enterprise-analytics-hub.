@@ -52,12 +52,5 @@ if bash "$helper" "$tmpdir/test.iso" "$tmpdir/bad-sums" >/dev/null 2>&1; then
 fi
 echo "Checksum helper positive and negative smoke tests passed."
 
-# Role-assignment utility dry-run smoke test (no account or system changes).
-role_helper="$ROOT/scripts/assign-role.sh"
-for role in owner manager leader analyst; do
- bash "$role_helper" --dry-run ci-fixture "$role" >/dev/null
-done
-if bash "$role_helper" --dry-run ci-fixture invalid >/dev/null 2>&1; then
- echo "ERROR: role helper accepted an invalid role"; exit 1
-fi
-echo "Role assignment helper dry-run smoke tests passed."
+# Dedicated role helper safe tests (dry-run only; no account or system changes).
+bash "$ROOT/scripts/test-assign-role.sh"
