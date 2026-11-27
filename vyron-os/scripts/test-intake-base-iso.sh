@@ -15,6 +15,7 @@ echo "[GNUPG:] VALIDSIG 0123456789ABCDEF0123456789ABCDEF01234567 20261127 0 4 0 
 MOCK
 cat > "$tmp/bin/xorriso" <<'MOCK'
 #!/usr/bin/env bash
+[[ "${FAIL_XORRISO:-0}" == 1 ]] && exit 8
 case " $* " in
   *" -report_el_torito plain "*) echo "El Torito boot catalog: present";;
   *" -ls /casper "*) echo "filesystem.squashfs"; echo "vmlinuz"; echo "initrd";;
@@ -50,4 +51,7 @@ printf '0000000000000000000000000000000000000000000000000000000000000000  bad.is
 if bash "$SCRIPT" "$tmp/bad.iso" "$tmp/bad-SHA256SUMS" "$tmp/SHA256SUMS.gpg" "$tmp/keyring.gpg" "$tmp/bad-candidate" >"$tmp/checksum.log" 2>&1; then echo "ERROR: invalid ISO checksum accepted"; exit 1; fi
 grep -q 'checksum mismatch' "$tmp/checksum.log"
 test ! -e "$tmp/bad-candidate"
+if FAIL_XORRISO=1 bash "$SCRIPT" "$tmp/source.iso" "$tmp/SHA256SUMS" "$tmp/SHA256SUMS.gpg" "$tmp/keyring.gpg" "$tmp/inspection-failure" >"$tmp/inspection-failure.log" 2>&1; then echo "ERROR: failed ISO inspection accepted"; exit 1; fi
+ test ! -e "$tmp/inspection-failure"
+ if compgen -G "$tmp/.inspection-failure.tmp.*" >/dev/null; then echo "ERROR: failed intake left temporary workspace behind"; exit 1; fi
 echo 'Authenticated base ISO intake tests passed.'
