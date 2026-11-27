@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# Configure a branded XFCE session and a first-login welcome launcher.
+set -euo pipefail
+# Avoid mutating the build host: this hook runs inside the target chroot.
+install -d -m 0755 /etc/skel/.config/xfce4
+install -d -m 0755 /etc/skel/.config/autostart
+install -d -m 0755 /usr/share/vyron
+cat > /usr/share/vyron/welcome.sh <<'WELCOME'
+#!/usr/bin/env bash
+set -euo pipefail
+if command -v zenity >/dev/null 2>&1; then
+ zenity --info --title="Welcome to Bhupendra's Workstation" --width=480 --text="Welcome to Bhupendra's Workstation\n\nVyronOS analytics environment\n\nYour account and local role are configured by your administrator.\n\nStart with Firefox, LibreOffice, Python or MySQL from the Applications menu."
+fi
+WELCOME
+chmod 0755 /usr/share/vyron/welcome.sh
+cat > /etc/skel/.config/autostart/vyron-welcome.desktop <<'DESKTOP'
+[Desktop Entry]
+Type=Application
+Name=VyronOS Welcome
+Comment=Welcome to Bhupendra's Workstation
+Exec=/usr/share/vyron/welcome.sh
+Terminal=false
+OnlyShowIn=XFCE;
+X-GNOME-Autostart-enabled=true
+DESKTOP
+# Configure default wallpaper via XFCE XML profile; settings are per-user.
+install -d -m 0755 /etc/xdg/xfce4/xfconf/xfce-perchannel-xml
+cat > /etc/xdg/xfce4/xfconf/xfce-perchannel-xml/xfce4-desktop.xml <<'XML'
+<?xml version="1.0" encoding="UTF-8"?>
+<channel name="xfce4-desktop" version="1.0">
+ <property name="desktop-icons" type="empty">
+  <property name="style" type="int" value="0"/>
+ </property>
+ <property name="backdrop" type="empty">
+  <property name="screen0" type="empty">
+   <property name="monitor0" type="empty">
+    <property name="workspace0" type="empty">
+     <property name="last-image" type="string" value="/usr/share/backgrounds/vyron/wallpaper.svg"/>
+    </property>
+    <property name="image-style" type="int" value="5"/>
+   </property>
+  </property>
+ </property>
+</channel>
+XML
+echo "VyronOS XFCE welcome/autostart defaults configured."
