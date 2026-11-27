@@ -10,7 +10,9 @@ if command -v ufw >/dev/null; then
  if grep -qi 'Default: deny (incoming)' <<<"$status"; then pass "UFW incoming default deny"; else warnf "UFW default incoming deny not confirmed"; fi
 else warnf "UFW missing"; fi
 for svc in apparmor auditd unattended-upgrades; do
- if systemctl is-active --quiet "$svc"; then pass "$svc active"; else warnf "$svc inactive"; fi
+ if command -v systemctl >/dev/null 2>&1; then
+  if systemctl is-active --quiet "$svc"; then pass "$svc active"; else warnf "$svc inactive"; fi
+ else warnf "systemctl unavailable; cannot verify $svc"; fi
 done
 if command -v sshd >/dev/null 2>&1; then
  effective="$(sshd -T 2>/dev/null || true)"
