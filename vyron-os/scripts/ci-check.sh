@@ -42,7 +42,7 @@ while IFS= read -r raw || [[ -n "$raw" ]]; do
  if [[ ! "$pkg" =~ ^[a-z0-9][a-z0-9+.-]*$ ]]; then
   echo "INVALID NAME: $raw"; invalid=$((invalid+1)); continue
  fi
- if command -v apt-cache >/dev/null 2>&1 && apt-cache policy "$pkg" 2>/dev/null | grep -qE 'Candidate: [^\-]'; then
+ if command -v apt-cache >/dev/null 2>&1 && apt-cache policy "$pkg" 2>/dev/null | grep -qE 'Candidate: [0-9][^[:space:]]*'; then
   echo "CANDIDATE: $pkg"
  else
   echo "NO CANDIDATE/UNKNOWN: $pkg"; missing=$((missing+1))
