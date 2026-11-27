@@ -41,7 +41,8 @@ grep -q 'Source ISO: .*source.iso' "$tmp/candidate/intake-evidence.txt"
 if bash "$SCRIPT" "$tmp/source.iso" "$tmp/SHA256SUMS" "$tmp/SHA256SUMS.gpg" "$tmp/keyring.gpg" "$tmp/candidate" >"$tmp/overwrite.log" 2>&1; then echo "ERROR: existing candidate overwritten"; exit 1; fi
 grep -q 'already exists; refusing overwrite' "$tmp/overwrite.log"
 printf 'bad checksum\n' > "$tmp/bad.iso"
-if bash "$SCRIPT" "$tmp/bad.iso" "$tmp/SHA256SUMS" "$tmp/SHA256SUMS.gpg" "$tmp/keyring.gpg" "$tmp/bad-candidate" >"$tmp/checksum.log" 2>&1; then echo "ERROR: invalid ISO checksum accepted"; exit 1; fi
+printf '0000000000000000000000000000000000000000000000000000000000000000  bad.iso\n' > "$tmp/bad-SHA256SUMS"
+if bash "$SCRIPT" "$tmp/bad.iso" "$tmp/bad-SHA256SUMS" "$tmp/SHA256SUMS.gpg" "$tmp/keyring.gpg" "$tmp/bad-candidate" >"$tmp/checksum.log" 2>&1; then echo "ERROR: invalid ISO checksum accepted"; exit 1; fi
 grep -q 'checksum mismatch' "$tmp/checksum.log"
 test ! -e "$tmp/bad-candidate"
 echo 'Authenticated base ISO intake tests passed.'
