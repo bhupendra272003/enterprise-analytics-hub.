@@ -54,7 +54,7 @@ if bash "$helper" "$tmpdir/test.iso" "$tmpdir/bad-sums" >/dev/null 2>&1; then
 fi
 echo "Checksum helper positive and negative smoke tests passed."
 
-# Dedicated role helper safe tests (dry-run only; no account or system changes).
+# Role helper tests include dry-run and mocked execution (no host account/group changes).
 bash "$ROOT/scripts/test-assign-role.sh"
 
 # Local groups hook idempotency and expected-directory command tests (mocked).
