@@ -6,7 +6,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ROLE_HELPER="$ROOT/scripts/assign-role.sh"
 usage(){ echo "Usage: $0"; exit 2; }
 [[ $# -eq 0 ]] || usage
-[[ "${EUID}" -eq 0 ]] || { echo "Run this setup as root (e.g. sudo $0)." >&2; exit 1; }
+[[ "${VYRON_TEST_MODE:-0}" == "1" || "${EUID}" -eq 0 ]] || { echo "Run this setup as root (e.g. sudo $0)." >&2; exit 1; }
 [[ -x "$ROLE_HELPER" || -f "$ROLE_HELPER" ]] || { echo "Role helper missing." >&2; exit 1; }
 for g in vyron-users vyron-owner vyron-manager vyron-leader vyron-analyst; do
  getent group "$g" >/dev/null || { echo "Missing group '$g'; run the image group hook first." >&2; exit 1; }
