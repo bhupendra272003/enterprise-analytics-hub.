@@ -27,7 +27,12 @@ getent group "$group" >/dev/null || { echo "Required group '$group' missing." >&
 getent group vyron-users >/dev/null || { echo "Required group vyron-users missing." >&2; exit 1; }
 current_groups="$(id -nG "$user")"
 for existing in "${role_groups[@]}"; do
-  if grep -qw "$existing" <<<"$current_groups" && [[ "$existing" != "$group" ]]; then
+  if grep -qw "$existing" <<<"$current_groups"; then
+    if [[ "$existing" == "$group" ]]; then
+      echo "Account '$user' already has role '$role'; no role change required."
+      usermod -aG vyron-users "$user"
+      exit 0
+    fi
     echo "Account '$user' already belongs to role group '$existing'; refusing multi-role assignment." >&2
     echo "Review and resolve the existing role manually before retrying." >&2
     exit 1
