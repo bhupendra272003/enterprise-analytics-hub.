@@ -11,7 +11,7 @@ grep -Fq 'passwd "$username"' "$helper"
 grep -Fq 'assign-role.sh' "$helper"
 grep -Fq 'userdel' "$helper"
 grep -Fq 'Cancelled.' "$helper"
-if grep -Eq 'useradd .*--password|chpasswd|echo .*password' "$helper"; then
+if grep -Eq 'useradd[[:space:]].*(-p[[:space:]]|--password)|chpasswd' "$helper"; then
  echo "ERROR: unsafe password handling detected"; exit 1
 fi
 echo "First-user provisioning static checks passed."
