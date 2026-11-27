@@ -5,7 +5,8 @@ tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 mkdir -p "$tmp/bin"
 printf 'source iso fixture\\n' > "$tmp/source.iso"
 (cd "$tmp" && sha256sum source.iso > SHA256SUMS)
-touch "$tmp/signature.gpg" "$tmp/keyring.gpg"
+printf "test signature\\n" > "$tmp/signature.gpg"
+printf "test keyring\\n" > "$tmp/keyring.gpg"
 fingerprint="0123456789ABCDEF0123456789ABCDEF01234567"
 cat > "$tmp/bin/gpgv" <<'MOCK'
 #!/usr/bin/env bash
