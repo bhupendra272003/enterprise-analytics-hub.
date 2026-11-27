@@ -12,7 +12,7 @@ echo "Default: deny (incoming), allow (outgoing), disabled (routed)"
 MOCK
 cat > "$tmp/bin/systemctl" <<'MOCK'
 #!/bin/bash
-[[ "$2" == apparmor || "$2" == auditd || "$2" == unattended-upgrades ]]
+[[ "$3" == apparmor || "$3" == auditd || "$3" == unattended-upgrades ]]
 MOCK
 cat > "$tmp/bin/sshd" <<'MOCK'
 #!/bin/bash
