@@ -75,6 +75,7 @@ echo "Checksum helper positive and negative smoke tests passed."
 # Role helper tests include dry-run and mocked execution (no host account/group changes).
 bash "$ROOT/scripts/test-assign-role.sh"
 bash "$ROOT/scripts/test-provision-user.sh"
+bash "$ROOT/scripts/test-provision-user-execution.sh"
 bash "$ROOT/scripts/test-first-user-install-hook.sh"
 bash "$ROOT/scripts/test-xfce-onboarding-hook.sh"
 bash "$ROOT/scripts/test-lightdm-branding-hook.sh"
