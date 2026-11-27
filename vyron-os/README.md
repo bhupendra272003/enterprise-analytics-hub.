@@ -44,3 +44,8 @@ evidence in a new candidate workspace. It refuses overwrite and symlink inputs.
 Mocked fixtures in CI test failure handling only; they are not authentic release
 inputs. Intake evidence does not certify customization compatibility, installation,
 or bootability.
+
+
+## Analytics workstation quick start
+
+See [Analytics Quick Start](docs/ANALYTICS-QUICKSTART.md) for the intended analyst workflow and security/account guidance. This documentation does not imply that the ISO has been built or boot-tested.
