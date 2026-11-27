@@ -14,3 +14,8 @@ The live chroot hook `0800-vyron-local-groups.hook.chroot` establishes the follo
 - Installer/admin provisioning must assign each person's role group and validate permissions.
 - The shared directory is only a local filesystem scaffold; tenant/data access must still be enforced in application services and tests.
 - The hook is syntactically reviewed by CI but not yet run in a live Ubuntu image.
+
+
+## Automated hook tests
+
+`scripts/test-local-groups-hook.sh` runs the group hook using mocked `getent`, `groupadd`, and `install` commands. It verifies the expected group set, directory-command count, and idempotent second run without touching host groups or directories. This is a mocked test, not a real installation/permission validation.
