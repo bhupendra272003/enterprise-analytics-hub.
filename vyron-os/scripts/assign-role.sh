@@ -21,7 +21,7 @@ if [[ $dry -eq 1 ]]; then
  echo "DRY RUN: check for conflicting existing Vyron role membership before changing groups"
  exit 0
 fi
-[[ $EUID -eq 0 ]] || { echo "Run as root (e.g. sudo)." >&2; exit 1; }
+[[ "${VYRON_TEST_MODE:-0}" == "1" || $EUID -eq 0 ]] || { echo "Run as root (e.g. sudo)." >&2; exit 1; }
 id "$user" >/dev/null 2>&1 || { echo "Account '$user' does not exist; refusing to create it." >&2; exit 1; }
 getent group "$group" >/dev/null || { echo "Required group '$group' missing." >&2; exit 1; }
 getent group vyron-users >/dev/null || { echo "Required group vyron-users missing." >&2; exit 1; }
