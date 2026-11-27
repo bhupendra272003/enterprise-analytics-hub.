@@ -28,4 +28,22 @@ grep -q 'signature verification failed' "$tmp/bad-signature.log"
 ln -s "$tmp/source.iso" "$tmp/iso-link"
 if PATH="$tmp/bin:$PATH" VYRON_EXPECTED_SIGNING_FINGERPRINT="$fingerprint" bash "$ROOT/scripts/verify-source-integrity.sh" "$tmp/iso-link" "$tmp/SHA256SUMS" "$tmp/signature.gpg" "$tmp/keyring.gpg" >"$tmp/link.log" 2>&1; then echo "ERROR: symlink ISO accepted"; exit 1; fi
 grep -q 'not symlink' "$tmp/link.log"
+# Reject symlinks for every trust input, not only the ISO.
+for input in SHA256SUMS signature.gpg keyring.gpg; do
+ ln -sf "$tmp/$input" "$tmp/link-$input"
+ args=("$tmp/source.iso" "$tmp/SHA256SUMS" "$tmp/signature.gpg" "$tmp/keyring.gpg")
+ case "$input" in
+  SHA256SUMS) args[1]="$tmp/link-$input" ;;
+  signature.gpg) args[2]="$tmp/link-$input" ;;
+  keyring.gpg) args[3]="$tmp/link-$input" ;;
+ esac
+ if PATH="$tmp/bin:$PATH" VYRON_EXPECTED_SIGNING_FINGERPRINT="$fingerprint" bash "$ROOT/scripts/verify-source-integrity.sh" "${args[@]}" >"$tmp/input-link.log" 2>&1; then
+  echo "ERROR: symlink $input accepted"; exit 1
+ fi
+ grep -q 'not symlink' "$tmp/input-link.log"
+done
+if PATH="$tmp/bin:$PATH" VYRON_EXPECTED_SIGNING_FINGERPRINT="bad-pin" bash "$ROOT/scripts/verify-source-integrity.sh" "$tmp/source.iso" "$tmp/SHA256SUMS" "$tmp/signature.gpg" "$tmp/keyring.gpg" >"$tmp/malformed-pin.log" 2>&1; then
+ echo "ERROR: malformed fingerprint accepted"; exit 1
+fi
+grep -q 'independently verified' "$tmp/malformed-pin.log"
 echo "Source integrity helper regression tests passed."
