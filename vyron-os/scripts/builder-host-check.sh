@@ -2,6 +2,10 @@
 # Read-only preflight for the VyronOS image-building host.
 set -euo pipefail
 MIN_FREE_GB="${VYRON_MIN_FREE_GB:-100}"
+if [[ ! "$MIN_FREE_GB" =~ ^[1-9][0-9]*$ ]]; then
+ echo "ERROR: VYRON_MIN_FREE_GB must be a positive whole number of GiB" >&2
+ exit 2
+fi
 BUILD_DIR="${VYRON_BUILD_DIR:-$PWD}"
 errors=0
 warnings=0
