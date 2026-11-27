@@ -26,7 +26,6 @@ python3-pandas
 python3-matplotlib
 python3-seaborn
 python3-scipy
-python3-jupyter
 python3-notebook
 mysql-server
 mysql-client
