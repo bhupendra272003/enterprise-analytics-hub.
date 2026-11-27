@@ -26,4 +26,11 @@ if VYRON_TEST_DF_AVAILABLE=92274688 VYRON_BUILD_DIR="$tmp/build" VYRON_SOURCE_IS
  echo 'ERROR: readiness snapshot accepted less than 100 GiB free'; exit 1
 fi
 grep -q 'BLOCKED: storage 88 GiB free; target >=100 GiB' "$tmp/blocked-report.txt"
+# A report symlink must be rejected without modifying its target.
+printf 'keep intact\\n' > "$tmp/target.txt"
+ln -s "$tmp/target.txt" "$tmp/symlink-report"
+if VYRON_BUILD_DIR="$tmp/build" VYRON_SOURCE_ISO="$tmp/source.iso" VYRON_READINESS_REPORT="$tmp/symlink-report" bash "$ROOT/scripts/release-readiness-snapshot.sh" >/dev/null 2>&1; then
+ echo 'ERROR: report symlink was accepted'; exit 1
+fi
+grep -q 'keep intact' "$tmp/target.txt"
 echo 'Release readiness snapshot regression tests passed.'
