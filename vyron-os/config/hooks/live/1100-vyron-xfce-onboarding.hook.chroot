@@ -12,10 +12,12 @@ install -m 0644 "$ROOT/desktop/branding/wallpaper.svg" /usr/share/backgrounds/vy
 cat > /usr/share/vyron/welcome.sh <<'WELCOME'
 #!/usr/bin/env bash
 set -euo pipefail
-if command -v zenity >/dev/null 2>&1; then
- zenity --info --title="Welcome to Bhupendra's Workstation" --width=480 --text="Welcome to Bhupendra's Workstation\n\nVyronOS analytics environment\n\nYour account and local role are configured by your administrator.\n\nIf no account exists yet, use the desktop Setup User launcher to create your local account.
-
-Start with Firefox, LibreOffice, Python or MySQL from the Applications menu."
+# Display the welcome dialog once per user; keep a reusable help launcher available.
+marker="${HOME}/.config/vyron/welcome-shown"
+if [[ ! -e "$marker" ]] && command -v zenity >/dev/null 2>&1; then
+ zenity --info --title="Welcome to Bhupendra's Workstation" --width=480 --text="Welcome to Bhupendra's Workstation\n\nVyronOS analytics environment\n\nYour account and local role are configured by your administrator.\n\nStart with Firefox, LibreOffice, Python or MySQL from the Applications menu."
+ install -d -m 0755 "$(dirname "$marker")"
+ touch "$marker"
 fi
 WELCOME
 chmod 0755 /usr/share/vyron/welcome.sh
