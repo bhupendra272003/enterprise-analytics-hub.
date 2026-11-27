@@ -71,4 +71,14 @@ if bash "$SCRIPT" "$tmp/source.iso" "$tmp/output.iso" "$tmp/actions.yaml" "$tmp/
   echo 'ERROR: accepted mismatched signing-key pin' >&2; exit 1
 fi
 grep -q 'signing-key fingerprint must match' "$tmp/wrong-fingerprint.log"
+# Symlink source, actions and destination must fail closed.
+ln -s "$tmp/source.iso" "$tmp/source-link.iso"
+if bash "$SCRIPT" "$tmp/source-link.iso" "$tmp/link-output.iso" "$tmp/actions.yaml" "$tmp/intake" "$tmp/keyring.gpg" >"$tmp/source-link.log" 2>&1; then echo 'ERROR: symlink source accepted'; exit 1; fi
+grep -q 'symlink input is not accepted' "$tmp/source-link.log"
+ln -s "$tmp/actions.yaml" "$tmp/actions-link.yaml"
+if bash "$SCRIPT" "$tmp/source.iso" "$tmp/actions-link-output.iso" "$tmp/actions-link.yaml" "$tmp/intake" "$tmp/keyring.gpg" >"$tmp/actions-link.log" 2>&1; then echo 'ERROR: symlink actions accepted'; exit 1; fi
+grep -q 'symlink input is not accepted' "$tmp/actions-link.log"
+ln -s "$tmp/nonexistent-output" "$tmp/output-link.iso"
+if bash "$SCRIPT" "$tmp/source.iso" "$tmp/output-link.iso" "$tmp/actions.yaml" "$tmp/intake" "$tmp/keyring.gpg" >"$tmp/output-link.log" 2>&1; then echo 'ERROR: symlink destination accepted'; exit 1; fi
+grep -q 'symlink destination is not accepted' "$tmp/output-link.log"
 echo 'Customization wrapper safety regression tests passed (inputs, evidence binding, pin, threshold, source/destination and overwrite).'
