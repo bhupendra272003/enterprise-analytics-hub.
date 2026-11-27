@@ -20,3 +20,27 @@ This repository currently contains the build scaffolding and host preparation sc
 
 ## Security notes
 Linux groups alone do not implement application RBAC. USB blocking is not a complete data-loss-prevention system. Role policy, file permissions, application controls, audit logs and encryption must be tested together. Never test the installer on a machine with valuable data without backups.
+
+## Base ISO intake (authenticated, evidence-first)
+
+The intake pipeline is deliberately fail-closed. Before running it, obtain the ISO,
+checksum manifest, detached signature and signing-keyring from the official Ubuntu
+release channels, and independently confirm the signing-key fingerprint using
+Ubuntu's published guidance. Do not treat a fingerprint copied only from a file
+in this repository or from the same download as independent verification.
+
+On a dedicated Ubuntu build host, after confirming the fingerprint out-of-band:
+
+```bash
+export VYRON_EXPECTED_SIGNING_FINGERPRINT='YOUR independently verified fingerprint'
+mkdir -p ~/vyron-candidates
+sudo bash scripts/prepare-host.sh
+bash scripts/intake-base-iso.sh /path/to/ubuntu.iso /path/to/SHA256SUMS /path/to/SHA256SUMS.gpg /path/to/trusted-keyring.gpg ~/vyron-candidates/ubuntu-intake
+```
+
+Use the correct repository folder when invoking the script. Intake authenticates the
+checksum manifest, verifies the ISO hash, performs read-only inspection, and records
+evidence in a new candidate workspace. It refuses overwrite and symlink inputs.
+Mocked fixtures in CI test failure handling only; they are not authentic release
+inputs. Intake evidence does not certify customization compatibility, installation,
+or bootability.
