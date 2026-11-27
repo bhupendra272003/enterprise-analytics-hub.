@@ -69,6 +69,15 @@ class FinancialProjectAssetTests(unittest.TestCase):
         self.assertIn("loan_amount_outcome_summary.csv", guide)
         self.assertIn("loan_amount_outcome_summary.csv", readme)
 
+    def test_analytics_manifest_is_documented(self):
+        script = (ROOT / "python" / "build_analytics.py").read_text(encoding="utf-8")
+        self.assertIn("analytics_manifest.json", script)
+        self.assertIn("_sha256_file", script)
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        guide = (ROOT / "POWER_BI_MODEL.md").read_text(encoding="utf-8")
+        self.assertIn("analytics_manifest.json", readme)
+        self.assertIn("analytics_manifest.json", guide)
+
     def test_python_profiler_covers_all_table_nulls_and_relationships(self):
         script = (ROOT / "python" / "profile_financial.py").read_text(encoding="utf-8")
         self.assertIn("fetch_missing_values", script)

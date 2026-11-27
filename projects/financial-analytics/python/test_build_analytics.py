@@ -1,5 +1,7 @@
 """Unit tests for offline Financial grouped analytical outputs."""
 import csv
+import hashlib
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -44,6 +46,21 @@ class BuildAnalyticsTests(unittest.TestCase):
         self.assertEqual(duration[0]["duration_months"], "12")
         self.assertEqual(duration[0]["average_loan_amount"], "1000.00")
         self.assertAlmostEqual(sum(float(row["share_pct"]) for row in duration), 100.0, places=1)
+
+    def test_analytics_manifest_hashes_input_and_outputs(self):
+        result = build_analytics(self.directory)
+        manifest = json.loads((self.directory / result["manifest_file"]).read_text(encoding="utf-8"))
+        source = self.directory / "loan_analysis_extract.csv"
+        self.assertEqual(manifest["schema_version"], 1)
+        self.assertEqual(manifest["source"]["file"], source.name)
+        self.assertEqual(manifest["source"]["sha256"], hashlib.sha256(source.read_bytes()).hexdigest())
+        self.assertEqual(manifest["summary"]["loan_rows"], 3)
+        self.assertTrue(manifest["descriptive_only"])
+        for output in manifest["outputs"]:
+            path = self.directory / output["file"]
+            self.assertEqual(output["bytes"], path.stat().st_size)
+            self.assertEqual(output["sha256"], hashlib.sha256(path.read_bytes()).hexdigest())
+        self.assertEqual(len(manifest["outputs"]), 4)
 
     def test_amount_band_boundaries_and_exceptions(self):
         self.assertEqual(normalize_loan_amount_band("50000"), "0 < amount <= 50,000")

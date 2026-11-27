@@ -50,6 +50,7 @@ The profiler prompts for the database user and password; it does not write them 
 | output/loan_vintage_outcome_summary.csv | Descriptive loan counts, distinct accounts, average amount and overall share by loan month and observed status |
 | output/loan_amount_outcome_summary.csv | Descriptive loan counts, distinct accounts, average principal and overall share by fixed amount band and observed status; non-positive, missing and invalid values remain separate |
 | output/loan_scheduled_repayment_summary.csv | Scheduled installment and scheduled-total-to-principal metrics by duration/status; not actual repayments |
+| output/analytics_manifest.json | SHA-256 fingerprint of the loan extract and four grouped-summary outputs, plus byte sizes and build summary |
 | output/loan_prior_features.csv | Transaction aggregates strictly before each loan date, without the target status |
 | output/source_tables/*.csv | Full raw-table extracts for all eight source tables, streamed in 10,000-row batches |
 | output/source_tables/manifest.json | Export completion marker with UTC timestamp, row counts, column counts and source column names for all eight tables |
@@ -74,7 +75,7 @@ Transaction types are retained as observed categories. Do not label them income/
 2. Load source_profile.json, loan_analysis_extract.csv, loan_prior_features.csv, loan_duration_outcome_summary.csv, loan_vintage_outcome_summary.csv, loan_amount_outcome_summary.csv, loan_scheduled_repayment_summary.csv, missing_value_profile.csv, and relationship_integrity.csv into Vyron's Financial Analytics page for local review.
 3. Import the CSV outputs into Power BI Desktop, including loan_amount_outcome_summary.csv for principal-band comparisons.
 4. Follow POWER_BI_MODEL.md for relationship cardinality, measures, temporal leakage controls and report pages.
-5. Keep source extract date, query version, row counts and validation report with the PBIX deliverable.
+5. Keep source extract date, query version, row counts, `analytics_manifest.json`, and validation report with the PBIX deliverable. The manifest fingerprints the input loan extract and core grouped outputs; it is not a substitute for validation.
 
 ## Important limitations
 
