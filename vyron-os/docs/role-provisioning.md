@@ -26,4 +26,4 @@ Roles accepted: `owner`, `manager`, `leader`, `analyst`. The helper rejects unkn
 - It does not yet provision organizations, app users, workspace memberships, datasets, or permissions.
 - It grants no sudo privileges.
 - Account creation, authentication, recovery, and app authorization require a separate reviewed implementation.
-- CI smoke tests only exercise the dry-run path; no real host changes are made.
+- CI tests include an isolated mock-mode execution path for the two expected `usermod` calls and a conflict rejection case; mocked commands prevent host changes. This does not validate behavior on a real Ubuntu host.
