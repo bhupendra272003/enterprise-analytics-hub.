@@ -55,7 +55,7 @@ helper="$ROOT/scripts/verify-iso-checksum.sh"
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "$tmpdir"' EXIT
 printf 'fixture ISO data\n' > "$tmpdir/test.iso"
-sha256sum "$tmpdir/test.iso" > "$tmpdir/SHA256SUMS"
+(cd "$tmpdir" && sha256sum test.iso > SHA256SUMS)
 bash "$helper" "$tmpdir/test.iso" "$tmpdir/SHA256SUMS"
 # Negative test: a modified checksum must be rejected.
 printf '0000000000000000000000000000000000000000000000000000000000000000  test.iso\n' > "$tmpdir/bad-sums"
