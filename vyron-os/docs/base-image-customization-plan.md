@@ -7,7 +7,7 @@ Ubuntu's documentation identifies `livecd-rootfs` as its image creation machiner
 
 ## Practical workflow
 
-A guarded wrapper now exists at `scripts/customize-base-iso.sh`. It requires a source ISO, destination path and reviewed LiveFS Editor YAML action file; checks source/destination separation, tools and free disk space; prints the source hash; and requires an explicit typed confirmation before running. It is a wrapper, not yet a verified end-to-end pipeline.
+A guarded wrapper now exists at `scripts/customize-base-iso.sh`. It requires a source ISO, destination path and reviewed LiveFS Editor YAML action file; checks source/destination separation, tools and free disk space (100 GiB by default, aligned with builder preflight; configurable via `VYRON_CUSTOMIZE_MIN_FREE_GB`); prints the source hash; and requires an explicit typed confirmation before running. It is a wrapper, not yet a verified end-to-end pipeline.
 1. Download a verified Ubuntu 24.04 Desktop ISO from an official source; verify its checksum/signature.
 2. Run customization on a dedicated Ubuntu 24.04 VM/host with ample disk space (recommend 100 GB+ for ISO customization workflows).
 3. Prepare and review a LiveFS Editor action YAML; use the guarded wrapper. The precise desktop squashfs targets and branding action sequence still require test validation.
