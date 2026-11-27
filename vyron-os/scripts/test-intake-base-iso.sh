@@ -29,6 +29,7 @@ printf '/dev/mock 200000000 1 125829120 1%% /mock\n'
 MOCK
 chmod +x "$tmp/bin/"*
 export PATH="$tmp/bin:$PATH"
+export VYRON_EXPECTED_SIGNING_FINGERPRINT="0123456789ABCDEF0123456789ABCDEF01234567"
 VYRON_INTAKE_MIN_FREE_GB=abc bash "$SCRIPT" "$tmp/source.iso" "$tmp/SHA256SUMS" "$tmp/SHA256SUMS.gpg" "$tmp/keyring.gpg" "$tmp/bad-threshold" >"$tmp/threshold.log" 2>&1 && { echo "ERROR: invalid threshold accepted"; exit 1; }
 grep -q 'must be a positive whole number' "$tmp/threshold.log"
 bash "$SCRIPT" "$tmp/source.iso" "$tmp/SHA256SUMS" "$tmp/SHA256SUMS.gpg" "$tmp/keyring.gpg" "$tmp/candidate"
