@@ -9,6 +9,9 @@ grep -Fq 'logo=/usr/share/pixmaps/vyron/lion-mark.svg' "$hook"
 grep -Fq 'theme-name=Arc-Dark' "$hook"
 grep -Fq 'hide-users=true' "$hook"
 grep -Fq 'user-session=xfce' "$hook"
+grep -Fq 'show-manual-login=false' "$hook"
+grep -Fq 'indicators=~host;~spacer;~clock;~spacer;~session;~language;~a11y;~power' "$hook"
+grep -Fq 'position=50% 50%' "$hook"
 grep -Fq 'greeter-session=lightdm-gtk-greeter' "$hook"
 if grep -Eiq 'autologin-user[[:space:]]*=' "$hook"; then
  echo "ERROR: greeter hook must not enable autologin"; exit 1
