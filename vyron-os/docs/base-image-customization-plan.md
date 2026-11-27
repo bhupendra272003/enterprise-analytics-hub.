@@ -11,6 +11,21 @@ A guarded wrapper now exists at `scripts/customize-base-iso.sh`. It requires a s
 1. Download a verified Ubuntu 24.04 Desktop ISO from an official source; verify its checksum/signature.
 2. Run customization on a dedicated Ubuntu 24.04 VM/host with ample disk space (recommend 100 GB+ for ISO customization workflows).
 3. Prepare and review a LiveFS Editor action YAML; use the guarded wrapper with the intake workspace and same trusted keyring (see `docs/base-iso-inspection.md`). The precise desktop squashfs targets and branding action sequence still require test validation.
+
+Example invocation after authenticated intake (run only inside the isolated Ubuntu 24.04 builder):
+
+```bash
+VYRON_EXPECTED_SIGNING_FINGERPRINT=YOUR_INDEPENDENTLY_VERIFIED_FINGERPRINT \\
+  sudo --preserve-env=VYRON_EXPECTED_SIGNING_FINGERPRINT \\
+  scripts/customize-base-iso.sh \\
+  /path/to/ubuntu-24.04-desktop.iso \\
+  /path/to/vyronos-candidate.iso \\
+  /path/to/reviewed-actions.yaml \\
+  /path/to/vyronos-base-candidate \\
+  /path/to/ubuntu-trusted-keyring.gpg
+```
+
+The wrapper rechecks the manifest signature and ISO checksum using the supplied keyring and pin immediately before the privileged customization step. The evidence text is an audit aid; the cryptographic recheck is the trust gate.
 4. Keep installer, casper, kernel and initramfs components intact unless an explicit validated change requires rebuilding them.
 5. Generate image, checksum, inspect files, and VM-test both BIOS/UEFI where supported, plus installer and live session.
 6. Never use this pipeline on the host's system image or production disk; build in an isolated workspace.
