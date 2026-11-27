@@ -8,7 +8,7 @@ cat > "$tmp/bin/xorriso" <<'MOCK'
 printf 'xorriso args:'; printf ' <%s>' "$@"; printf '\n'
 case " $* " in
  *" -report_el_torito plain "*) echo 'El Torito boot catalog: present';;
- *" -ls /casper "*) echo 'filesystem.squashfs'; echo 'vmlinuz'; echo 'initrd';;
+ *" -ls /casper "*) [[ "${VYRON_TEST_FAIL_CASPER:-0}" != 1 ]] || exit 17; echo 'filesystem.squashfs'; echo 'vmlinuz'; echo 'initrd';
  *" -ls / "*) echo 'casper'; echo 'boot';;
  *) exit 9;;
 esac
@@ -18,6 +18,14 @@ PATH="$tmp/bin:$PATH" bash "$ROOT/scripts/inspect-base-iso.sh" "$tmp/source.iso"
 grep -q 'filesystem.squashfs' "$tmp/report.txt"
 grep -q 'El Torito boot metadata' "$tmp/report.txt"
 grep -q 'does not verify the publisher signature' "$tmp/report.txt"
+# Failed inspection must not publish a partial report or leave a temporary artifact.
+if PATH="$tmp/bin:$PATH" VYRON_TEST_FAIL_CASPER=1 bash "$ROOT/scripts/inspect-base-iso.sh" "$tmp/source.iso" "$tmp/failed-report.txt" >/dev/null 2>&1; then
+ echo 'ERROR: inspector accepted a failed xorriso operation'; exit 1
+fi
+[[ ! -e "$tmp/failed-report.txt" ]]
+if compgen -G "$tmp/failed-report.txt.tmp.*" >/dev/null; then
+ echo 'ERROR: inspector left a partial temporary report'; exit 1
+fi
 # Never truncate or overwrite a pre-existing report (including a symlink).
 printf 'keep-existing-report\n' > "$tmp/existing-report.txt"
 if PATH="$tmp/bin:$PATH" bash "$ROOT/scripts/inspect-base-iso.sh" "$tmp/source.iso" "$tmp/existing-report.txt" >/dev/null 2>&1; then
