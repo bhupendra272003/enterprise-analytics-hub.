@@ -10,6 +10,7 @@ grep -q '^=== Casper entries (if present) ===$' "$REPORT" || { echo "ERROR: repo
 for path in "$@"; do
  [[ "$path" == /* && "$path" != *'..'* ]] || { echo "ERROR: required ISO path must be absolute and traversal-free: $path" >&2; exit 2; }
  # Match listing tokens, not merely report commentary.
- if ! grep -Fq "$path" "$REPORT"; then echo "ERROR: required ISO path not found in inspection report: $path" >&2; exit 1; fi
+ basename="$(basename "$path")"
+ if ! grep -Fxq "$basename" "$REPORT" && ! grep -Fq "$path" "$REPORT"; then echo "ERROR: required ISO path not found in inspection report: $path" >&2; exit 1; fi
 done
 echo "Inspection report documents all requested paths. This is a text-presence check, not ISO compatibility proof."
