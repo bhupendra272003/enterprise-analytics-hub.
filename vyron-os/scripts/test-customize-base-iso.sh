@@ -32,12 +32,12 @@ for value in abc 0 -5 1.5; do
   fi
   grep -q 'VYRON_CUSTOMIZE_MIN_FREE_GB must be a positive whole number' "$tmp/out"
 done
-if bash "$SCRIPT" "$tmp/source.iso" "$tmp/source.iso" "$tmp/actions.yaml" "$tmp/intake" "$tmp/keyring.gpg" >"$tmp/same.log" 2>&1; then
+if PATH="$tmp/mock-bin:$PATH" bash "$SCRIPT" "$tmp/source.iso" "$tmp/source.iso" "$tmp/actions.yaml" "$tmp/intake" "$tmp/keyring.gpg" >"$tmp/same.log" 2>&1; then
   echo 'ERROR: accepted source as destination' >&2; exit 1
 fi
 grep -q 'destination must differ from source' "$tmp/same.log"
 printf 'existing output must survive\n' > "$tmp/existing.iso"
-if bash "$SCRIPT" "$tmp/source.iso" "$tmp/existing.iso" "$tmp/actions.yaml" "$tmp/intake" "$tmp/keyring.gpg" >"$tmp/existing.log" 2>&1; then
+if PATH="$tmp/mock-bin:$PATH" bash "$SCRIPT" "$tmp/source.iso" "$tmp/existing.iso" "$tmp/actions.yaml" "$tmp/intake" "$tmp/keyring.gpg" >"$tmp/existing.log" 2>&1; then
   echo 'ERROR: accepted existing destination' >&2; exit 1
 fi
 grep -q 'destination already exists; refusing overwrite' "$tmp/existing.log"
