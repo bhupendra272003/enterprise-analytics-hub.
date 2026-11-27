@@ -4,6 +4,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 usage(){ echo "Usage: $0 SOURCE.iso SHA256SUMS SHA256SUMS.gpg TRUSTED_KEYRING CANDIDATE_DIR" >&2; }
 [[ $# -eq 5 ]] || { usage; exit 2; }
+# Reject symlink inputs before canonicalizing paths; otherwise realpath hides them.
+for input in "$1" "$2" "$3" "$4"; do
+  [[ ! -L "$input" ]] || { echo "ERROR: symlink input is not accepted: $input" >&2; exit 1; }
+done
 ISO="$(realpath "$1")"; SUMS="$(realpath "$2")"; SIG="$(realpath "$3")"; KEYRING="$(realpath "$4")"
 WORKSPACE_PARENT="$(realpath "$(dirname "$5")")"
 WORKSPACE="$WORKSPACE_PARENT/$(basename "$5")"
