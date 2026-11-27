@@ -41,7 +41,7 @@ trap cleanup EXIT
   if [[ -n "$SOURCE_ISO" ]]; then echo "Source ISO: $(basename "$SOURCE_ISO")"; echo "Source SHA256: $SOURCE_HASH"; else echo "Source ISO: not-provided"; echo "Source SHA256: $SOURCE_HASH"; fi
   echo "Status: evidence only; does not certify authenticity, bootability, installation, or release readiness."
 } > "$STAGING/candidate-evidence.txt"
-printf '%s  %s\\n' "$OUT_HASH" "$(basename "$OUTPUT_ISO")"
+printf '%s  %s\n' "$OUT_HASH" "$(basename "$OUTPUT_ISO")"
 chmod 0644 "$STAGING/"*
 mv -T -n -- "$STAGING" "$FINAL_DIR"
 [[ ! -e "$STAGING" ]] || { echo "Evidence destination appeared during publication; refusing to overwrite" >&2; exit 1; }
