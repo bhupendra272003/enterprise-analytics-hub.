@@ -42,12 +42,16 @@ if bash "$SCRIPT" "$tmp/source.iso" "$tmp/output.iso" "$tmp/actions.yaml" "$tmp/
 fi
 grep -q 'authenticated intake evidence directory unreadable' "$tmp/missing-evidence.log"
 mkdir -p "$tmp/wrong-intake"
+cp "$tmp/intake/SHA256SUMS" "$tmp/wrong-intake/SHA256SUMS"
+cp "$tmp/intake/SHA256SUMS.gpg" "$tmp/wrong-intake/SHA256SUMS.gpg"
 printf 'Source ISO: %s\nSource SHA256: %s\nPinned signing-key fingerprint: %s\n' "$(realpath "$tmp/source.iso")" "0000000000000000000000000000000000000000000000000000000000000000" "$VYRON_EXPECTED_SIGNING_FINGERPRINT" > "$tmp/wrong-intake/intake-evidence.txt"
 if bash "$SCRIPT" "$tmp/source.iso" "$tmp/output.iso" "$tmp/actions.yaml" "$tmp/wrong-intake" "$tmp/keyring.gpg" >"$tmp/wrong-evidence.log" 2>&1; then
   echo 'ERROR: accepted evidence for different source bytes' >&2; exit 1
 fi
 grep -q 'intake evidence does not match' "$tmp/wrong-evidence.log"
 mkdir -p "$tmp/wrong-fingerprint-intake"
+cp "$tmp/intake/SHA256SUMS" "$tmp/wrong-fingerprint-intake/SHA256SUMS"
+cp "$tmp/intake/SHA256SUMS.gpg" "$tmp/wrong-fingerprint-intake/SHA256SUMS.gpg"
 printf 'Source ISO: %s\nSource SHA256: %s\nPinned signing-key fingerprint: %s\n' "$(realpath "$tmp/source.iso")" "$(sha256sum "$tmp/source.iso" | awk '{print toupper($1)}')" "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" > "$tmp/wrong-fingerprint-intake/intake-evidence.txt"
 if bash "$SCRIPT" "$tmp/source.iso" "$tmp/output.iso" "$tmp/actions.yaml" "$tmp/wrong-fingerprint-intake" "$tmp/keyring.gpg" >"$tmp/wrong-fingerprint.log" 2>&1; then
   echo 'ERROR: accepted mismatched signing-key pin' >&2; exit 1
