@@ -11,7 +11,7 @@ printf 'test signature\n' > "$tmp/SHA256SUMS.gpg"
 (cd "$tmp" && sha256sum source.iso > SHA256SUMS)
 cat > "$tmp/bin/gpgv" <<'MOCK'
 #!/usr/bin/env bash
-exit 0
+echo "[GNUPG:] VALIDSIG 0123456789ABCDEF0123456789ABCDEF01234567 20261127 0 4 0 1 10 00 ABCDEF"
 MOCK
 cat > "$tmp/bin/xorriso" <<'MOCK'
 #!/usr/bin/env bash
