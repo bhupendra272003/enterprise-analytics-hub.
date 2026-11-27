@@ -31,6 +31,11 @@ MOCK
 chmod +x "$tmp/bin/"*
 export PATH="$tmp/bin:$PATH"
 export VYRON_EXPECTED_SIGNING_FINGERPRINT="0123456789ABCDEF0123456789ABCDEF01234567"
+# Intake must reject symlink source inputs before canonicalization.
+ln -s "$tmp/source.iso" "$tmp/source-link.iso"
+if bash "$SCRIPT" "$tmp/source-link.iso" "$tmp/SHA256SUMS" "$tmp/SHA256SUMS.gpg" "$tmp/keyring.gpg" "$tmp/symlink-input" >"$tmp/input-link.log" 2>&1; then echo "ERROR: symlink source accepted"; exit 1; fi
+grep -q 'symlink input is not accepted' "$tmp/input-link.log"
+test ! -e "$tmp/symlink-input"
 VYRON_INTAKE_MIN_FREE_GB=abc bash "$SCRIPT" "$tmp/source.iso" "$tmp/SHA256SUMS" "$tmp/SHA256SUMS.gpg" "$tmp/keyring.gpg" "$tmp/bad-threshold" >"$tmp/threshold.log" 2>&1 && { echo "ERROR: invalid threshold accepted"; exit 1; }
 grep -q 'must be a positive whole number' "$tmp/threshold.log"
 bash "$SCRIPT" "$tmp/source.iso" "$tmp/SHA256SUMS" "$tmp/SHA256SUMS.gpg" "$tmp/keyring.gpg" "$tmp/candidate"
