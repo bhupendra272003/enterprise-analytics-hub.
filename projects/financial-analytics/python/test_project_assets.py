@@ -1,6 +1,7 @@
 """Offline contract tests for the read-only CTU Financial project pack."""
 from pathlib import Path
 import csv
+import hashlib
 import json
 import re
 import tempfile
@@ -123,6 +124,7 @@ class FinancialProjectAssetTests(unittest.TestCase):
         manifest = {
             "dataset": "financial",
             "read_only": True,
+            "manifest_version": 2,
             "tables": {},
         }
         for table in sorted(validate_exports.SOURCE_TABLES):
@@ -139,6 +141,8 @@ class FinancialProjectAssetTests(unittest.TestCase):
                 "row_count": len(rows),
                 "column_count": len(columns),
                 "columns": columns,
+                "byte_size": (export_dir / f\"{table}.csv\").stat().st_size,
+                "sha256": hashlib.sha256((export_dir / f\"{table}.csv\").read_bytes()).hexdigest(),
             }
         (export_dir / "manifest.json").write_text(
             json.dumps(manifest), encoding="utf-8"
@@ -152,6 +156,30 @@ class FinancialProjectAssetTests(unittest.TestCase):
             passed, detail = validate_exports.validate_raw_source_exports(directory)
             self.assertTrue(passed, detail)
             self.assertIn("All eight raw CSVs", detail)
+
+    def test_raw_export_manifest_rejects_checksum_mismatch(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            self._write_raw_export_fixture(directory)
+            with (directory / "source_tables" / "loan.csv").open("a", encoding="utf-8") as handle:
+                handle.write("tampered\\n")
+            passed, detail = validate_exports.validate_raw_source_exports(directory)
+            self.assertFalse(passed)
+            self.assertIn("SHA-256 checksum mismatch", detail)
+
+    def test_raw_export_manifest_accepts_legacy_version_one(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            manifest = self._write_raw_export_fixture(directory)
+            manifest["manifest_version"] = 1
+            for item in manifest["tables"].values():
+                item.pop("byte_size", None)
+                item.pop("sha256", None)
+            (directory / "source_tables" / "manifest.json").write_text(
+                json.dumps(manifest), encoding="utf-8"
+            )
+            passed, detail = validate_exports.validate_raw_source_exports(directory)
+            self.assertTrue(passed, detail)
 
     def test_raw_export_manifest_rejects_row_count_mismatch(self):
         with tempfile.TemporaryDirectory() as temp:

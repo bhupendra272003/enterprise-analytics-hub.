@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import csv
 import getpass
+import hashlib
 import json
 import shutil
 from datetime import datetime, timezone
@@ -59,6 +60,14 @@ def stream_table(cursor, table: str, columns: list[str], destination: Path,
     return written
 
 
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def main() -> None:
     OUTPUT.mkdir(parents=True, exist_ok=True)
     if STAGING.exists():
@@ -76,6 +85,7 @@ def main() -> None:
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
         "batch_size": BATCH_SIZE,
         "read_only": True,
+        "manifest_version": 2,
         "tables": {},
     }
     try:
@@ -90,6 +100,8 @@ def main() -> None:
                 "row_count": count,
                 "column_count": len(columns),
                 "columns": columns,
+                "byte_size": staged_file.stat().st_size,
+                "sha256": sha256_file(staged_file),
             }
             print(f"  {count:,} rows staged")
         cursor.close()

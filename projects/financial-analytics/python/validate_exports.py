@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
@@ -35,6 +36,9 @@ def validate_raw_source_exports(directory: Path) -> tuple[bool, str]:
     try:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         tables = manifest.get("tables", {})
+        version = int(manifest.get("manifest_version", 1))
+        if version not in (1, 2):
+            return False, f"Unsupported raw export manifest version: {version}."
         if manifest.get("dataset") != "financial" or manifest.get("read_only") is not True:
             return False, "Manifest dataset/read_only metadata is invalid."
         if set(tables) != SOURCE_TABLES:
@@ -42,8 +46,6 @@ def validate_raw_source_exports(directory: Path) -> tuple[bool, str]:
         checked = []
         for table in sorted(SOURCE_TABLES):
             item = tables[table]
-            # Only the expected basename is accepted; a manifest must never
-            # redirect validation outside the source_tables directory.
             expected_filename = f"{table}.csv"
             if item.get("file") != expected_filename:
                 return False, f"{table}: manifest filename must be {expected_filename!r}."
@@ -60,10 +62,29 @@ def validate_raw_source_exports(directory: Path) -> tuple[bool, str]:
                 return False, f"{table}: missing CSV or empty column definition."
             if len(expected_columns) != expected_column_count:
                 return False, f"{table}: manifest column_count does not match columns."
+            if version >= 2 and (not item.get("sha256") or item.get("byte_size") is None):
+                return False, f"{table}: version 2 manifest requires byte_size and sha256."
+            if item.get("byte_size") is not None:
+                try:
+                    expected_bytes = int(item["byte_size"])
+                except (TypeError, ValueError):
+                    return False, f"{table}: manifest byte_size must be an integer."
+                if expected_bytes < 0 or path.stat().st_size != expected_bytes:
+                    return False, f"{table}: file byte size does not match manifest."
+            if item.get("sha256") is not None:
+                expected_hash = str(item["sha256"]).lower()
+                if len(expected_hash) != 64 or any(c not in "0123456789abcdef" for c in expected_hash):
+                    return False, f"{table}: manifest sha256 is not a valid SHA-256 hex digest."
+                digest = hashlib.sha256()
+                with path.open("rb") as handle:
+                    for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                        digest.update(chunk)
+                if digest.hexdigest() != expected_hash:
+                    return False, f"{table}: SHA-256 checksum mismatch."
             with path.open("r", encoding="utf-8-sig", newline="") as handle:
                 reader = csv.reader(handle)
                 header = next(reader, None)
-                if header != expected_columns or len(header) != int(item["column_count"]):
+                if header != expected_columns or len(header) != expected_column_count:
                     return False, f"{table}: CSV header does not match manifest."
                 row_count = sum(1 for _ in reader)
             if row_count != expected_row_count:
@@ -71,7 +92,7 @@ def validate_raw_source_exports(directory: Path) -> tuple[bool, str]:
             checked.append(f"{table}={row_count}")
     except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError, csv.Error, StopIteration) as exc:
         return False, f"Raw source export validation error: {exc}"
-    return True, "All eight raw CSVs match manifest row counts and headers (" + ", ".join(checked) + ")."
+    return True, "All eight raw CSVs match manifest row counts, headers, and available checksums (" + ", ".join(checked) + ")."
 
 
 
