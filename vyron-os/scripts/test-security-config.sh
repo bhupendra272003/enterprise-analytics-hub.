@@ -14,6 +14,14 @@ if bash "$validator" "$tmp/security.conf" >/dev/null 2>&1; then echo "ERROR: dup
 cp "$ROOT/config/security.conf" "$tmp/security.conf"
 sed -i 's/VYRON_FIREWALL_DEFAULT_INCOMING="deny"/VYRON_FIREWALL_DEFAULT_INCOMING="allow"/' "$tmp/security.conf"
 if bash "$validator" "$tmp/security.conf" >/dev/null 2>&1; then echo "ERROR: unsafe incoming policy accepted"; exit 1; fi
+# Unsupported policy value must be rejected.
+cp "$ROOT/config/security.conf" "$tmp/security.conf"
+sed -i 's/VYRON_FIREWALL="ufw"/VYRON_FIREWALL="iptables"/' "$tmp/security.conf"
+if bash "$validator" "$tmp/security.conf" >/dev/null 2>&1; then echo "ERROR: unsupported firewall accepted"; exit 1; fi
+# Missing required key must be rejected.
+cp "$ROOT/config/security.conf" "$tmp/security.conf"
+sed -i '/VYRON_ENABLE_AUDITD=/d' "$tmp/security.conf"
+if bash "$validator" "$tmp/security.conf" >/dev/null 2>&1; then echo "ERROR: missing required key accepted"; exit 1; fi
 # Malformed line must be rejected.
 cp "$ROOT/config/security.conf" "$tmp/security.conf"
 printf '\nmalformed policy\n' >> "$tmp/security.conf"
