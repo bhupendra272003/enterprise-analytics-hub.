@@ -26,6 +26,9 @@ fi
 if [[ ! "$EXPECTED_FINGERPRINT" =~ ^([[:xdigit:]]{40}|[[:xdigit:]]{64})$ || "${EXPECTED_FINGERPRINT^^}" != "$EVIDENCE_FINGERPRINT" ]]; then
  echo "ERROR: independently pinned signing-key fingerprint must match the intake evidence" >&2; exit 1
 fi
+echo "Source SHA256 matches intake evidence: $SOURCE_SHA256"
+echo "Re-authenticating checksum manifest and source ISO before customization..."
+VYRON_EXPECTED_SIGNING_FINGERPRINT="$EXPECTED_FINGERPRINT" bash "$ROOT/scripts/verify-source-integrity.sh" "$SOURCE" "$INTAKE_DIR/SHA256SUMS" "$INTAKE_DIR/SHA256SUMS.gpg" "$KEYRING"
 [[ "$SOURCE" != "$DEST" ]] || { echo "ERROR: destination must differ from source" >&2; exit 1; }
 [[ ! -e "$DEST" ]] || { echo "ERROR: destination already exists; refusing overwrite" >&2; exit 1; }
 command -v livefs-edit >/dev/null || { echo "ERROR: livefs-edit missing; install per Ubuntu image-cookbook instructions" >&2; exit 1; }
@@ -36,9 +39,6 @@ if (( free_gb < MIN_FREE_GB )); then echo "ERROR: at least ${MIN_FREE_GB} GiB fr
 echo "Source ISO SHA256:"
 sha256sum "$SOURCE"
 echo "Authenticated intake evidence: $EVIDENCE"
-echo "Source SHA256 matches intake evidence: $SOURCE_SHA256"
-echo "Re-authenticating checksum manifest and source ISO before customization..."
-VYRON_EXPECTED_SIGNING_FINGERPRINT="$EXPECTED_FINGERPRINT" bash "$ROOT/scripts/verify-source-integrity.sh" "$SOURCE" "$INTAKE_DIR/SHA256SUMS" "$INTAKE_DIR/SHA256SUMS.gpg" "$KEYRING"
 [[ "$EUID" -eq 0 ]] || { echo "ERROR: livefs-edit requires root; run in an isolated builder VM" >&2; exit 1; }
 echo "WARNING: LiveFS Editor primarily targets Ubuntu live/server installer images; desktop ISO compatibility is not assured."
 echo "Review the action YAML carefully. A test output is not a release image until VM-validated."
