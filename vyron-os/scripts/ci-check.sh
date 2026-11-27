@@ -54,3 +54,6 @@ echo "Checksum helper positive and negative smoke tests passed."
 
 # Dedicated role helper safe tests (dry-run only; no account or system changes).
 bash "$ROOT/scripts/test-assign-role.sh"
+
+# Local groups hook idempotency and expected-directory command tests (mocked).
+bash "$ROOT/scripts/test-local-groups-hook.sh"
