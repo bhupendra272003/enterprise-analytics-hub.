@@ -1,6 +1,11 @@
 # Vyron OS base package selection for Ubuntu 24.04 live-build
 # Ubuntu repository packages only. Vendor apps (e.g. MySQL Workbench) are provisioned separately.
 # MySQL Workbench is intentionally excluded: it is not listed in Ubuntu Noble's package index.
+# Security baseline packages.
+ufw
+auditd
+apparmor
+unattended-upgrades
 xfce4
 xfce4-goodies
 lightdm
