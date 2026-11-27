@@ -68,6 +68,7 @@ echo "Checksum helper positive and negative smoke tests passed."
 bash "$ROOT/scripts/test-assign-role.sh"
 bash "$ROOT/scripts/test-provision-user.sh"
 bash "$ROOT/scripts/test-first-user-install-hook.sh"
+bash "$ROOT/scripts/test-xfce-onboarding-hook.sh"
 
 # Local groups hook idempotency and expected-directory command tests (mocked).
 bash "$ROOT/scripts/test-local-groups-hook.sh"
