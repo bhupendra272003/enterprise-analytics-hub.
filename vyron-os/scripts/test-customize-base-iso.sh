@@ -32,7 +32,7 @@ if bash "$SCRIPT" "$tmp/missing.iso" "$tmp/output.iso" "$tmp/actions.yaml" "$tmp
   echo 'ERROR: accepted missing source ISO' >&2; exit 1
 fi
 grep -q 'source ISO unreadable' "$tmp/missing-source.log"
-if bash "$SCRIPT" "$tmp/source.iso" "$tmp/output.iso" "$tmp/missing.yaml" >"$tmp/missing-actions.log" 2>&1; then
+if bash "$SCRIPT" "$tmp/source.iso" "$tmp/output.iso" "$tmp/missing.yaml" "$tmp/intake" "$tmp/keyring.gpg" >"$tmp/missing-actions.log" 2>&1; then
   echo 'ERROR: accepted missing action YAML' >&2; exit 1
 fi
 grep -q 'action YAML unreadable' "$tmp/missing-actions.log"
@@ -40,7 +40,7 @@ grep -q 'action YAML unreadable' "$tmp/missing-actions.log"
 if bash "$SCRIPT" "$tmp/source.iso" "$tmp/output.iso" "$tmp/actions.yaml" "$tmp/missing-intake" "$tmp/keyring.gpg" >"$tmp/missing-evidence.log" 2>&1; then
   echo 'ERROR: accepted missing intake evidence' >&2; exit 1
 fi
-grep -q 'authenticated intake evidence unreadable' "$tmp/missing-evidence.log"
+grep -q 'authenticated intake evidence directory unreadable' "$tmp/missing-evidence.log"
 mkdir -p "$tmp/wrong-intake"
 printf 'Source ISO: %s\nSource SHA256: %s\nPinned signing-key fingerprint: %s\n' "$(realpath "$tmp/source.iso")" "0000000000000000000000000000000000000000000000000000000000000000" "$VYRON_EXPECTED_SIGNING_FINGERPRINT" > "$tmp/wrong-intake/intake-evidence.txt"
 if bash "$SCRIPT" "$tmp/source.iso" "$tmp/output.iso" "$tmp/actions.yaml" "$tmp/wrong-intake" "$tmp/keyring.gpg" >"$tmp/wrong-evidence.log" 2>&1; then
