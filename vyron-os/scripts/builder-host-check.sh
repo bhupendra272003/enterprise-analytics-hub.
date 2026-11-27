@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 # Read-only preflight for the VyronOS image-building host.
 set -euo pipefail
-MIN_FREE_GB="${VYRON_MIN_FREE_GB:-30}"
+MIN_FREE_GB="${VYRON_MIN_FREE_GB:-100}"
 BUILD_DIR="${VYRON_BUILD_DIR:-$PWD}"
 errors=0
 warnings=0
 say(){ printf '%s\n' "$*"; }
 fail(){ say "ERROR: $*"; errors=$((errors+1)); }
 warn(){ say "WARN: $*"; warnings=$((warnings+1)); }
-if [[ ! -r /etc/os-release ]]; then fail "/etc/os-release unavailable"; else
- . /etc/os-release
+OS_RELEASE_FILE="${VYRON_OS_RELEASE_FILE:-/etc/os-release}"
+if [[ ! -r "$OS_RELEASE_FILE" ]]; then fail "$OS_RELEASE_FILE unavailable"; else
+ . "$OS_RELEASE_FILE"
  if [[ "${ID:-}" != ubuntu ]]; then fail "Ubuntu build host required (detected ${PRETTY_NAME:-unknown})"; fi
  if [[ "${VERSION_ID:-}" != 24.04 ]]; then fail "Ubuntu 24.04 host required (detected ${VERSION_ID:-unknown})"; fi
 fi
