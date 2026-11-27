@@ -50,4 +50,16 @@ if printf 'vyron_test\nTest User\n1\ny\n' | PATH="$mock:$PATH" VYRON_TEST_MODE=1
  echo "ERROR: password failure unexpectedly succeeded"; exit 1
 fi
 grep -q '^userdel:' "$MOCK_LOG"; ! grep -q '^usermod:' "$MOCK_LOG"
-echo "Provisioning execution tests (success, cancellation, rollback) passed."
+# Invalid role must abort before confirmation or account creation.
+: > "$MOCK_LOG"
+if printf 'vyron_test\nTest User\n9\ny\n' | PATH="$mock:$PATH" VYRON_TEST_MODE=1 MOCK_LOG="$MOCK_LOG" bash "$helper"; then
+ echo "ERROR: invalid role unexpectedly succeeded"; exit 1
+fi
+! grep -q '^adduser:' "$MOCK_LOG"; ! grep -q '^usermod:' "$MOCK_LOG"
+# Account creation failure must not trigger account removal or role assignment.
+: > "$MOCK_LOG"
+if printf 'vyron_test\nTest User\n1\ny\n' | PATH="$mock:$PATH" VYRON_TEST_MODE=1 MOCK_LOG="$MOCK_LOG" MOCK_ADDUSER_FAIL=1 bash "$helper"; then
+ echo "ERROR: adduser failure unexpectedly succeeded"; exit 1
+fi
+! grep -q '^userdel:' "$MOCK_LOG"; ! grep -q '^usermod:' "$MOCK_LOG"
+echo "Provisioning execution tests (success, cancellation, role rejection, creation failure, rollback) passed."
