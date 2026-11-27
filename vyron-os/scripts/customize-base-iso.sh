@@ -5,6 +5,11 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 usage(){ echo "Usage: sudo $0 SOURCE.iso DEST.iso ACTIONS.yaml INTAKE_DIRECTORY TRUSTED_KEYRING"; }
 [[ $# -eq 5 ]] || { usage >&2; exit 2; }
+# Reject linked source/action/intake/keyring inputs before resolving paths.
+for input in "$1" "$3" "$4" "$5"; do
+ [[ ! -L "$input" ]] || { echo "ERROR: symlink input is not accepted: $input" >&2; exit 1; }
+done
+[[ ! -L "$2" ]] || { echo "ERROR: symlink destination is not accepted: $2" >&2; exit 1; }
 SOURCE="$(realpath "$1")"; DEST="$(realpath -m "$2")"; ACTIONS="$(realpath "$3")"; INTAKE_DIR="$(realpath "$4")"; KEYRING="$(realpath "$5")"; EVIDENCE="$INTAKE_DIR/intake-evidence.txt"
 MIN_FREE_GB="${VYRON_CUSTOMIZE_MIN_FREE_GB:-100}"
 if [[ ! "$MIN_FREE_GB" =~ ^[1-9][0-9]*$ ]]; then
