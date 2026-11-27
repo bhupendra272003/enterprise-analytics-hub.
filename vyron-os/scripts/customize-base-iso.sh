@@ -3,9 +3,9 @@
 # Requires a user-supplied official ISO, isolated builder and reviewed package/action YAML.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-usage(){ echo "Usage: sudo $0 SOURCE.iso DEST.iso ACTIONS.yaml INTAKE_EVIDENCE.txt"; }
-[[ $# -eq 4 ]] || { usage >&2; exit 2; }
-SOURCE="$(realpath "$1")"; DEST="$(realpath -m "$2")"; ACTIONS="$(realpath "$3")"; EVIDENCE="$(realpath "$4")"
+usage(){ echo "Usage: sudo $0 SOURCE.iso DEST.iso ACTIONS.yaml INTAKE_DIRECTORY TRUSTED_KEYRING"; }
+[[ $# -eq 5 ]] || { usage >&2; exit 2; }
+SOURCE="$(realpath "$1")"; DEST="$(realpath -m "$2")"; ACTIONS="$(realpath "$3")"; INTAKE_DIR="$(realpath "$4")"; KEYRING="$(realpath "$5")"; EVIDENCE="$INTAKE_DIR/intake-evidence.txt"
 MIN_FREE_GB="${VYRON_CUSTOMIZE_MIN_FREE_GB:-100}"
 if [[ ! "$MIN_FREE_GB" =~ ^[1-9][0-9]*$ ]]; then
  echo "ERROR: VYRON_CUSTOMIZE_MIN_FREE_GB must be a positive whole number of GiB" >&2
@@ -13,7 +13,8 @@ if [[ ! "$MIN_FREE_GB" =~ ^[1-9][0-9]*$ ]]; then
 fi
 [[ -f "$SOURCE" && -r "$SOURCE" ]] || { echo "ERROR: source ISO unreadable" >&2; exit 1; }
 [[ -f "$ACTIONS" && -r "$ACTIONS" ]] || { echo "ERROR: action YAML unreadable" >&2; exit 1; }
-[[ -f "$EVIDENCE" && -r "$EVIDENCE" && -s "$EVIDENCE" ]] || { echo "ERROR: authenticated intake evidence unreadable" >&2; exit 1; }
+[[ -d "$INTAKE_DIR" && -f "$EVIDENCE" && -r "$EVIDENCE" && -s "$EVIDENCE" ]] || { echo "ERROR: authenticated intake evidence directory unreadable" >&2; exit 1; }
+[[ -s "$INTAKE_DIR/SHA256SUMS" && -s "$INTAKE_DIR/SHA256SUMS.gpg" && -f "$KEYRING" && -r "$KEYRING" && -s "$KEYRING" ]] || { echo "ERROR: intake checksum, detached signature or trusted keyring missing" >&2; exit 1; }
 SOURCE_SHA256="$(sha256sum "$SOURCE" | awk '{print toupper($1)}')"
 EVIDENCE_SOURCE="$(sed -n 's/^Source ISO: //p' "$EVIDENCE" | head -n 1)"
 EVIDENCE_SHA256="$(sed -n 's/^Source SHA256: //p' "$EVIDENCE" | head -n 1 | tr '[:lower:]' '[:upper:]')"
@@ -36,7 +37,9 @@ if (( free_gb < MIN_FREE_GB )); then echo "ERROR: at least ${MIN_FREE_GB} GiB fr
 echo "Source ISO SHA256:"
 sha256sum "$SOURCE"
 echo "Authenticated intake evidence: $EVIDENCE"
-echo "Source SHA256 matches authenticated intake evidence: $SOURCE_SHA256"
+echo "Source SHA256 matches intake evidence: $SOURCE_SHA256"
+echo "Re-authenticating checksum manifest and source ISO before customization..."
+VYRON_EXPECTED_SIGNING_FINGERPRINT="$EXPECTED_FINGERPRINT" bash "$ROOT/scripts/verify-source-integrity.sh" "$SOURCE" "$INTAKE_DIR/SHA256SUMS" "$INTAKE_DIR/SHA256SUMS.gpg" "$KEYRING"
 echo "WARNING: LiveFS Editor primarily targets Ubuntu live/server installer images; desktop ISO compatibility is not assured."
 echo "Review the action YAML carefully. A test output is not a release image until VM-validated."
 echo "Action YAML is user-reviewed and executes installer filesystem modifications."
