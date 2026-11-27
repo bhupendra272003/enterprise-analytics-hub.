@@ -24,12 +24,16 @@ if ! gpgv --status-fd=1 --keyring "$KEYRING" "$SIG" "$SUMS" >"$status_file"; the
  echo "ERROR: checksum manifest signature verification failed" >&2
  exit 1
 fi
-mapfile -t valid_fingerprints < <(awk '$1=="[GNUPG:]" && $2=="VALIDSIG" {print toupper($3)}' "$status_file")
-if (( ${#valid_fingerprints[@]} != 1 )); then
- echo "ERROR: expected exactly one valid signature; found ${#valid_fingerprints[@]}" >&2
+mapfile -t valid_fingerprints < <(awk '$1=="[GNUPG:]" && $2=="VALIDSIG" {print toupper($3); if ($NF ~ /^([[:xdigit:]]{40}|[[:xdigit:]]{64})$/) print toupper($NF)}' "$status_file")
+if (( ${#valid_fingerprints[@]} < 1 )); then
+ echo "ERROR: signature verification produced no VALIDSIG status" >&2
  exit 1
 fi
-if [[ "${valid_fingerprints[0]}" != "$EXPECTED" ]]; then
+matches=0
+for fingerprint in "${valid_fingerprints[@]}"; do
+ [[ "$fingerprint" == "$EXPECTED" ]] && matches=1
+done
+if (( matches == 0 )); then
  echo "ERROR: signature is valid but signing-key fingerprint does not match the independently pinned fingerprint" >&2
  exit 1
 fi
