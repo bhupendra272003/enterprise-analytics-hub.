@@ -12,6 +12,19 @@ printf 'mock detached signature\n' > "$tmp/intake/SHA256SUMS.gpg"
 printf 'mock trusted keyring\n' > "$tmp/keyring.gpg"
 printf 'Source ISO: %s\nSource SHA256: %s\nPinned signing-key fingerprint: %s\n' "$(realpath "$tmp/source.iso")" "$(sha256sum "$tmp/source.iso" | awk '{print toupper($1)}')" "0123456789ABCDEF0123456789ABCDEF01234567" > "$tmp/intake/intake-evidence.txt"
 export VYRON_EXPECTED_SIGNING_FINGERPRINT="0123456789ABCDEF0123456789ABCDEF01234567"
+# A valid intake must be cryptographically rechecked before the privileged execution guard.
+mkdir -p "$tmp/mock-bin"
+cat > "$tmp/mock-bin/gpgv" <<'MOCK'
+#!/usr/bin/env bash
+printf '[GNUPG:] VALIDSIG 0123456789ABCDEF0123456789ABCDEF01234567 20261127 0 4 0 1 10 00 ABCDEF\\n'
+MOCK
+chmod +x "$tmp/mock-bin/gpgv"
+if PATH="$tmp/mock-bin:$PATH" bash "$SCRIPT" "$tmp/source.iso" "$tmp/verified-output.iso" "$tmp/actions.yaml" "$tmp/intake" "$tmp/keyring.gpg" >"$tmp/verified.log" 2>&1; then
+  echo 'ERROR: customization unexpectedly passed the root execution guard in CI' >&2; exit 1
+fi
+grep -q 'Signing-key fingerprint matches' "$tmp/verified.log"
+grep -q 'Checksum matches' "$tmp/verified.log"
+grep -q 'livefs-edit requires root' "$tmp/verified.log"
 for value in abc 0 -5 1.5; do
   if VYRON_CUSTOMIZE_MIN_FREE_GB="$value" bash "$SCRIPT" "$tmp/source.iso" "$tmp/output.iso" "$tmp/actions.yaml" "$tmp/intake" "$tmp/keyring.gpg" >"$tmp/out" 2>&1; then
     echo "ERROR: accepted invalid customization disk threshold: $value" >&2; exit 1
