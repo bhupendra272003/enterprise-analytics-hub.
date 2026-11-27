@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Apply baseline settings in the image chroot; policy validation runs before this hook.
+set -euo pipefail
+POLICY=/etc/vyron/security.conf
+install -d -m 0750 -o root -g vyron-users /etc/vyron
+# Copy the reviewed policy into the image for audit/reference.
+install -m 0640 -o root -g vyron-users "${POLICY_SOURCE:-/etc/vyron/security.conf}" "$POLICY" 2>/dev/null || true
+
+# UFW defaults and policy. Do not configure remote access rules by default.
+if command -v ufw >/dev/null 2>&1; then
+  ufw --force reset
+  ufw default deny incoming
+  ufw default allow outgoing
+  ufw --force enable || echo "WARNING: UFW activation deferred to first boot."
+fi
+
+# Ensure automatic security updates are configured.
+if [[ -f /etc/apt/apt.conf.d/50unattended-upgrades ]]; then
+  sed -i 's|//Unattended-Upgrade::Automatic-Reboot "false";|Unattended-Upgrade::Automatic-Reboot "false";|' /etc/apt/apt.conf.d/50unattended-upgrades
+fi
+cat > /etc/apt/apt.conf.d/20auto-upgrades <<'EOF'
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+EOF
+
+# Enable AppArmor and auditd where systemd service units exist.
+if command -v systemctl >/dev/null 2>&1; then
+  systemctl enable apparmor.service 2>/dev/null || echo "WARNING: AppArmor enable deferred."
+  systemctl enable auditd.service 2>/dev/null || echo "WARNING: auditd enable deferred."
+  systemctl enable ufw.service 2>/dev/null || echo "WARNING: UFW enable deferred."
+fi
+
+# Harden SSH root login if an SSH server is installed in this image.
+if [[ -d /etc/ssh/sshd_config.d ]]; then
+  cat > /etc/ssh/sshd_config.d/99-vyron-hardening.conf <<'EOF'
+PermitRootLogin no
+EOF
+fi
+
+echo "VyronOS baseline policy applied (image configuration; runtime verification required)."
