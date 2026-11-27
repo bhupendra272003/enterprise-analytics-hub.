@@ -10,6 +10,7 @@ REPORT="${2:-}"
 if [[ -n "$REPORT" ]]; then
  REPORT="$(realpath -m "$REPORT")"
  [[ "$REPORT" != "$ISO" ]] || { echo "ERROR: report path must differ from source ISO" >&2; exit 1; }
+ [[ ! -e "$REPORT" && ! -L "$REPORT" ]] || { echo "ERROR: report path already exists; refusing to overwrite" >&2; exit 1; }
  mkdir -p "$(dirname "$REPORT")"
 fi
 run_report(){
