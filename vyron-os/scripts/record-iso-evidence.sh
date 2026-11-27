@@ -16,7 +16,7 @@ if [[ -n "$SOURCE_ISO" ]]; then
   [[ -f "$SOURCE_ISO" && -r "$SOURCE_ISO" ]] || { echo "Source ISO must be readable." >&2; exit 1; }
   SOURCE_HASH="$(sha256sum "$SOURCE_ISO" | awk '{print $1}')"
 fi
-COMMIT="$(git -C "$(dirname "$0")/../../.." rev-parse HEAD 2>/dev/null || echo unknown)"
+COMMIT="$(git -C "$(dirname "$0")/../.." rev-parse HEAD 2>/dev/null || echo unknown)"
 HOST="$(uname -srm)"
 OS_NAME="unknown"
 if [[ -r /etc/os-release ]]; then OS_NAME="$(sed -n 's/^PRETTY_NAME=//p' /etc/os-release | head -n1 | tr -d '"' )"; fi
