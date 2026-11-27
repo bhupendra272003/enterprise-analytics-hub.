@@ -3,6 +3,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 echo "== VyronOS configuration validation =="
 bash "$ROOT/scripts/preflight.sh"
+bash "$ROOT/scripts/validate-security-config.sh"
 echo
 echo "Checking build host tools (informational; ISO builder installs these separately):"
 for tool in lb xorriso debootstrap mksquashfs grub-mkrescue; do
