@@ -10,6 +10,12 @@ grep -Fq 'getent passwd "$username"' "$helper"
 grep -Fq 'passwd "$username"' "$helper"
 grep -Fq 'assign-role.sh' "$helper"
 grep -Fq 'userdel' "$helper"
+grep -Fq 'trap cleanup ERR' "$helper"
+grep -Fq 'removing incomplete account' "$helper"
+# Password must be set before the role assignment; provisioning failure cleanup is armed.
+passwd_line="$(grep -n 'passwd "\\$username"' "$helper" | cut -d: -f1)"
+role_line="$(grep -n 'ROLE_HELPER.*username.*role' "$helper" | cut -d: -f1)"
+[[ -n "$passwd_line" && -n "$role_line" && "$passwd_line" -lt "$role_line" ]]
 grep -Fq 'Cancelled.' "$helper"
 if grep -Eq 'useradd[[:space:]].*(-p[[:space:]]|--password)|chpasswd' "$helper"; then
  echo "ERROR: unsafe password handling detected"; exit 1
