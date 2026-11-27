@@ -24,17 +24,17 @@ APT
 chmod +x "$mockbin/apt-cache"
 export PATH="$mockbin:$PATH" VYRON_OS_RELEASE_FILE="$tmp/os-release" VYRON_BUILD_DIR="$tmp"
 # Default threshold must accept 120 GiB.
-MOCK_FREE_KB=125829120 "$CHECK" > "$tmp/pass.log"
+MOCK_FREE_KB=125829120 bash "$CHECK" > "$tmp/pass.log"
 grep -q 'Builder-host preflight passed' "$tmp/pass.log"
 # Default threshold must reject 88 GiB.
-if MOCK_FREE_KB=92274688 "$CHECK" > "$tmp/low.log" 2>&1; then
+if MOCK_FREE_KB=92274688 bash "$CHECK" > "$tmp/low.log" 2>&1; then
   echo 'ERROR: builder check accepted 88 GiB with its 100 GiB default' >&2
   exit 1
 fi
 grep -q 'need at least 100 GiB' "$tmp/low.log"
 # A non-Ubuntu host must be rejected even when tools and disk are available.
 printf 'ID=debian\nVERSION_ID="12"\nPRETTY_NAME="Debian GNU/Linux 12"\n' > "$tmp/os-release"
-if MOCK_FREE_KB=125829120 "$CHECK" > "$tmp/os.log" 2>&1; then
+if MOCK_FREE_KB=125829120 bash "$CHECK" > "$tmp/os.log" 2>&1; then
   echo 'ERROR: builder check accepted a non-Ubuntu host' >&2
   exit 1
 fi
