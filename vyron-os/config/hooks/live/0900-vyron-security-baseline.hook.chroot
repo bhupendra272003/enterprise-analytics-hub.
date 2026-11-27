@@ -1,11 +1,6 @@
 #!/usr/bin/env bash
 # Apply baseline settings in the image chroot; policy validation runs before this hook.
 set -euo pipefail
-POLICY=/etc/vyron/security.conf
-install -d -m 0750 -o root -g vyron-users /etc/vyron
-# Copy the reviewed policy into the image for audit/reference.
-install -m 0640 -o root -g vyron-users "${POLICY_SOURCE:-/etc/vyron/security.conf}" "$POLICY" 2>/dev/null || true
-
 # UFW defaults and policy. Do not configure remote access rules by default.
 if command -v ufw >/dev/null 2>&1; then
   ufw --force reset
