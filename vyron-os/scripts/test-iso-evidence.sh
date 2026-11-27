@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
-set -x
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 printf 'test output image\\n' > "$tmp/output.iso"
@@ -9,6 +8,10 @@ bash "$ROOT/scripts/record-iso-evidence.sh" "$tmp/output.iso" "$tmp/evidence" "$
 for file in "$tmp/evidence/candidate-evidence.txt" "$tmp/evidence/output-sha256.txt"; do
   [[ -s "$file" ]] || { echo "ERROR: missing or empty evidence artifact: $file" >&2; exit 1; }
 done
+expected_hash="$(sha256sum "$tmp/output.iso" | awk '{print $1}')"
+read -r recorded_hash recorded_name < "$tmp/evidence/output-sha256.txt"
+[[ "$recorded_hash" == "$expected_hash" && "$recorded_name" == "output.iso" ]] || { echo "ERROR: checksum artifact does not match output ISO" >&2; exit 1; }
+[[ "$(tail -c 1 "$tmp/evidence/output-sha256.txt" | od -An -t x1 | tr -d ' \n')" == "0a" ]] || { echo "ERROR: checksum artifact lacks a final newline" >&2; exit 1; }
 grep -q 'Output SHA256:' "$tmp/evidence/candidate-evidence.txt" || { echo "ERROR: output hash absent from evidence record" >&2; exit 1; }
 grep -q 'Source SHA256:' "$tmp/evidence/candidate-evidence.txt" || { echo "ERROR: source hash absent from evidence record" >&2; exit 1; }
 grep -q 'does not certify' "$tmp/evidence/candidate-evidence.txt" || { echo "ERROR: evidence limitation disclaimer absent" >&2; exit 1; }
