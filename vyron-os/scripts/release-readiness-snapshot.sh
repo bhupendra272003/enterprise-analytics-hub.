@@ -6,9 +6,15 @@ BUILD_DIR="${VYRON_BUILD_DIR:-$PWD}"
 SOURCE_ISO="${VYRON_SOURCE_ISO:-}"
 checks=0; passed=0; blocked=0; warned=0
 report="${VYRON_READINESS_REPORT:-}"
-emit(){ printf '%s\n' "$*" ; if [[ -n "$report" ]]; then printf '%s\n' "$*" >> "$report"; fi; }
+report_tmp=""
+if [[ -n "$report" ]]; then
+ if [[ -L "$report" ]]; then echo "ERROR: refusing readiness report symlink: $report" >&2; exit 1; fi
+ mkdir -p "$(dirname "$report")"
+ report_tmp="$(mktemp "$(dirname "$report")/.readiness.XXXXXX")"
+ trap '[[ -z "$report_tmp" ]] || rm -f "$report_tmp"' EXIT
+fi
+emit(){ printf '%s\n' "$*" ; if [[ -n "$report_tmp" ]]; then printf '%s\n' "$*" >> "$report_tmp"; fi; }
 warn(){ warned=$((warned+1)); emit "WARN: $*"; }
-if [[ -n "$report" ]]; then mkdir -p "$(dirname "$report")"; : > "$report"; fi
 emit "VyronOS readiness snapshot (not release certification)"
 emit "Branch/commit context: $(git -C "$ROOT/.." rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown) / $(git -C "$ROOT/.." rev-parse HEAD 2>/dev/null || echo unknown)"
 for tool in sha256sum xorriso mksquashfs livefs-edit qemu-system-x86_64; do
@@ -26,4 +32,5 @@ if [[ -d "$BUILD_DIR" ]]; then
 else warn "Build directory absent; storage test skipped."; fi
 emit "Summary: checks=$checks passed=$passed blocked=$blocked warnings=$warned"
 emit "This snapshot cannot prove source authenticity, ISO bootability, installer operation, or VM validation."
+if [[ -n "$report_tmp" ]]; then mv -f -- "$report_tmp" "$report"; report_tmp=""; fi
 (( blocked == 0 )) || exit 1
