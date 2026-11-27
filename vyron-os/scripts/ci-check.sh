@@ -6,6 +6,7 @@ bash "$ROOT/scripts/preflight.sh"
 bash "$ROOT/scripts/validate-security-config.sh"
 bash "$ROOT/scripts/test-security-config.sh"
 bash "$ROOT/scripts/test-security-hook.sh"
+bash "$ROOT/scripts/test-source-integrity.sh"
 for script in "$ROOT"/scripts/*.sh; do bash -n "$script"; done
 for hook in "$ROOT"/config/hooks/live/*.hook.chroot; do bash -n "$hook"; done
 if command -v xmllint >/dev/null 2>&1; then
