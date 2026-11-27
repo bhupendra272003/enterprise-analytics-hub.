@@ -50,8 +50,6 @@ while IFS= read -r raw || [[ -n "$raw" ]]; do
 done < "$ROOT/config/packages.list"
 echo "No candidate/unknown: $missing; invalid names: $invalid (advisory)"
 (( invalid == 0 )) || exit 1
-echo "CI structural checks passed (not an ISO build or boot test)."
-
 # Smoke-test checksum helper against a temporary fixture (no real ISO required).
 helper="$ROOT/scripts/verify-iso-checksum.sh"
 tmpdir="$(mktemp -d)"
@@ -71,3 +69,5 @@ bash "$ROOT/scripts/test-assign-role.sh"
 
 # Local groups hook idempotency and expected-directory command tests (mocked).
 bash "$ROOT/scripts/test-local-groups-hook.sh"
+
+echo "All CI structural and smoke checks passed (not an ISO build or boot test)."
