@@ -8,7 +8,7 @@ cat > "$tmp/bin/xorriso" <<'MOCK'
 printf 'xorriso args:'; printf ' <%s>' "$@"; printf '\n'
 case " $* " in
  *" -report_el_torito plain "*) echo 'El Torito boot catalog: present';;
- *" -ls /casper "*) [[ "${VYRON_TEST_FAIL_CASPER:-0}" != 1 ]] || exit 17; echo 'filesystem.squashfs'; echo 'vmlinuz'; echo 'initrd';
+ *" -ls /casper "*) [[ "${VYRON_TEST_FAIL_CASPER:-0}" != 1 ]] || exit 17; echo 'filesystem.squashfs'; echo 'vmlinuz'; echo 'initrd';;
  *" -ls / "*) echo 'casper'; echo 'boot';;
  *) exit 9;;
 esac
