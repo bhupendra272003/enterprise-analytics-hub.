@@ -2,13 +2,13 @@
 # Validate security.conf as data (never source/evaluate it).
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-file="$ROOT/config/security.conf"
+file="${1:-$ROOT/config/security.conf}"
 [[ -r "$file" ]] || { echo "Missing security policy file" >&2; exit 1; }
 declare -A values
 while IFS= read -r line || [[ -n "$line" ]]; do
  line="${line%%#*}"
  [[ "$line" =~ ^[[:space:]]*$ ]] && continue
- if [[ "$line" =~ ^[[:space:]]*([A-Z][A-Z0-9_]*)[[:space:]]*=[[:space:]]*"(true|false|deny|allow|ufw)"[[:space:]]*$ ]]; then
+ if [[ "$line" =~ ^[[:space:]]*([A-Z][A-Z0-9_]*)[[:space:]]*=[[:space:]]*\"(true|false|deny|allow|ufw)\"[[:space:]]*$ ]]; then
   key="${BASH_REMATCH[1]}"; val="${BASH_REMATCH[2]}"
   [[ -z "${values[$key]+x}" ]] || { echo "Duplicate key: $key" >&2; exit 1; }
   values["$key"]="$val"
