@@ -39,4 +39,10 @@ if MOCK_FREE_KB=125829120 bash "$CHECK" > "$tmp/os.log" 2>&1; then
   exit 1
 fi
 grep -q 'Ubuntu build host required' "$tmp/os.log"
+# Invalid threshold input must fail clearly rather than reaching shell arithmetic.
+if VYRON_MIN_FREE_GB=abc bash "$CHECK" > "$tmp/invalid.log" 2>&1; then
+  echo 'ERROR: builder check accepted a non-numeric disk threshold' >&2
+  exit 1
+fi
+grep -q 'must be a positive whole number' "$tmp/invalid.log"
 echo 'Builder-host check tests passed (100 GiB default, low-space rejection, OS rejection).'
