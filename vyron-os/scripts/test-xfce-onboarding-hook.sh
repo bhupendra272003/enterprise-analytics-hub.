@@ -19,8 +19,15 @@ from pathlib import Path
 root=Path(sys.argv[1])
 ET.parse(root/'desktop/branding/wallpaper.svg')
 hook=(root/'config/hooks/live/1100-vyron-xfce-onboarding.hook.chroot').read_text()
+xml=hook.split("cat > /etc/xdg/xfce4/xfconf/xfconf-perchannel-xml/xfce4-desktop.xml <<'XML'\n",1)
+# Validate the embedded desktop XML at the actual hook target path.
 xml=hook.split("cat > /etc/xdg/xfce4/xfconf/xfce-perchannel-xml/xfce4-desktop.xml <<'XML'\n",1)[1].split('\nXML\n',1)[0]
 ET.fromstring(xml)
-print("XFCE wallpaper SVG and embedded XML validated.")
+theme=(root/'desktop/xfce/desktop-theme.conf').read_text()
+assert 'WALLPAPER=/usr/share/backgrounds/vyron/wallpaper.svg' in theme, 'theme reference must match installed wallpaper'
+assert 'WALLPAPER=desktop/branding/wallpaper.jpg' not in theme, 'obsolete wallpaper reference'
+assert 'ICON_THEME=Papirus-Dark' in theme
+assert 'GTK_THEME=Adwaita-dark' in theme
+print('XFCE wallpaper SVG, embedded XML and theme reference validated.')
 PY
 echo "XFCE onboarding hook static checks passed."
