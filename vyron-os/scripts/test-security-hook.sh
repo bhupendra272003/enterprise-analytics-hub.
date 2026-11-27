@@ -9,6 +9,13 @@ if grep -Eq 'ufw[[:space:]]+--force[[:space:]]+enable|ufw[[:space:]]+enable' "$H
 fi
 grep -q 'ufw default deny incoming' "$HOOK"
 grep -q 'ufw default allow outgoing' "$HOOK"
+# Ensure ENABLED=yes is handled when the UFW config key/file is missing.
+grep -q "^    else$" "$HOOK"
+grep -q "printf '\\\\nENABLED=yes\\\\n' >> /etc/ufw/ufw.conf" "$HOOK"
+grep -q "printf 'ENABLED=yes\\\\n' > /etc/ufw/ufw.conf" "$HOOK"
+if grep -q 'ufw --force reset' "$HOOK"; then
+ echo "ERROR: destructive UFW reset found in image hook"; exit 1
+fi
 grep -q 'APT::Periodic::Unattended-Upgrade "1"' "$HOOK"
 grep -q 'PermitRootLogin no' "$HOOK"
 echo "Security hook static regression checks passed."
