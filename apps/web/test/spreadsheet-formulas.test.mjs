@@ -73,3 +73,23 @@ test("COUNTIF and COUNTIFS count matched blank cells", () => {
   assert.equal(blankCalc('=COUNTIF(A2:A4,"North")'), "2");
   assert.equal(blankCalc('=COUNTIFS(A2:A4,"",B2:B4,">0")'), "1");
 });
+
+
+
+test("supports bounded exact-match lookup and INDEX/MATCH formulas", () => {
+  assert.equal(calc('=VLOOKUP("South",A2:B5,2,FALSE)'), "200");
+  assert.equal(calc('=VLOOKUP("West",A2:B5,2,0)'), "50");
+  assert.equal(calc('=INDEX(B2:B5,3)'), "300");
+  assert.equal(calc('=INDEX(A2:B5,2,2)'), "200");
+  assert.equal(calc('=MATCH("West",A2:A5,0)'), "4");
+  assert.equal(calc('=XLOOKUP("South",A2:A5,B2:B5,"not found")'), "200");
+  assert.equal(calc('=XLOOKUP("Missing",A2:A5,B2:B5,"not found")'), "not found");
+  assert.equal(calc('=XLOOKUP("North",A2:A5,B2:B5,"not found",0,-1)'), "300");
+});
+
+test("lookup functions reject approximate matching and mismatched ranges", () => {
+  assert.throws(() => calc('=VLOOKUP("South",A2:B5,2,TRUE)'), /exact matches only/);
+  assert.throws(() => calc('=XLOOKUP("North",A2:A5,B2:B4)'), /same number of cells/);
+  assert.throws(() => calc('=MATCH("North",A2:A5,1)'), /exact match type 0/);
+  assert.throws(() => calc('=INDEX(B2:B5,99)'), /outside/);
+});

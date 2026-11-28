@@ -25,17 +25,20 @@ function columnIndex(letters: string): number {
   return value - 1;
 }
 
-function readRange(reference: string, rows: SpreadsheetRow[], columns: string[]): unknown[] {
+function readMatrix(reference: string, rows: SpreadsheetRow[], columns: string[]): unknown[][] {
   const match = reference.trim().toUpperCase().match(/^\$?([A-Z]{1,3})\$?(\d+)(?::\$?([A-Z]{1,3})\$?(\d+))?$/);
   if (!match) throw new Error("Use a cell or range such as A2:A51.");
   const firstCol = columnIndex(match[1]), lastCol = match[3] ? columnIndex(match[3]) : firstCol;
   const firstRow = Number(match[2]) - 2, lastRow = match[4] ? Number(match[4]) - 2 : firstRow;
-  if (firstCol < 0 || lastCol >= columns.length || firstRow < 0 || lastRow < firstRow || lastRow >= rows.length) {
+  if (firstCol < 0 || lastCol >= columns.length || firstRow < 0 || lastRow < firstRow || lastRow >= rows.length || lastCol < firstCol) {
     throw new Error("The formula range must stay inside the currently visible page (maximum 50 data rows).");
   }
-  const values: unknown[] = [];
-  for (let r = firstRow; r <= lastRow; r++) for (let c = firstCol; c <= lastCol; c++) values.push(rows[r]?.[columns[c]]);
-  return values;
+  return Array.from({length:lastRow-firstRow+1},(_,r)=>
+    Array.from({length:lastCol-firstCol+1},(_,c)=>rows[firstRow+r]?.[columns[firstCol+c]])
+  );
+}
+function readRange(reference: string, rows: SpreadsheetRow[], columns: string[]): unknown[] {
+  return readMatrix(reference,rows,columns).flat();
 }
 
 function numeric(values: unknown[]): number[] {
@@ -149,6 +152,52 @@ export function evaluateSpreadsheetFormula(formula: string, rows: SpreadsheetRow
     const scaled = value * factor;
     const rounded = name === "ROUNDUP" ? Math.sign(scaled) * Math.ceil(Math.abs(scaled)) : name === "ROUNDDOWN" ? Math.trunc(scaled) : Math.round(scaled + Number.EPSILON);
     return String(rounded / factor);
+  }
+  if (["VLOOKUP","XLOOKUP","INDEX","MATCH"].includes(name)) {
+    const exact = (a: unknown, b: unknown) => String(a ?? "").toLocaleLowerCase() === String(b ?? "").toLocaleLowerCase();
+    const matrix = (arg: string) => readMatrix(arg, rows, columns);
+    const oneDimensional = (arg: string, fn: string) => {
+      const values = matrix(arg);
+      if (values.length !== 1 && values.some(row => row.length !== 1)) throw new Error(fn + " lookup arrays must be a single row or column.");
+      return values.flat();
+    };
+    if (name === "VLOOKUP") {
+      if (args.length < 3 || args.length > 4) throw new Error("VLOOKUP expects lookup value, table range, column index and optional exact-match flag.");
+      const lookup = scalar(args[0]), table = matrix(args[1]), index = Number(scalar(args[2]));
+      const exactFlag = args[3] ? scalar(args[3]) : false;
+      if (exactFlag !== false && exactFlag !== 0) throw new Error("VYRON VLOOKUP supports exact matches only (FALSE or 0).");
+      if (!Number.isInteger(index) || index < 1 || index > (table[0]?.length||0)) throw new Error("VLOOKUP column index is outside the selected table.");
+      const row = table.find(r=>exact(r[0],lookup));
+      if (!row) throw new Error("VLOOKUP did not find the requested value.");
+      return String(row[index-1] ?? "");
+    }
+    if (name === "XLOOKUP") {
+      if (args.length < 3 || args.length > 6) throw new Error("XLOOKUP expects lookup value, lookup range, return range and optional not-found, match-mode and search-mode arguments.");
+      const lookup = scalar(args[0]), lookupValues = oneDimensional(args[1],"XLOOKUP"), returnValues = oneDimensional(args[2],"XLOOKUP");
+      if (lookupValues.length !== returnValues.length) throw new Error("XLOOKUP lookup and return ranges must contain the same number of cells.");
+      const notFound = args[3] ? scalar(args[3]) : undefined, matchMode = args[4] ? Number(scalar(args[4])) : 0, searchMode = args[5] ? Number(scalar(args[5])) : 1;
+      if (matchMode !== 0) throw new Error("XLOOKUP supports exact-match mode 0 only.");
+      if (searchMode !== 1 && searchMode !== -1) throw new Error("XLOOKUP search mode must be 1 (first-to-last) or -1 (last-to-first).");
+      const indices = Array.from({length:lookupValues.length},(_,i)=>i);
+      if (searchMode === -1) indices.reverse();
+      const found = indices.find(i=>exact(lookupValues[i],lookup));
+      if (found === undefined) { if (args[3]) return String(notFound ?? ""); throw new Error("XLOOKUP did not find the requested value."); }
+      return String(returnValues[found] ?? "");
+    }
+    if (name === "INDEX") {
+      if (args.length < 2 || args.length > 3) throw new Error("INDEX expects an array, row number and optional column number.");
+      const values = matrix(args[0]), rowIndex = Number(scalar(args[1])), column = args[2] ? Number(scalar(args[2])) : 1;
+      if (!Number.isInteger(rowIndex)||rowIndex<1||rowIndex>values.length||!Number.isInteger(column)||column<1||column>(values[rowIndex-1]?.length||0)) throw new Error("INDEX row or column is outside the selected array.");
+      return String(values[rowIndex-1][column-1] ?? "");
+    }
+    if (name === "MATCH") {
+      if (args.length < 2 || args.length > 3) throw new Error("MATCH expects lookup value, lookup range and optional match type.");
+      const lookup=scalar(args[0]), values=oneDimensional(args[1],"MATCH"), mode=args[2]?Number(scalar(args[2])):0;
+      if(mode!==0)throw new Error("MATCH supports exact match type 0 only.");
+      const found=values.findIndex(v=>exact(v,lookup));
+      if(found<0)throw new Error("MATCH did not find the requested value.");
+      return String(found+1);
+    }
   }
   if (["SUMIFS","COUNTIFS","AVERAGEIFS"].includes(name)) {
     if (name === "COUNTIFS" ? args.length < 2 || args.length % 2 !== 0 : args.length < 3 || args.length % 2 !== 1) throw new Error(name + " expects criteria range/criteria pairs and a target range where required.");
