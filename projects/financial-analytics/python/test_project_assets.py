@@ -141,8 +141,8 @@ class FinancialProjectAssetTests(unittest.TestCase):
                 "row_count": len(rows),
                 "column_count": len(columns),
                 "columns": columns,
-                "byte_size": (export_dir / f\"{table}.csv\").stat().st_size,
-                "sha256": hashlib.sha256((export_dir / f\"{table}.csv\").read_bytes()).hexdigest(),
+                "byte_size": (export_dir / f"{table}.csv").stat().st_size,
+                "sha256": hashlib.sha256((export_dir / f"{table}.csv").read_bytes()).hexdigest(),
             }
         (export_dir / "manifest.json").write_text(
             json.dumps(manifest), encoding="utf-8"
