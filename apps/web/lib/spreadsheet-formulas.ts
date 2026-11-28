@@ -71,7 +71,7 @@ export function evaluateSpreadsheetFormula(formula: string, rows: SpreadsheetRow
   const source = formula.trim();
   if (!source.startsWith("=")) throw new Error("Start a formula with =, for example =SUM(B2:B51).");
   const match = source.slice(1).match(/^([A-Z]+)\((.*)\)$/i);
-  if (!match) throw new Error("Supported formulas: SUM, AVERAGE, COUNT, COUNTA, MIN, MAX, SUMIF, COUNTIF and AVERAGEIF.");
+  if (!match) throw new Error("Supported formulas: SUM, AVERAGE, COUNT, COUNTA, COUNTBLANK, MIN, MAX, SUMIF, COUNTIF, AVERAGEIF, SUMIFS, COUNTIFS, AVERAGEIFS, VLOOKUP, XLOOKUP, INDEX and MATCH, plus text and numeric functions.");
   const name = match[1].toUpperCase(), args = splitArgs(match[2]);
   const range = (arg: string) => readRange(arg, rows, columns);
   const scalar = (arg: string): unknown => {
